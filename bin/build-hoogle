@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+rm -rf tmp/doc
+
+pushd vendor/plutus
+  cabal haddock all --haddock-hoogle --haddock-html --haddock-quickjump
+popd
+
+for file in $(find ./vendor/plutus/dist-newstyle/build/ -name "*.txt"); do
+  cp -r $(dirname $file) tmp/doc
+done
+
+hoogle generate --database=tmp/doc/plutus.hoo --local=./tmp/doc
