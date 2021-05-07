@@ -17,7 +17,7 @@ nix-shell
 bin/build-hoogle
 ```
 
-Start [http://localhost:8080/](plutus hoogle):
+Start [plutus hoogle](http://localhost:8080/):
 ```
 nix-shell
 bin/start-hoogle
