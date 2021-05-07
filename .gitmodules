@@ -1,0 +1,3 @@
+[submodule "vendor/plutus"]
+	path = vendor/plutus
+	url = git@github.com:input-output-hk/plutus.git
