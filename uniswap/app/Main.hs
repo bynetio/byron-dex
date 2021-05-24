@@ -34,23 +34,24 @@ main = runEmulatorTraceIO' def emulatorCfg myTrace
 myTrace :: EmulatorTrace ()
 myTrace = do
 	h1 <- activateContractWallet (Wallet 1) ownerEndpoint
+        void $ callEndpoint @"start" h1 ()
         Extras.logInfo @String "przed"
-        void $ waitNSlots 3
+        void $ waitNSlots 10
         Extras.logInfo @String "miedzy"
-        maybePool <-  observableState h1
+        maybePool <- getLast <$> observableState h1
         Extras.logInfo @String (show maybePool)
---        case maybePool of
---	  Just (Right pool) -> userTrace pool
---          _ -> return ()
+        case maybePool of
+	  Just (Right pool) -> userTrace pool
+          _                 -> return ()
         void $ waitNSlots 1
 
 
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
---        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
---        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
---        void $ callEndpoint @"create" h2 (CreateParams (Coin $ Value.assetClass customSymbol customToken) (Coin $ Value.assetClass "" "") 1000 1000)
+        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
+        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
+        void $ callEndpoint @"create" h2 (CreateParams (Coin $ Value.assetClass customSymbol customToken) (Coin $ Value.assetClass "" "") 1000 1000)
         return ()
 
 myReverse :: [a] -> [a]

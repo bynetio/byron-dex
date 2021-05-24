@@ -27,13 +27,13 @@ module Uniswap.OffChain
     , start, create, add, remove, close, swap, pools
     , ownerEndpoint, userEndpoints
     ) where
-
 import           Control.Monad             hiding (fmap)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
 import           Data.Proxy                (Proxy (..))
 import           Data.Text                 (Text, pack)
 import           Data.Void                 (Void)
+import           Debug.Trace
 import           Ledger                    hiding (singleton)
 import           Ledger.Constraints        as Constraints
 import qualified Ledger.Typed.Scripts      as Scripts
@@ -69,6 +69,7 @@ type UniswapUserSchema =
         .\/ Endpoint "pools"  ()
         .\/ Endpoint "funds"  ()
         .\/ Endpoint "stop"   ()
+
 
 -- | Type of the Uniswap user contract state.
 data UserContractState =
@@ -488,12 +489,18 @@ findSwapB oldA oldB inB = findSwapA (switch oldB) (switch oldA) (switch inB)
   where
     switch = Amount . unAmount
 
-ownerEndpoint :: Contract (Last (Either Text Uniswap)) BlockchainActions Void ()
-ownerEndpoint = do
-    e <- runError start
-    tell $ Last $ Just $ case e of
-        Left err -> Left err
-        Right us -> Right us
+ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+ownerEndpoint = (startHandler) >> ownerEndpoint
+    where
+
+      startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+      startHandler = do
+    	   e <- runError $ do
+		  endpoint @"start"
+                  start
+    	   tell $ Last $ Just $ case e of
+            Left err -> Left err
+            Right us -> Right us
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
