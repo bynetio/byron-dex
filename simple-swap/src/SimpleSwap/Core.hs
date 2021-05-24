@@ -112,7 +112,7 @@ mkOracleValidator oracle x r ctx =
     feesPaid :: Bool
     feesPaid =
       let
-        inVal  = txOutValue ownInput
+        inVal  = txaaOutValue ownInput
         outVal = txOutValue ownOutput
       in
         outVal `geq` (inVal <> Ada.lovelaceValueOf (oFee oracle))
