@@ -411,13 +411,14 @@ indirectSwap us IndirectSwapParams{..} = do
             in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
     let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
     let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
-    logInfo @String (show paths)
+    let ispAmount = if ispAmountA > 0 then unAmount ispAmountA else unAmount ispAmountB
     path <- maybe (throwError $ pack $ show paths) pure $ if ispAmountA > 0 then
-              findBestSwapA abstractPools (unAmount ispAmountA) paths
+              findBestSwapA abstractPools ispAmount paths
             else
-              reverse <$> findBestSwapB abstractPools (unAmount ispAmountB) paths
+              reverse <$> findBestSwapB abstractPools ispAmount paths
+    logInfo @String (show path)
     let findSwap = if ispAmountA > 0 then findSwapA else \a b c -> findSwapB a b (Amount $ unAmount c)
-    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools in (Amount $ findSwap (Amount a') (Amount b') amount)) ispAmountA path
+    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools in (Amount $ findSwap (Amount a') (Amount b') amount)) (Amount ispAmount) path
     logInfo @[(String,String,Integer)] (map (\((a,b),amount) -> (show a, show b, unAmount amount)) moneyToPay)
     pkh <- pubKeyHash <$> ownPubKey
 

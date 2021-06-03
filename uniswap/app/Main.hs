@@ -61,13 +61,13 @@ myTrace = do
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
         h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
-        h11 <- activateContractWallet (Wallet 11) $ userEndpoints pool
+        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
         h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
         void $ callEndpoint @"create" h2 (CreateParams customCoin customCoin2  1000 1000)
         void $ waitNSlots 10
         void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin3  1000 1000)
         void $ waitNSlots 10
-        void $ callEndpoint @"iSwap" h11 (IndirectSwapParams customCoin customCoin3 500 0)
+        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin customCoin3 0 500)
         void $ waitNSlots 100
         -- void $ callEndpoint @"add" h4 (AddParams customCoin customCoin2 1000 1000)
         -- void $ waitNSlots 10
