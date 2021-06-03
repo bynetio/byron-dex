@@ -19,6 +19,7 @@ module Uniswap.OffChain
     ( poolStateCoinFromUniswapCurrency, liquidityCoin
     , CreateParams (..)
     , SwapParams (..)
+    , IndirectSwapParams (..)
     , CloseParams (..)
     , RemoveParams (..)
     , AddParams (..)
@@ -27,7 +28,7 @@ module Uniswap.OffChain
     , start, create, add, remove, close, swap, pools
     , ownerEndpoint, userEndpoints
     ) where
-import           Control.Monad             hiding (fmap)
+import           Control.Monad             hiding (fmap, mapM)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
 import           Data.Proxy                (Proxy (..))
@@ -44,11 +45,13 @@ import qualified PlutusTx
 import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
 import           Prelude                   (Semigroup (..))
 import           Text.Printf               (printf)
+import           Uniswap.IndirectSwaps
 import           Uniswap.OnChain           (mkUniswapValidator,
                                             validateLiquidityForging)
 import           Uniswap.Pool
 import           Uniswap.Types
 
+import           Data.List                 (nubBy)
 data Uniswapping
 instance Scripts.ScriptType Uniswapping where
     type instance RedeemerType Uniswapping = UniswapAction
@@ -63,6 +66,7 @@ type UniswapUserSchema =
     BlockchainActions
         .\/ Endpoint "create" CreateParams
         .\/ Endpoint "swap"   SwapParams
+        .\/ Endpoint "iSwap"  IndirectSwapParams
         .\/ Endpoint "close"  CloseParams
         .\/ Endpoint "remove" RemoveParams
         .\/ Endpoint "add"    AddParams
@@ -77,6 +81,7 @@ data UserContractState =
     | Funds Value
     | Created
     | Swapped
+    | ISwapped
     | Added
     | Removed
     | Closed
@@ -149,6 +154,15 @@ data SwapParams = SwapParams
     , spAmountA :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
     , spAmountB :: Amount B       -- ^ The amount of the second 'Coin' that should be swapped.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+
+data IndirectSwapParams = IndirectSwapParams
+    { ispCoinA   :: Coin A         -- ^ One 'Coin' of the liquidity pair.
+    , ispCoinB   :: Coin B         -- ^ The other 'Coin'.
+    , ispAmountA :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    , ispAmountB :: Amount B       -- ^ The amount of the second 'Coin' that should be swapped.
+    } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
@@ -294,6 +308,7 @@ add :: HasBlockchainActions s => Uniswap -> AddParams -> Contract w s Text ()
 add us AddParams{..} = do
     pkh                           <- pubKeyHash <$> ownPubKey
     (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us apCoinA apCoinB
+    logInfo @String $ printf "old liquidity = %d" $ unAmount liquidity
     when (apAmountA < 0 || apAmountB < 0) $ throwError "amounts must not be negative"
     let outVal = txOutValue $ txOutTxOut o
         oldA   = amountOf outVal apCoinA
@@ -334,6 +349,14 @@ add us AddParams{..} = do
 
     logInfo $ "added liquidity to pool: " ++ show lp
 
+
+
+
+
+
+
+
+
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
 swap :: HasBlockchainActions s => Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams{..} = do
@@ -362,7 +385,7 @@ swap us SwapParams{..} = do
                   Constraints.unspentOutputs (Map.singleton oref o)      <>
                   Constraints.ownPubKeyHash pkh
 
-        tx      = mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
+        tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
                   Constraints.mustPayToTheScript (Pool lp liquidity) val
 
     logInfo $ show tx
@@ -370,6 +393,67 @@ swap us SwapParams{..} = do
     logInfo $ show ledgerTx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo $ "swapped with: " ++ show lp
+
+
+
+
+
+indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
+indirectSwap us IndirectSwapParams{..} = do
+    unless (ispAmountA > 0 && ispAmountB == 0 || ispAmountA == 0 && ispAmountB > 0) $ throwError "exactly one amount must be positive"
+    (oref, o, allPools) <- findUniswapFactory us
+    let outVal = txOutValue $ txOutTxOut o
+
+    let paths = findPaths (unCoin ispCoinA, unCoin ispCoinB) (map (\LiquidityPool{..} -> (unCoin lpCoinA, unCoin lpCoinB)) allPools)
+    relevantPools <- (mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp))) $ (map (\(a,b) -> LiquidityPool (Coin a) (Coin b))) $ concat paths
+    let abstractPools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
+            let pOutVal = txOutValue $ txOutTxOut pO
+            in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
+    let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
+    let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
+    logInfo @String (show paths)
+    path <- maybe (throwError $ pack $ show paths) pure $ if ispAmountA > 0 then
+              findBestSwapA abstractPools (unAmount ispAmountA) paths
+            else
+              reverse <$> findBestSwapB abstractPools (unAmount ispAmountB) paths
+    let findSwap = if ispAmountA > 0 then findSwapA else \a b c -> findSwapB a b (Amount $ unAmount c)
+    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools in (Amount $ findSwap (Amount a') (Amount b') amount)) ispAmountA path
+    logInfo @[(String,String,Integer)] (map (\((a,b),amount) -> (show a, show b, unAmount amount)) moneyToPay)
+    pkh <- pubKeyHash <$> ownPubKey
+
+    --logInfo @String $ printf "oldA = %d, oldB = %d, old product = %d, newA = %d, newB = %d, new product = %d" oldA oldB (unAmount oldA * unAmount oldB) newA newB (unAmount newA * unAmount newB)
+
+    let inst    = uniswapInstance us
+
+        lookups = Constraints.scriptInstanceLookups inst                 <>
+                  Constraints.otherScript (Scripts.validatorScript inst) <>
+                  Constraints.unspentOutputs (Map.fromList $ map (\((oref,o,_),_) -> (oref,o)) relevantPools)      <>
+                  Constraints.ownPubKeyHash pkh
+
+        tx      = mconcat $ map (\((a,b),amount) ->
+                                    let Just (oref,_) = Map.lookup (a,b) orefs
+                                        Just (pool, liquidity) = Map.lookup (a,b) pools
+                                        Just (oldA,oldB) = Map.lookup (a,b) abstractPools
+                                        (newA,newB) = if ispAmountA > 0 then (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount) else (oldA - findSwap (Amount oldA) (Amount oldB) amount, oldB+ unAmount amount)
+                                        val = valueOf (Coin a) (Amount newA) <> valueOf (Coin b) (Amount newB) <> unitValue (poolStateCoin us)
+                                    in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
+                                       Constraints.mustPayToTheScript (Pool pool liquidity) val
+
+                 ) moneyToPay
+
+        --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
+        --           Constraints.mustPayToTheScript (Pool lp liquidity) val
+
+    logInfo $ show tx
+    ledgerTx <- submitTxConstraintsWith lookups tx
+    logInfo $ show ledgerTx
+    void $ awaitTxConfirmed $ txId ledgerTx
+
+
+
+
+
+
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
@@ -464,30 +548,7 @@ findUniswapFactoryAndPool us coinA coinB = do
                    )
         _    -> throwError "liquidity pool not found"
 
-findSwapA :: Amount A -> Amount B -> Amount A -> Integer
-findSwapA oldA oldB inA
-    | ub' <= 1   = 0
-    | otherwise  = go 1 ub'
-  where
-    cs :: Integer -> Bool
-    cs outB = checkSwap oldA oldB (oldA + inA) (oldB - Amount outB)
 
-    ub' :: Integer
-    ub' = head $ dropWhile cs [2 ^ i | i <- [0 :: Int ..]]
-
-    go :: Integer -> Integer -> Integer
-    go lb ub
-        | ub == (lb + 1) = lb
-        | otherwise      =
-      let
-        m = div (ub + lb) 2
-      in
-        if cs m then go m ub else go lb m
-
-findSwapB :: Amount A -> Amount B -> Amount B -> Integer
-findSwapB oldA oldB inB = findSwapA (switch oldB) (switch oldA) (switch inB)
-  where
-    switch = Amount . unAmount
 
 ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
 ownerEndpoint = (startHandler) >> ownerEndpoint
@@ -518,6 +579,7 @@ userEndpoints us =
         `select`
     ((f (Proxy @"create") (const Created) create                 `select`
       f (Proxy @"swap")   (const Swapped) swap                   `select`
+      f (Proxy @"iSwap")  (const ISwapped) indirectSwap          `select`
       f (Proxy @"close")  (const Closed)  close                  `select`
       f (Proxy @"remove") (const Removed) remove                 `select`
       f (Proxy @"add")    (const Added)   add                    `select`

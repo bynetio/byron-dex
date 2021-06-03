@@ -119,13 +119,14 @@ instance Eq LiquidityPool where
               -- Make sure the underlying coins aren't equal.
              (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y))
 
-data UniswapAction = Create LiquidityPool | Close | Swap | Remove | Add
+data UniswapAction = Create LiquidityPool | Close | Swap | ISwap | Remove | Add
     deriving Show
 PlutusTx.makeIsDataIndexed ''UniswapAction [ ('Create , 0)
                                            , ('Close,   1)
                                            , ('Swap,    2)
-                                           , ('Remove,  3)
-                                           , ('Add,     4)
+                                           , ('ISwap,   3)
+                                           , ('Remove,  4)
+                                           , ('Add,     5)
                                            ]
 PlutusTx.makeLift ''UniswapAction
 
