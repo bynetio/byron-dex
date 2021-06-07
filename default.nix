@@ -71,30 +71,6 @@ let
     terraform
     z3
     zlib
-
-    haskellPackages.hasktags
-    haskellPackages.hoogle
-    haskellPackages.implicit-hie
-    ((vim_configurable.override { python = python3; }).customize {
-      name = "vim";
-      vimrcConfig.customRC = "source $HOME/.vimrc";
-      vimrcConfig.packages.myVimPackage = with pkgs.vimPlugins; {
-        start = [
-          coc-nvim
-          fzf-vim
-          fzfWrapper
-          haskell-vim
-          nerdtree
-          syntastic
-          tabular
-          ultisnips
-          vim-airline
-          vim-airline-themes
-          vim-fugitive
-          vim-gitgutter
-        ];
-      };
-    })
   ] ++ (lib.optionals (!stdenv.isDarwin) [ rPackages.plotly R ]));
 
   # local build inputs ( -> ./nix/pkgs/default.nix )
@@ -124,11 +100,35 @@ let
     docs.build-and-serve-docs
   ]);
 
+  devInputs = (with pkgs; [
+    haskellPackages.hoogle
+    haskellPackages.hasktags
+    haskellPackages.implicit-hie
+    ((vim_configurable.override { python = python3; }).customize {
+      name = "vim";
+      vimrcConfig.customRC = "source $HOME/.vimrc";
+      vimrcConfig.packages.myVimPackage = with pkgs.vimPlugins; {
+        start = [
+          coc-nvim
+          fzf-vim
+          fzfWrapper
+          haskell-vim
+          nerdtree
+          syntastic
+          tabular
+          ultisnips
+          vim-airline
+          vim-airline-themes
+          vim-fugitive
+          vim-gitgutter
+        ];
+      };
+    })
+  ]);
+
 in
 haskell.project.shellFor {
-  nativeBuildInputs = nixpkgsInputs ++ localInputs ++ [ agdaWithStdlib sphinxTools ];
-  # We don't currently use this, and it's a pain to materialize, and otherwise
-  # costs a fair bit of eval time.
+  nativeBuildInputs = nixpkgsInputs ++ localInputs ++ devInputs ++ [ agdaWithStdlib sphinxTools ];
   withHoogle = false;
 
   shellHook = ''

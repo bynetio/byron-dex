@@ -1,0 +1,6 @@
+version: "3.8"
+services:
+  web: &base
+    image: "uniswap-json-api-image:latest"
+    ports:
+      - '8080:8080'
