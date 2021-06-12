@@ -1,0 +1,8 @@
+cradle:
+  cabal:
+    - path: "./app"
+      component: "exe:uniswap-json-api"
+    - path: "./src"
+      component: "lib:uniswap-json-api"
+    - path: "./test"
+      component: "test:uniswap-json-api-spec"
