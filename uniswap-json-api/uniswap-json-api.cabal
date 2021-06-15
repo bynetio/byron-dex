@@ -8,11 +8,15 @@ library
   hs-source-dirs:     src
   exposed-modules:    UniswapJsonApi
                     , UniswapJsonApi.Logic
+                    , UniswapJsonApi.Client
                     , UniswapJsonApi.Model
   build-depends:      base
                     , aeson
+                    , http-client
+                    , http-client-tls
                     , mtl
                     , servant
+                    , servant-client
                     , servant-server
                     , text
                     , warp
@@ -34,6 +38,7 @@ test-suite uniswap-json-api-spec
                     , hspec
                     , hspec-wai
                     , http-client
+                    , http-client-tls
                     , servant
                     , servant-client
                     , servant-server
