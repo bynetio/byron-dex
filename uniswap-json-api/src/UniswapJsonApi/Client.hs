@@ -12,8 +12,13 @@ import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.API
 import           Servant.Client
 import           System.Environment
+import qualified Network.HTTP.Client as Network.HTTP.Client.Types
 
+baseApiUrl :: String
 baseApiUrl = "jsonplaceholder.typicode.com"
+
+theManager :: IO Network.HTTP.Client.Types.Manager
+theManager = newManager tlsManagerSettings
 
 data PlaceholderTodoResponse =
   PlaceholderTodoResponse { tid        :: Int
@@ -59,10 +64,10 @@ posts :: Int -> ClientM PlaceholderPostResponse
 
 fetchTodos :: Int -> IO (Either ClientError PlaceholderTodoResponse)
 fetchTodos i = do
-  manager' <- newManager tlsManagerSettings
+  manager' <- theManager
   runClientM (todos i) (mkClientEnv manager' (BaseUrl Https baseApiUrl 443 ""))
 
 fetchPosts :: Int -> IO (Either ClientError PlaceholderPostResponse)
 fetchPosts i = do
-  manager' <- newManager tlsManagerSettings
+  manager' <- theManager
   runClientM (posts i) (mkClientEnv manager' (BaseUrl Https baseApiUrl 443 ""))
