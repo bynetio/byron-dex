@@ -109,18 +109,19 @@ let
       vimrcConfig.customRC = "source $HOME/.vimrc";
       vimrcConfig.packages.myVimPackage = with pkgs.vimPlugins; {
         start = [
+          coc-fzf
           coc-nvim
+          coc-snippets
+          coc-solargraph
           fzf-vim
           fzfWrapper
           haskell-vim
           nerdtree
           syntastic
-          tabular
           ultisnips
           vim-airline
           vim-airline-themes
           vim-fugitive
-          vim-gitgutter
         ];
       };
     })
