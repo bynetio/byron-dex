@@ -13,36 +13,56 @@ import           Servant.API
 import           Servant.Client
 import           System.Environment
 
-data PlaceholderResponse =
-  PlaceholderResponse { id        :: Int
-                      , userId    :: Int
-                      , title     :: T.Text
-                      , completed :: Bool
-                      } deriving (Eq, Show)
+baseApiUrl = "jsonplaceholder.typicode.com"
 
-instance FromJSON PlaceholderResponse where
+data PlaceholderTodoResponse =
+  PlaceholderTodoResponse { tid        :: Int
+                          , tuserId    :: Int
+                          , ttitle     :: T.Text
+                          , tcompleted :: Bool
+                          } deriving (Eq, Show)
+
+data PlaceholderPostResponse =
+  PlaceholderPostResponse { pid     :: Int
+                          , puserId :: Int
+                          , ptitle  :: T.Text
+                          , pbody   :: T.Text
+                          } deriving (Eq, Show)
+
+instance FromJSON PlaceholderTodoResponse where
   parseJSON = withObject "response" $ \o -> do
     i <- o .: "id"
     u <- o .: "userId"
     t <- o .: "title"
     c <- o .: "completed"
-    return $ PlaceholderResponse i u t c
+    return $ PlaceholderTodoResponse i u t c
 
-type PlaceholderAPI = "todos"
-  :> Capture "id" Int
-  :> Get '[JSON] PlaceholderResponse
+instance FromJSON PlaceholderPostResponse where
+  parseJSON = withObject "response" $ \o -> do
+    i <- o .: "id"
+    u <- o .: "userId"
+    t <- o .: "title"
+    b <- o .: "body"
+    return $ PlaceholderPostResponse i u t b
+
+type PlaceholderAPI = "todos" :> Capture "id" Int :> Get '[JSON] PlaceholderTodoResponse
+                 :<|> "posts" :> Capture "id" Int :> Get '[JSON] PlaceholderPostResponse
 
 placeholderApi :: Proxy PlaceholderAPI
 placeholderApi = Proxy
 
-search = client placeholderApi
+placeholder = client placeholderApi
 
-queries :: Int -> ClientM PlaceholderResponse
-queries = search
+todos :: Int -> ClientM PlaceholderTodoResponse
+posts :: Int -> ClientM PlaceholderPostResponse
+(todos :<|> posts) = placeholder
 
-main :: IO ()
-main = do
-  i <- getLine
+fetchTodos :: Int -> IO (Either ClientError PlaceholderTodoResponse)
+fetchTodos i = do
   manager' <- newManager tlsManagerSettings
-  res <- runClientM (queries (read i)) (mkClientEnv manager' (BaseUrl Https "jsonplaceholder.typicode.com" 443 ""))
-  print res
+  runClientM (todos i) (mkClientEnv manager' (BaseUrl Https baseApiUrl 443 ""))
+
+fetchPosts :: Int -> IO (Either ClientError PlaceholderPostResponse)
+fetchPosts i = do
+  manager' <- newManager tlsManagerSettings
+  runClientM (posts i) (mkClientEnv manager' (BaseUrl Https baseApiUrl 443 ""))
