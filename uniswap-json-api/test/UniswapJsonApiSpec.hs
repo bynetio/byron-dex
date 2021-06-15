@@ -18,12 +18,11 @@ import           UniswapJsonApi
 import           UniswapJsonApi.Logic
 import           UniswapJsonApi.Model
 
-withTheApp :: (Warp.Port -> IO ()) -> IO ()
-withTheApp = Warp.testWithApplication (pure swapApp)
+config = Config 9999 "jsonplaceholder.typicode.com" 443
 
 spec :: Spec
 spec =
-  with (pure swapApp) $ do
+  with (pure $ swapApp config) $ do
     describe "GET /create..." $ do
       it "should end up with missing `coin_a` error" $
         get "/create?coin_a=A&coin_b=B&amount_a=1000&amount_b=1500" `shouldRespondWith` 405
@@ -72,14 +71,22 @@ spec =
       it "should end up with an error" $
         get "/stop" `shouldRespondWith` 501
 
---      it "should be able to handle odd HTTP requests" $
---        request methodPost "/docs/501" [] "{" `shouldRespondWith` 405
---      it "we can also do more with the Response using hspec-wai's matchers" $
---        -- see also `MatchHeader` and JSON-matching tools as well...
---        get "/docs/1" `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
+    describe "GET /todos/:id" $ do
+      it "should end up with an error" $
+        get "/todos/1" `shouldRespondWith` 200
+
+    describe "GET /posts/:id" $ do
+      it "should end up with an error" $
+        get "/posts/1" `shouldRespondWith` 200
+
+--       it "should be able to handle odd HTTP requests" $
+--         request methodPost "/docs/501" [] "{" `shouldRespondWith` 405
+--       it "we can also do more with the Response using hspec-wai's matchers" $
+--         -- see also `MatchHeader` and JSON-matching tools as well...
+--         get "/docs/1" `shouldRespondWith` 200 { matchBody = MatchBody bodyMatcher }
 --
---bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
---bodyMatcher _ body = case (decode body :: Maybe ()) of
---  -- success in this case means we return `Nothing`
---  Just val | val == Object $ HM.fromList [("a", String "b")] -> Nothing
---  _                                                          -> Just "This is how we represent failure: this message will be printed"
+-- bodyMatcher :: [Network.HTTP.Types.Header] -> Body -> Maybe String
+-- bodyMatcher _ body = case (decode body :: Maybe ()) of
+--   -- success in this case means we return `Nothing`
+--   Just val | val == Object $ HM.fromList [("a", String "b")] -> Nothing
+--   _                                                          -> Just "This is how we represent failure: this message will be printed"

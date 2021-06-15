@@ -5,6 +5,11 @@ module UniswapJsonApi.Model where
 import           Data.Aeson
 import qualified Data.Text as T
 
+data Config = Config { _port    :: Int
+                     , _apiUrl  :: String
+                     , _apiPort :: Int
+                     }
+
 data PlaceholderTodoResponse =
   PlaceholderTodoResponse { tid        :: Int
                           , tuserId    :: Int
