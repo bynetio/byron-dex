@@ -25,6 +25,8 @@ type SwapApi = "create"        :> QueryParam "coin_a" Text :> QueryParam "coin_b
           :<|> "pools"         :> Get '[JSON] ()
           :<|> "funds"         :> Get '[JSON] ()
           :<|> "stop"          :> Get '[JSON] ()
+          :<|> "todos"         :> Capture "id" Int :> Get '[JSON] ()
+          :<|> "posts"         :> Capture "id" Int :> Get '[JSON] ()
 
 
 swapApp :: Application
@@ -40,6 +42,8 @@ swapServer = Logic.create
         :<|> Logic.pools
         :<|> Logic.funds
         :<|> Logic.stop
+        :<|> Logic.todos
+        :<|> Logic.posts
 
 runApp :: Reader Config (IO ())
 runApp = do

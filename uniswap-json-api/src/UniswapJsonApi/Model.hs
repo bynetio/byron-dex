@@ -1,14 +1,36 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module UniswapJsonApi.Model where
 
 import           Data.Aeson
-import           Data.Text
-import           GHC.Generics
+import qualified Data.Text as T
 
--- wahtever model we'll need
+data PlaceholderTodoResponse =
+  PlaceholderTodoResponse { tid        :: Int
+                          , tuserId    :: Int
+                          , ttitle     :: T.Text
+                          , tcompleted :: Bool
+                          } deriving (Eq, Show)
 
-newtype User = User { name :: Text } deriving (Eq, Show, Generic)
+data PlaceholderPostResponse =
+  PlaceholderPostResponse { pid     :: Int
+                          , puserId :: Int
+                          , ptitle  :: T.Text
+                          , pbody   :: T.Text
+                          } deriving (Eq, Show)
 
-instance FromJSON User
-instance ToJSON User
+instance FromJSON PlaceholderTodoResponse where
+  parseJSON = withObject "response" $ \o -> do
+    i <- o .: "id"
+    u <- o .: "userId"
+    t <- o .: "title"
+    c <- o .: "completed"
+    return $ PlaceholderTodoResponse i u t c
+
+instance FromJSON PlaceholderPostResponse where
+  parseJSON = withObject "response" $ \o -> do
+    i <- o .: "id"
+    u <- o .: "userId"
+    t <- o .: "title"
+    b <- o .: "body"
+    return $ PlaceholderPostResponse i u t b
