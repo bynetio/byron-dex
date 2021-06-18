@@ -104,6 +104,7 @@ let
     haskellPackages.hoogle
     haskellPackages.hasktags
     haskellPackages.implicit-hie
+    haskellPackages.hpc
     ((vim_configurable.override { python = python3; }).customize {
       name = "vim";
       vimrcConfig.customRC = "source $HOME/.vimrc";

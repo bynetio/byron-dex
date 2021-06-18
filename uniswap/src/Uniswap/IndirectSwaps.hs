@@ -16,31 +16,13 @@
 {-# LANGUAGE TypeOperators              #-}
 
 module Uniswap.IndirectSwaps where
-import           Control.Monad             hiding (fmap)
-import qualified Data.Map                  as Map
-import           Data.Monoid               (Last (..))
-import           Data.Proxy                (Proxy (..))
-import           Data.Text                 (Text, pack)
-import           Data.Void                 (Void)
-import           Debug.Trace
-import           Ledger                    hiding (singleton)
-import           Ledger.Constraints        as Constraints
-import qualified Ledger.Typed.Scripts      as Scripts
-import           Playground.Contract
-import           Plutus.Contract           hiding (when)
-import qualified Plutus.Contracts.Currency as Currency
-import qualified PlutusTx
-import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..))
-import           Text.Printf               (printf)
-import           Uniswap.OnChain           (mkUniswapValidator,
-                                            validateLiquidityForging)
+import           Control.Monad    hiding (fmap)
+import           Data.List        (foldl', sortOn)
+import qualified Data.Map         as Map
+import           PlutusTx.Prelude hiding (Semigroup (..), unless)
+import           Prelude          (div, (^))
 import           Uniswap.Pool
 import           Uniswap.Types
-
-import           Control.Monad
-import           Data.List                 (foldl', sortOn)
-import qualified Data.Set                  as Set
 
 findSwapA :: Amount A -> Amount B -> Amount A -> Integer
 findSwapA oldA oldB inA
@@ -51,7 +33,7 @@ findSwapA oldA oldB inA
     cs outB = checkSwap oldA oldB (oldA + inA) (oldB - Amount outB)
 
     ub' :: Integer
-    ub' = head $ dropWhile cs [2 ^ i | i <- [0 :: Int ..]]
+    ub' = head $ dropWhile cs [2 ^ i | i <- [0 :: Integer ..]]
 
     go :: Integer -> Integer -> Integer
     go lb ub
@@ -98,6 +80,10 @@ findBestSwap swapA pools swapAmount paths = sortOn ((negate <$>) . snd)
 
         findSwap currentSwapAmount pair = do
             (a,b) <- Map.lookup pair pools
-            if swapA
-                then return $ findSwapA (Amount a) (Amount b) (Amount currentSwapAmount)
-                else return $ findSwapA (Amount b) (Amount a) (Amount currentSwapAmount)
+            let out = if swapA
+                then findSwapA (Amount a) (Amount b) (Amount currentSwapAmount)
+                else findSwapA (Amount b) (Amount a) (Amount currentSwapAmount)
+            guard (out > 0)
+            return out
+
+

@@ -28,6 +28,7 @@ import           Ledger.Value        (AssetClass (..), assetClass,
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude
+import           Prelude             (Show)
 import qualified Prelude
 import           Text.Printf         (PrintfArg)
 
@@ -110,6 +111,8 @@ data LiquidityPool = LiquidityPool
     , lpCoinB :: Coin B
     }
     deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+
 PlutusTx.makeIsDataIndexed ''LiquidityPool [('LiquidityPool, 0)]
 PlutusTx.makeLift ''LiquidityPool
 
@@ -118,6 +121,19 @@ instance Eq LiquidityPool where
     x == y = (lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
               -- Make sure the underlying coins aren't equal.
              (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y))
+
+
+instance Prelude.Eq LiquidityPool where
+    x == y = (lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
+              -- Make sure the underlying coins aren't equal.
+             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y))
+
+
+instance Prelude.Ord LiquidityPool where
+  compare (LiquidityPool a b) (LiquidityPool a2 b2) =
+    let (a',b') = if unCoin a <= unCoin b then (a,b) else (Coin $ unCoin b,Coin $ unCoin a)
+        (a2',b2') = if unCoin a2 <= unCoin b2 then (a2,b2) else (Coin $ unCoin b2, Coin $ unCoin a2)
+    in Prelude.compare (a',b') (a2',b2')
 
 data UniswapAction = Create LiquidityPool | Close | Swap | ISwap | Remove | Add
     deriving Show

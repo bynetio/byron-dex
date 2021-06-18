@@ -24,11 +24,12 @@ module Uniswap.OffChain
     , RemoveParams (..)
     , AddParams (..)
     , UniswapUserSchema, UserContractState (..)
-    , UniswapOwnerSchema
+    , UniswapOwnerSchema, UniswapOwnerSchema'
     , start, create, add, remove, close, swap, pools
-    , ownerEndpoint, userEndpoints
+    , ownerEndpoint, ownerEndpoint', userEndpoints
+    , uniswap, uniswapTokenName
     ) where
-import           Control.Monad             hiding (fmap, mapM)
+import           Control.Monad             hiding (fmap, mapM, mapM_)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
 import           Data.Proxy                (Proxy (..))
@@ -43,7 +44,7 @@ import           Plutus.Contract           hiding (when)
 import qualified Plutus.Contracts.Currency as Currency
 import qualified PlutusTx
 import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..))
+import           Prelude                   (Semigroup (..), String, show)
 import           Text.Printf               (printf)
 import           Uniswap.IndirectSwaps
 import           Uniswap.OnChain           (mkUniswapValidator,
@@ -51,7 +52,7 @@ import           Uniswap.OnChain           (mkUniswapValidator,
 import           Uniswap.Pool
 import           Uniswap.Types
 
-import           Data.List                 (nubBy)
+import           Data.List                 (nubBy, scanl)
 data Uniswapping
 instance Scripts.ScriptType Uniswapping where
     type instance RedeemerType Uniswapping = UniswapAction
@@ -60,6 +61,13 @@ instance Scripts.ScriptType Uniswapping where
 type UniswapOwnerSchema =
     BlockchainActions
         .\/ Endpoint "start" ()
+
+type UniswapOwnerSchema' =
+    BlockchainActions
+        .\/ Endpoint "start" (CurrencySymbol)
+
+
+
 
 -- | Schema for the endpoints for users of Uniswap.
 type UniswapUserSchema =
@@ -187,12 +195,16 @@ data AddParams = AddParams
 
 -- | Creates a Uniswap "factory". This factory will keep track of the existing liquidity pools and enforce that there will be at most one liquidity pool
 -- for any pair of tokens at any given time.
-start :: HasBlockchainActions s => Contract w s Text Uniswap
-start = do
+start :: HasBlockchainActions s => Maybe CurrencySymbol -> Contract w s Text Uniswap
+start mcs = do
     pkh <- pubKeyHash <$> ownPubKey
-    cs  <- fmap Currency.currencySymbol $
-           mapError (pack . show @Currency.CurrencyError) $
-           Currency.forgeContract pkh [(uniswapTokenName, 1)]
+
+
+    cs  <- case mcs of
+        Nothing -> fmap Currency.currencySymbol
+                        $ mapError (pack . show @Currency.CurrencyError)
+                        $ Currency.forgeContract pkh [(uniswapTokenName, 1)]
+        Just jcs -> return jcs
     let c    = mkCoin cs uniswapTokenName
         us   = uniswap cs
         inst = uniswapInstance us
@@ -552,19 +564,29 @@ findUniswapFactoryAndPool us coinA coinB = do
         _    -> throwError "liquidity pool not found"
 
 
-
 ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
 ownerEndpoint = (startHandler) >> ownerEndpoint
     where
 
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
       startHandler = do
-    	   e <- runError $ do
-		  endpoint @"start"
-                  start
+    	   e <- runError $ (endpoint @"start" >> start Nothing)
     	   tell $ Last $ Just $ case e of
             Left err -> Left err
             Right us -> Right us
+
+ownerEndpoint' :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+ownerEndpoint' = (startHandler) >> ownerEndpoint'
+    where
+
+      startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+      startHandler = do
+    	   e <- runError $ (endpoint @"start" >>= start . Just)
+    	   tell $ Last $ Just $ case e of
+            Left err -> Left err
+            Right us -> Right us
+
+
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -599,9 +621,10 @@ userEndpoints us =
         e <- runError $ do
             p <- endpoint @l
             c us p
-        tell $ Last $ Just $ case e of
-            Left err -> Left err
-            Right a  -> Right $ g a
+
+        case e of
+            Left err -> logInfo @Text ("ERROR POLECIAL ERROR:      " <> err) >> (tell $ Last $ Just $ Left err)
+            Right a  -> tell $ Last $ Just $ Right $ g a
 
     stop :: Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
     stop = do

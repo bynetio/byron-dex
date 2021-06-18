@@ -67,3 +67,30 @@ executable uniswap
                     , freer-extras
     hs-source-dirs:   app
     default-language: Haskell2010
+
+
+
+test-suite uniswap-tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  hs-source-dirs: test
+  other-modules:       Spec.Model
+  default-language: Haskell2010
+  ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas
+  build-depends:       base ^>=4.14.1.0
+                     , containers
+                     , data-default
+                     , freer-extras
+                     , lens
+                     , plutus-contract
+                     , plutus-ledger
+                     , plutus-tx
+                     , QuickCheck
+                     , tasty
+                     , tasty-quickcheck
+                     , text
+                     , uniswap
+                     , plutus-ledger-api
+                     , plutus-use-cases
+  if !(impl(ghcjs) || os(ghcjs))
+    build-depends: plutus-tx-plugin -any
