@@ -1,20 +1,3 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE TypeOperators              #-}
-
 module Uniswap.IndirectSwaps where
 import           Control.Monad    hiding (fmap)
 import           Data.List        (foldl', sortOn)
@@ -24,8 +7,8 @@ import           Prelude          (div, (^))
 import           Uniswap.Pool
 import           Uniswap.Types
 
-findSwapA :: Amount A -> Amount B -> Amount A -> Integer
-findSwapA oldA oldB inA
+findSwap :: Amount A -> Amount B -> Amount A -> Integer
+findSwap oldA oldB inA
     | ub' <= 1   = 0
     | otherwise  = go 1 ub'
   where
@@ -44,17 +27,12 @@ findSwapA oldA oldB inA
       in
         if cs m then go m ub else go lb m
 
-findSwapB :: Amount A -> Amount B -> Amount B -> Integer
-findSwapB oldA oldB inB = findSwapA (switch oldB) (switch oldA) (switch inB)
-  where
-    switch = Amount . unAmount
-
 
 
 
 
 findPaths :: (Eq c, Ord c) => (c,c) -> [(c,c)] -> [[(c,c)]]
-findPaths (start,goal) pairs = go start pairs
+findPaths (start,goal) pairs = go start (pairs ++ map (\(a,b)->(b,a)) pairs)
    where
          go a availablePairs
              | a == goal = [[]]
@@ -68,21 +46,26 @@ findPaths (start,goal) pairs = go start pairs
 
 
 
-findBestSwap swapA pools swapAmount paths = sortOn ((negate <$>) . snd)
-                    $ filter (\(_,x) -> x /= Nothing)
-                    $ map (\x -> (x,price' swapAmount x)) paths
+
+findBestSwap pools (ca,cb) swapAmount =
+
+                  case sortOn (negate . snd)
+                    [(x,p) | (x,Just p) <- map (\x -> (x,price' swapAmount x)) paths]
+                    of
+                      []        -> Nothing
+                      ((a,_):_) -> Just a
 
   where
+        paths = findPaths (ca,cb) (Map.keys pools)
+        allPools = Map.union pools (Map.fromList $ map (\((c1,c2),(a,b)) -> ((c2,c1),(b,a) )) $ Map.toList pools)
         price' initialSwapAmount path = foldl' (\maybeAmount (a,b) ->
                                           case maybeAmount of
                                             Nothing -> Nothing
-                                            Just currentSwapAmount -> findSwap currentSwapAmount (a,b)) (Just initialSwapAmount) path
+                                            Just currentSwapAmount -> findSwap' currentSwapAmount (a,b)) (Just initialSwapAmount) path
 
-        findSwap currentSwapAmount pair = do
-            (a,b) <- Map.lookup pair pools
-            let out = if swapA
-                then findSwapA (Amount a) (Amount b) (Amount currentSwapAmount)
-                else findSwapA (Amount b) (Amount a) (Amount currentSwapAmount)
+        findSwap' currentSwapAmount pair = do
+            (a,b) <- Map.lookup pair allPools
+            let out = findSwap (Amount a) (Amount b) (Amount currentSwapAmount)
             guard (out > 0)
             return out
 
