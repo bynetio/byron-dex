@@ -147,3 +147,12 @@ source-repository-package
 
 
 
+package ouroboros-network
+  coverage: False
+  library-coverage: False
+
+package uniswap-tests
+  coverage: True
+
+package uniswap
+  coverage: True

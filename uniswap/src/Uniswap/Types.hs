@@ -73,7 +73,7 @@ PlutusTx.makeLift ''Coin
 newtype Amount a = Amount { unAmount :: Integer }
   deriving stock   (Show, Generic)
   deriving newtype (ToJSON, FromJSON, ToSchema, Eq, Ord, PrintfArg)
-  deriving newtype (Prelude.Eq, Prelude.Ord, Prelude.Num)
+  deriving newtype (Prelude.Eq, Prelude.Ord, Prelude.Num, Prelude.Enum, Prelude.Real, Prelude.Integral)
   deriving newtype (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, MultiplicativeSemigroup)
 PlutusTx.makeIsDataIndexed ''Amount [('Amount, 0)]
 PlutusTx.makeLift ''Amount
@@ -115,6 +115,12 @@ data LiquidityPool = LiquidityPool
 
 PlutusTx.makeIsDataIndexed ''LiquidityPool [('LiquidityPool, 0)]
 PlutusTx.makeLift ''LiquidityPool
+
+
+liquidityPool :: (Coin A, Coin B) -> LiquidityPool
+liquidityPool (Coin a,Coin b) = LiquidityPool (Coin (min a b)) (Coin (max a b))
+
+
 
 instance Eq LiquidityPool where
     {-# INLINABLE (==) #-}

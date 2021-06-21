@@ -64,8 +64,8 @@ validateSwap LiquidityPool{..} c ctx =
                      , txOutDatumHash o == Just (snd $ ownHashes ctx)
                      ] of
         [o] -> o
-        _   -> traceError "expected exactly one output to the same liquidity pool"
-
+        []  -> traceError "expected only one output to the same liquidity pool"
+        _   -> traceError "expected one output to the same liquidity pool"
     oldA = amountA inVal
     oldB = amountB inVal
     newA = amountA outVal

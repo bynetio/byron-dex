@@ -29,6 +29,7 @@ module Uniswap.OffChain
     , ownerEndpoint, ownerEndpoint', userEndpoints
     , uniswap, uniswapTokenName
     ) where
+import           Control.Applicative       ((<|>))
 import           Control.Monad             hiding (fmap, mapM, mapM_)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
@@ -157,18 +158,16 @@ data CreateParams = CreateParams
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-    { spCoinA   :: Coin A         -- ^ One 'Coin' of the liquidity pair.
-    , spCoinB   :: Coin B         -- ^ The other 'Coin'.
-    , spAmountA :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
-    , spAmountB :: Amount B       -- ^ The amount of the second 'Coin' that should be swapped.
+    { spCoinA  :: Coin A         -- ^ One 'Coin' of the liquidity pair.
+    , spCoinB  :: Coin B         -- ^ The other 'Coin'.
+    , spAmount :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 
 data IndirectSwapParams = IndirectSwapParams
-    { ispCoinA   :: Coin A         -- ^ One 'Coin' of the liquidity pair.
-    , ispCoinB   :: Coin B         -- ^ The other 'Coin'.
-    , ispAmountA :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
-    , ispAmountB :: Amount B       -- ^ The amount of the second 'Coin' that should be swapped.
+    { ispCoinA  :: Coin A         -- ^ One 'Coin' of the liquidity pair.
+    , ispCoinB  :: Coin B         -- ^ The other 'Coin'.
+    , ispAmount :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 
@@ -372,19 +371,16 @@ add us AddParams{..} = do
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
 swap :: HasBlockchainActions s => Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams{..} = do
-    unless (spAmountA > 0 && spAmountB == 0 || spAmountA == 0 && spAmountB > 0) $ throwError "exactly one amount must be positive"
+    unless (spAmount > 0) $ throwError "amount must be positive"
     (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us spCoinA spCoinB
     let outVal = txOutValue $ txOutTxOut o
     let oldA = amountOf outVal spCoinA
         oldB = amountOf outVal spCoinB
-    (newA, newB) <- if spAmountA > 0 then do
-        let outB = Amount $ findSwapA oldA oldB spAmountA
+    (newA, newB) <- do
+        let outB = Amount $ findSwap oldA oldB spAmount
         when (outB == 0) $ throwError "no payout"
-        return (oldA + spAmountA, oldB - outB)
-                                     else do
-        let outA = Amount $ findSwapB oldA oldB spAmountB
-        when (outA == 0) $ throwError "no payout"
-        return (oldA - outA, oldB + spAmountB)
+        return (oldA + spAmount, oldB - outB)
+
     pkh <- pubKeyHash <$> ownPubKey
 
     logInfo @String $ printf "oldA = %d, oldB = %d, old product = %d, newA = %d, newB = %d, new product = %d" oldA oldB (unAmount oldA * unAmount oldB) newA newB (unAmount newA * unAmount newB)
@@ -400,9 +396,7 @@ swap us SwapParams{..} = do
         tx      = Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
                   Constraints.mustPayToTheScript (Pool lp liquidity) val
 
-    logInfo $ show tx
     ledgerTx <- submitTxConstraintsWith lookups tx
-    logInfo $ show ledgerTx
     void $ awaitTxConfirmed $ txId ledgerTx
     logInfo $ "swapped with: " ++ show lp
 
@@ -412,31 +406,26 @@ swap us SwapParams{..} = do
 
 indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams{..} = do
-    unless (ispAmountA > 0 && ispAmountB == 0 || ispAmountA == 0 && ispAmountB > 0) $ throwError "exactly one amount must be positive"
+    unless (ispAmount > 0) $ throwError "amount must be positive"
     (oref, o, allPools) <- findUniswapFactory us
     let outVal = txOutValue $ txOutTxOut o
 
-    let paths = findPaths (unCoin ispCoinA, unCoin ispCoinB) (map (\LiquidityPool{..} -> (unCoin lpCoinA, unCoin lpCoinB)) allPools)
-    relevantPools <- (mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp))) $ (map (\(a,b) -> LiquidityPool (Coin a) (Coin b))) $ concat paths
-    let abstractPools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
+    relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp)) allPools
+
+    let abstractPools = Map.fromList $ nubBy (\((a1,a2),_) ((b1,b2),_) -> (a1,a2)==(b1,b2) || (a1,a2)==(b2,b1)) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
             let pOutVal = txOutValue $ txOutTxOut pO
             in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
+
     let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
     let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
-    let ispAmount = if ispAmountA > 0 then unAmount ispAmountA else unAmount ispAmountB
-    let pairs = findBestSwap (ispAmountA > 0) abstractPools ispAmount paths
-    mapM_ (\(path',finalPrice) -> do
-            logInfo @String (show path')
-            logInfo @String (show finalPrice)) pairs
-    (path',_) <- maybe (throwError $ pack $ show paths) pure $ case pairs of [] -> Nothing; (x:_) -> Just x
-    let path = if ispAmountA > 0 then path' else reverse path'
-    logInfo @String (show path)
-    let findSwap = if ispAmountA > 0 then findSwapA else \a b c -> findSwapB a b (Amount $ unAmount c)
-    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools in (Amount $ findSwap (Amount a') (Amount b') amount)) (Amount ispAmount) path
-    logInfo @[(String,String,Integer)] (map (\((a,b),amount) -> (show a, show b, unAmount amount)) moneyToPay)
-    pkh <- pubKeyHash <$> ownPubKey
+    path <- case findBestSwap abstractPools (unCoin ispCoinA,unCoin ispCoinB) (unAmount ispAmount) of
+        Nothing -> throwError "No path found"
+        Just p  -> return p
 
-    --logInfo @String $ printf "oldA = %d, oldB = %d, old product = %d, newA = %d, newB = %d, new product = %d" oldA oldB (unAmount oldA * unAmount oldB) newA newB (unAmount newA * unAmount newB)
+
+    logInfo @String (show path)
+    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools <|> ((\(x,y)->(y,x)) <$> Map.lookup (b,a) abstractPools) in (Amount $ findSwap (Amount a') (Amount b') amount)) ispAmount path
+    pkh <- pubKeyHash <$> ownPubKey
 
     let inst    = uniswapInstance us
 
@@ -446,10 +435,10 @@ indirectSwap us IndirectSwapParams{..} = do
                   Constraints.ownPubKeyHash pkh
 
         tx      = mconcat $ map (\((a,b),amount) ->
-                                    let Just (oref,_) = Map.lookup (a,b) orefs
-                                        Just (pool, liquidity) = Map.lookup (a,b) pools
-                                        Just (oldA,oldB) = Map.lookup (a,b) abstractPools
-                                        (newA,newB) = if ispAmountA > 0 then (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount) else (oldA - findSwap (Amount oldA) (Amount oldB) amount, oldB+ unAmount amount)
+                                    let Just (oref,_) = Map.lookup (a,b) orefs <|> Map.lookup (b,a) orefs
+                                        Just (pool, liquidity) = Map.lookup (a,b) pools <|> Map.lookup (b,a) pools
+                                        Just (oldA,oldB) = Map.lookup (a,b) abstractPools <|> (let Just (b',a') = Map.lookup (b,a) abstractPools in Just (a',b'))
+                                        (newA,newB) = (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount)
                                         val = valueOf (Coin a) (Amount newA) <> valueOf (Coin b) (Amount newB) <> unitValue (poolStateCoin us)
                                     in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
                                        Constraints.mustPayToTheScript (Pool pool liquidity) val
@@ -459,9 +448,7 @@ indirectSwap us IndirectSwapParams{..} = do
         --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
         --           Constraints.mustPayToTheScript (Pool lp liquidity) val
 
-    logInfo $ show tx
     ledgerTx <- submitTxConstraintsWith lookups tx
-    logInfo $ show ledgerTx
     void $ awaitTxConfirmed $ txId ledgerTx
 
 
