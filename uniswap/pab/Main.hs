@@ -64,6 +64,7 @@ main = void $ Simulator.runSimulationWith handlers $ do
         ada   = Uniswap.mkCoin adaSymbol adaToken
 
     cidStart <- Simulator.activateContract (Wallet 1) UniswapOwnerContract
+    _ <- Simulator.callEndpointOnInstance cidStart "start" ()
     us       <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
                     Success (Monoid.Last (Just (Right us))) -> Just us
                     _                                       -> Nothing
