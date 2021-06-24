@@ -144,15 +144,3 @@ source-repository-package
   type: git
   location: https://github.com/input-output-hk/goblins
   tag: cde90a2b27f79187ca8310b6549331e59595e7ba
-
-
-
-package ouroboros-network
-  coverage: False
-  library-coverage: False
-
-package uniswap-tests
-  coverage: True
-
-package uniswap
-  coverage: True

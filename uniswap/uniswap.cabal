@@ -29,11 +29,13 @@ library
 		             , Uniswap.Types
                  , Uniswap.Pool
                  , Uniswap.IndirectSwaps
+		 , Uniswap.Trace
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
                      , data-default
                      , freer-extras
+		     , freer-simple
                      , playground-common
                      , plutus-contract
                      , plutus-ledger
@@ -49,7 +51,7 @@ library
 
 
 
-executable uniswap
+executable uniswap-manual
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
@@ -94,3 +96,25 @@ test-suite uniswap-tests
                      , plutus-use-cases
   if !(impl(ghcjs) || os(ghcjs))
     build-depends: plutus-tx-plugin -any
+
+
+
+executable uniswap-pab
+  main-is: Main.hs
+  hs-source-dirs: pab
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    plutus-contract -any,
+    plutus-pab -any,
+    uniswap -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    aeson -any,
+    containers -any,
+    text -any,
+    plutus-use-cases -any
