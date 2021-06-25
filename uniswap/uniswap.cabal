@@ -26,7 +26,7 @@ library
   hs-source-dirs: src
   exposed-modules: Uniswap.OnChain
                  , Uniswap.OffChain
-		 , Uniswap.Types
+		             , Uniswap.Types
                  , Uniswap.Pool
                  , Uniswap.IndirectSwaps
   build-depends:       aeson

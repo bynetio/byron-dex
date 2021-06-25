@@ -59,22 +59,18 @@ myTrace = do
         h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
         h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
         h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
-        void $ callEndpoint @"create" h2 (CreateParams customCoin1 customCoin2  100 500)
+        void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin1  100 500)
         void $ waitNSlots 1
-        -- void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin3  1000 1000)
-        -- void $ waitNSlots 1
-        -- void $ callEndpoint @"create" h2 (CreateParams customCoin1 customCoin4 1_000_000 1_000_000)
-        -- void $ waitNSlots 1
-        -- void $ callEndpoint @"create" h2 (CreateParams customCoin4 customCoin3 10_000 10_000)
-        -- void $ waitNSlots 1
+        void $ callEndpoint @"create" h2 (CreateParams customCoin3 customCoin1  1000 1000)
+        void $ waitNSlots 1
 
-        -- void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 0 500)
+        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 500)
         -- void $ waitNSlots 1
         --void $ callEndpoint @"add" h4 (AddParams customCoin2 customCoin1 1000 0)
         -- void $ waitNSlots 10
         -- void $ callEndpoint @"remove" h4 (RemoveParams customCoin1 customCoin2 1040)
         -- void $ waitNSlots 10
-        void $ callEndpoint @"close" h2 (CloseParams customCoin2 customCoin1 )
+        --void $ callEndpoint @"close" h2 (CloseParams customCoin2 customCoin1 )
 
 myReverse :: [a] -> [a]
 myReverse = id
