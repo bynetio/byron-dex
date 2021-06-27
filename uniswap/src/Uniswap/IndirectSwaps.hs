@@ -53,7 +53,7 @@ findBestSwap pools (ca,cb) swapAmount =
                     [(x,p) | (x,Just p) <- map (\x -> (x,price' swapAmount x)) paths]
                     of
                       []        -> Nothing
-                      ((a,_):_) -> Just a
+                      ((a,p):_) -> Just (a,p)
 
   where
         paths = findPaths (ca,cb) (Map.keys pools)

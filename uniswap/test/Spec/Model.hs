@@ -19,7 +19,7 @@ module Spec.Model
       where
 
 import           Control.Applicative                ((<|>))
-import           Control.Lens                       hiding (elements)
+import           Control.Lens                       hiding (Swapped, elements)
 import           Control.Monad
 import           Control.Monad                      (void, when)
 import           Data.Map                           (Map)
@@ -58,13 +58,14 @@ type PoolData = ((Coin A, Integer),(Coin B, Integer),Integer)
 
 
 
-data UModel = UModel { _modelPools :: Map LiquidityPool PoolData
-                        , _uniswap :: Maybe Uniswap}
+data UModel = UModel { _modelPools           :: Map LiquidityPool PoolData
+                     , _uniswap              :: Maybe Uniswap
+		             , _walletStates :: Map Wallet UserContractState }
     deriving Show
 
 makeLenses ''UModel
 
-emptyUModel = UModel Map.empty Nothing
+emptyUModel = UModel Map.empty Nothing Map.empty
 
 
 tests :: TestTree
@@ -103,6 +104,17 @@ getLiquidity :: LiquidityPool -> Spec UModel (Maybe Integer)
 getLiquidity pool = do
     s <- getModelState
     return $ getLiquidity' s pool
+
+walletState w = walletStates . at w
+
+getWalletState' :: ModelState UModel -> Wallet -> Maybe UserContractState
+getWalletState' s w = s ^. contractState . walletState w
+
+getWalletState :: Wallet -> Spec UModel (Maybe UserContractState)
+getWalletState w = do
+       s <- getModelState
+       return $ getWalletState' s w
+
 
 getPoolState' :: ModelState UModel -> LiquidityPool -> Maybe PoolData
 getPoolState' s pool@LiquidityPool{..} = (s ^. contractState . modelPools . at pool)
@@ -146,8 +158,10 @@ instance ContractModel UModel where
             | AddA Wallet (Coin A, Coin B) Integer Integer
             | RemoveA Wallet (Coin A, Coin B) Integer
             | CloseA Wallet (Coin A, Coin B)
-            | SwapA Wallet (Coin A, Coin B) Integer
-            | ISwapA Wallet (Coin A, Coin B) Integer
+            | SwapA Wallet Integer
+	        | SwapPreviewA Wallet (Coin A, Coin B) Integer
+            | ISwapA Wallet Integer
+            | ISwapPreviewA Wallet (Coin A, Coin B) Integer
         deriving (Show, Eq)
 
     data ContractInstanceKey UModel w s e where
@@ -161,16 +175,18 @@ instance ContractModel UModel where
         [ CreateA  <$> genWallet <*> genCoinPair <*> genNonNeg <*> genNonNeg ]               ++
         [ AddA <$> genWallet <*> genCoinPair <*> genNonNeg <*> genNonNeg ]               ++
         [ RemoveA <$> genWallet <*> genCoinPair <*> genNonNeg ]               ++
-        [ CloseA  <$> genWallet <*> genCoinPair] ++
-        [ SwapA <$> genWallet <*> genCoinPair <*> genNonNeg] ++
-        [ ISwapA <$> genWallet <*> genCoinPair <*> genNonNeg]
+        [ CloseA  <$> genWallet <*> genCoinPair ] ++
+        [ SwapA <$> genWallet <*> genNonNeg ] ++
+        [ ISwapA <$> genWallet <*> genNonNeg ] ++
+	    [ SwapPreviewA <$> genWallet <*> genCoinPair <*> genNonNeg]  ++
+        [ ISwapPreviewA <$> genWallet <*> genCoinPair <*> genNonNeg ]
 
     initialState = emptyUModel
 
     nextState (StartA w) = do
         withdraw w nft
         uniswap $= Just (Uniswap.OffChain.uniswap uniswapCurrencySymbol)
-        wait 1
+        wait 2
 
 
 
@@ -191,7 +207,8 @@ instance ContractModel UModel where
                     withdraw w (valueOf coinA (Amount amountA) <> valueOf coinB (Amount amountB))
                     deposit w (Uniswap.Types.valueOf lC liquidityAmount)
             _ -> return ()
-        wait 1
+        walletState w $= Just Created
+        wait 2
 
     nextState (AddA w (coinA,coinB) amountA amountB) = do
         let pool@LiquidityPool{..} = liquidityPool (coinA,coinB)
@@ -215,7 +232,8 @@ instance ContractModel UModel where
                     withdraw w (valueOf coinA (Amount amountA) <> valueOf coinB (Amount amountB))
                     deposit w (Uniswap.Types.valueOf lC delLiquidity)
             _ -> return ()
-        wait 1
+        walletState w $= Just Added
+        wait 2
 
     nextState (RemoveA w (coinA,coinB) rpDiff) = do
         let pool@LiquidityPool{..} = liquidityPool (coinA,coinB)
@@ -239,7 +257,8 @@ instance ContractModel UModel where
                         deposit w (valueOf coinA (Amount (oldA - outA)) <> valueOf coinB (Amount (oldB - outB)))
                         withdraw w (Uniswap.Types.valueOf lC (Amount rpDiff))
             _ -> return ()
-        wait 1
+        walletState w $= Just Removed
+        wait 2
 
     nextState (CloseA w (coinA,coinB)) = do
         let pool = liquidityPool (coinA,coinB)
@@ -257,9 +276,10 @@ instance ContractModel UModel where
                         deposit w (valueOf coinA (Amount oldA) <> valueOf coinB (Amount oldB))
                         withdraw w (Uniswap.Types.valueOf lC (Amount oldLiquidity))
             _ -> return ()
-        wait 1
+        walletState w $= Just Closed
+        wait 2
 
-    nextState (SwapA w (coinA,coinB) swapAmount) = do
+    nextState (SwapPreviewA w (coinA,coinB) swapAmount) = do
         let pool = liquidityPool (coinA,coinB)
         bc <- askModelState $ view $ balanceChange w
         mUniswap <- getUniswap
@@ -268,81 +288,134 @@ instance ContractModel UModel where
         mOldB <- getAmountForCoin pool coinB
         mLiquidity <- getLiquidity pool
         case (mUniswap, liftM3 (,,) mOldA mOldB mLiquidity) of
-            (Just us, Just (oldA, oldB, oldLiquidity)) -> do
-                    when (tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount) $ do
+            (Just us, Just (oldA, oldB, oldLiquidity)) | tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount -> do
+                let outAmount = findSwap (Amount oldA) (Amount oldB) (Amount swapAmount)
+                walletState w $= Just (SwapPreview ((coinA, Amount swapAmount),(coinB, Amount outAmount)))
+            _ -> walletState w $= Nothing
+        wait 2
 
+    nextState (SwapA w slippage) = do
+
+        state <- getWalletState w
+
+        case state of
+            Just (SwapPreview ((coinA, Amount swapAmount),(coinB, Amount result))) -> do
+                let pool = liquidityPool (coinA,coinB)
+
+                bc <- askModelState $ view $ balanceChange w
+                mUniswap <- getUniswap
+
+                mOldA <- getAmountForCoin pool coinA
+                mOldB <- getAmountForCoin pool coinB
+                mLiquidity <- getLiquidity pool
+                case (mUniswap, liftM3 (,,) mOldA mOldB mLiquidity) of
+                    (Just us, Just (oldA, oldB, oldLiquidity)) | tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount -> do
                         let outAmount = findSwap (Amount oldA) (Amount oldB) (Amount swapAmount)
-                        when (outAmount < oldB && outAmount > 0) $ do
+                        when (outAmount < oldB && outAmount > 0 && ((100*outAmount `div` result) >= (100 - slippage))) $ do
 
                             amountForCoin pool coinA $= (oldA + swapAmount)
                             amountForCoin pool coinB $= (oldB - outAmount)
 
                             deposit w (valueOf coinB $ Amount outAmount)
                             withdraw w (valueOf coinA $ Amount swapAmount)
-            _ -> return ()
-        wait 1
+                    _ -> return ()
+		    _ -> return ()
+        walletState w $= Just Swapped
+        wait 2
 
-
-    nextState (ISwapA w (coinA,coinB) swapAmount) = do
+    nextState (ISwapPreviewA w (coinA,coinB) swapAmount) = do
         bc <- askModelState $ view $ balanceChange w
         mUniswap <- getUniswap
         pools <- getPools
         case (mUniswap) of
-            (Just us) -> do
-
-                    when (tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount) $ do
+            (Just us) | tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount -> do
                         let poolMap = (Map.fromList $ map (\((ca,a),(cb,b)) -> ((unCoin ca,unCoin cb),(a,b))) pools)
-                        let mPath = findBestSwap poolMap (unCoin coinA, unCoin coinB) swapAmount
+                        case findBestSwap poolMap (unCoin coinA, unCoin coinB) swapAmount of
+                            Just (_, outB) -> walletState w $= Just (ISwapPreview ((coinA, Amount swapAmount),(coinB, Amount outB)))
+                            _ -> walletState w $= Nothing
+            _ -> walletState w $= Nothing
+        wait 2
 
-                        case mPath of
-                            Nothing -> return ()
-                            Just path -> do
-                                s <- getModelState
-                                let oldModelPools = s ^. contractState . modelPools
+    nextState (ISwapA w slippage) = do
+        bc <- askModelState $ view $ balanceChange w
+        mUniswap <- getUniswap
+        pools <- getPools
+        state <- getWalletState w
+        case (mUniswap, state) of
+            (Just us, Just (ISwapPreview ((coinA, Amount swapAmount),(coinB, Amount result))))
+                | tokenAmt + assetClassValueOf bc (unCoin coinA) >= swapAmount -> do
+                    let poolMap = (Map.fromList $ map (\((ca,a),(cb,b)) -> ((unCoin ca,unCoin cb),(a,b))) pools)
+
+                    case findBestSwap poolMap (unCoin coinA, unCoin coinB) swapAmount of
+                        Nothing -> return ()
+                        Just (path,outAmount) | (100*outAmount `div` result) >= (100 - slippage) -> do
+                            s <- getModelState
+                            let oldModelPools = s ^. contractState . modelPools
 
 
-                                let step :: Maybe (Integer, Value.Value) -> (AssetClass,AssetClass) -> Spec UModel (Maybe (Integer,Value.Value))
-                                    step Nothing _             = return Nothing
-                                    step (Just (amount,value)) (ca,cb) = do
+                            let step :: Maybe (Integer, Value.Value) -> (AssetClass,AssetClass) -> Spec UModel (Maybe (Integer,Value.Value))
+                                step Nothing _             = return Nothing
+                                step (Just (amount,value)) (ca,cb) = do
 
-                                        let currentPool = (LiquidityPool (Coin ca) (Coin cb))
-                                        mA <- getAmountForCoin currentPool (Coin ca)
-                                        mB <- getAmountForCoin currentPool (Coin cb)
-                                        case (mA, mB) of
-                                            (Just a, Just b) -> do
-                                                let outAmount = findSwap (Amount a) (Amount b) (Amount amount)
-                                                if outAmount < b && outAmount > 0 && (tokenAmt + assetClassValueOf bc ca >= swapAmount)
-                                                    then do
-                                                        amountForCoin currentPool (Coin ca) $= (a+amount)
-                                                        amountForCoin currentPool (Coin cb) $= (b-outAmount)
-                                                        return $ Just (outAmount, value <> valueOf (Coin ca) (Amount amount) <> valueOf (Coin cb) (Amount (- outAmount)))
-                                                    else return Nothing
-                                            _ -> return Nothing
-                                result <- foldM step (Just (swapAmount, mempty)) path
-                                case result of
-                                    Nothing -> modelPools $= oldModelPools
-                                    Just (_,value) -> withdraw w value
+                                    let currentPool = (LiquidityPool (Coin ca) (Coin cb))
+                                    mA <- getAmountForCoin currentPool (Coin ca)
+                                    mB <- getAmountForCoin currentPool (Coin cb)
+                                    case (mA, mB) of
+                                        (Just a, Just b) -> do
+                                            let outAmount = findSwap (Amount a) (Amount b) (Amount amount)
+                                            if outAmount < b && outAmount > 0 && (tokenAmt + assetClassValueOf bc ca >= swapAmount)
+                                                then do
+                                                    amountForCoin currentPool (Coin ca) $= (a+amount)
+                                                    amountForCoin currentPool (Coin cb) $= (b-outAmount)
+                                                    return $ Just (outAmount, value <> valueOf (Coin ca) (Amount amount) <> valueOf (Coin cb) (Amount (- outAmount)))
+                                                else return Nothing
+                                        _ -> return Nothing
+                            result <- foldM step (Just (swapAmount, mempty)) path
+                            case result of
+                                Nothing        -> modelPools $= oldModelPools
+                                Just (_,value) -> withdraw w value
             _ -> return ()
+        walletState w $= Just ISwapped
         wait 5
 
     nextState _ = return ()
 
     perform h _ cmd = case cmd of
         (StartA w)          -> callEndpoint @"start" (h $ StartKey w) uniswapCurrencySymbol >> delay 1
-        (CreateA w (coinA,coinB) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (CreateParams coinA coinB (Amount amountA) (Amount amountB))    >> delay 1
-        (AddA w (coinA,coinB) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (AddParams coinA coinB (Amount amountA) (Amount amountB))               >> delay 1
-        (RemoveA w (coinA,coinB) liquidity)  -> callEndpoint @"remove" (h $ UseKey w) (RemoveParams coinA coinB (Amount liquidity))                  >> delay 1
-        (CloseA w (coinA,coinB)) -> callEndpoint @"close"   (h $ UseKey w) (CloseParams coinA coinB)   >> delay 1
-        (SwapA w (coinA,coinB) amountA) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams coinA coinB (Amount amountA)) >> delay 1
-        (ISwapA w (coinA,coinB) amountA) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams coinA coinB (Amount amountA))                   >> delay 5
+        (CreateA w (coinA,coinB) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (CreateParams coinA coinB (Amount amountA) (Amount amountB))    >> delay 2
+        (AddA w (coinA,coinB) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (AddParams coinA coinB (Amount amountA) (Amount amountB))               >> delay 2
+        (RemoveA w (coinA,coinB) liquidity)  -> callEndpoint @"remove" (h $ UseKey w) (RemoveParams coinA coinB (Amount liquidity))                  >> delay 2
+        (CloseA w (coinA,coinB)) -> callEndpoint @"close"   (h $ UseKey w) (CloseParams coinA coinB)   >> delay 2
+        (SwapA w slippage) -> swapTrace w slippage
+        (SwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"swapPreview" (h $ UseKey w) (SwapPreviewParams coinA coinB (Amount amountA)) >> delay 2
+        (ISwapA w slippage) -> iSwapTrace w slippage
+        (ISwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"iSwapPreview" (h $ UseKey w) (ISwapPreviewParams coinA coinB (Amount amountA)) >> delay 2
+      where
+        swapTrace w slippage = do
+            state <- getLast <$> observableState (h $ UseKey w)
+            case state of
+                Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams coinA coinB amountA amountB slippage)
+                _ -> return ()
+            delay 2
+
+        iSwapTrace w slippage = do
+            state <- getLast <$> observableState (h $ UseKey w)
+            case state of
+                Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams coinA coinB amountA amountB slippage)
+                _ -> return ()
+            delay 5
 
     precondition s (StartA w)          = (isNothing $ s ^. contractState . uniswap)
     precondition s (CreateA _ (liquidityPool -> pool) a b)   = (a>0 && b>0) && (isJust $ s ^. contractState . uniswap) && (isNothing $ s ^. contractState . modelPools . at pool)
     precondition s (AddA _ (liquidityPool -> pool) a b) = (a>0 && b >0) && (isJust $ s ^. contractState . uniswap) && (isJust $ s ^. contractState . modelPools . at pool)
     precondition s (RemoveA _ (liquidityPool -> pool) l) = (isJust $ s ^. contractState . uniswap) && (isJust $ s ^. contractState . modelPools . at pool)
     precondition s (CloseA _ (liquidityPool -> pool)) = (isJust $ s ^. contractState . uniswap) && (isJust $ s ^. contractState . modelPools . at pool)
-    precondition s (SwapA _ (liquidityPool -> pool) _) = (isJust $ s ^. contractState . uniswap) && (isJust $ s ^. contractState . modelPools . at pool)
-    precondition s (ISwapA _ (coinA,coinB) _) = (isJust $ s ^. contractState . uniswap) && (Prelude.not $ null $ findPaths (unCoin coinA,unCoin coinB) $ map (\(LiquidityPool a b)->(unCoin a, unCoin b)) $ Map.keys (s ^. contractState . modelPools))
+    precondition s (SwapA w _) = (isJust $ s ^. contractState . uniswap) &&
+                                    (case (s ^. contractState . walletState w) of Just (SwapPreview _) -> True; _ -> False)
+    precondition s (SwapPreviewA _ (liquidityPool -> pool) _) = (isJust $ s ^. contractState . uniswap) && (isJust $ s ^. contractState . modelPools . at pool)
+    precondition s (ISwapA w _) = (isJust $ s ^. contractState . uniswap) &&
+                                    (case (s ^. contractState . walletState w) of Just (ISwapPreview _) -> True; _ -> False)
+    precondition s (ISwapPreviewA _ (coinA,coinB) _) = (isJust $ s ^. contractState . uniswap) && (Prelude.not $ null $ findPaths (unCoin coinA,unCoin coinB) $ map (\(LiquidityPool a b)->(unCoin a, unCoin b)) $ Map.keys (s ^. contractState . modelPools))
     precondition _ _ = False
 deriving instance Eq (ContractInstanceKey UModel w s e)
 deriving instance Show (ContractInstanceKey UModel w s e)
