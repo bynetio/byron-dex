@@ -374,6 +374,7 @@ instance ContractModel UModel where
                             case result of
                                 Nothing        -> modelPools $= oldModelPools
                                 Just (_,value) -> withdraw w value
+                        _ -> return ()
             _ -> return ()
         walletState w $= Just ISwapped
         wait 5
