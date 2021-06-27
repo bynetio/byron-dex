@@ -19,7 +19,9 @@ module Uniswap.OffChain
     ( poolStateCoinFromUniswapCurrency, liquidityCoin
     , CreateParams (..)
     , SwapParams (..)
+    , SwapPreviewParams (..)
     , IndirectSwapParams (..)
+    , ISwapPreviewParams (..)
     , CloseParams (..)
     , RemoveParams (..)
     , AddParams (..)
@@ -45,7 +47,7 @@ import           Plutus.Contract           hiding (when)
 import qualified Plutus.Contracts.Currency as Currency
 import qualified PlutusTx
 import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..), String, show)
+import           Prelude                   (Semigroup (..), String, div, show)
 import           Text.Printf               (printf)
 import           Uniswap.IndirectSwaps
 import           Uniswap.OnChain           (mkUniswapValidator,
@@ -75,6 +77,8 @@ type UniswapUserSchema =
     BlockchainActions
         .\/ Endpoint "create" CreateParams
         .\/ Endpoint "swap"   SwapParams
+        .\/ Endpoint "swapPreview" SwapPreviewParams
+        .\/ Endpoint "iSwapPreview" ISwapPreviewParams
         .\/ Endpoint "iSwap"  IndirectSwapParams
         .\/ Endpoint "close"  CloseParams
         .\/ Endpoint "remove" RemoveParams
@@ -90,7 +94,9 @@ data UserContractState =
     | Funds Value
     | Created
     | Swapped
+    | SwapPreview ((Coin A, Amount A), (Coin B, Amount B))
     | ISwapped
+    | ISwapPreview ((Coin A, Amount A), (Coin B, Amount B))
     | Added
     | Removed
     | Closed
@@ -158,16 +164,31 @@ data CreateParams = CreateParams
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-    { spCoinA  :: Coin A         -- ^ One 'Coin' of the liquidity pair.
-    , spCoinB  :: Coin B         -- ^ The other 'Coin'.
-    , spAmount :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    { spCoinA    :: Coin A         -- ^ One 'Coin' of the liquidity pair.
+    , spCoinB    :: Coin B         -- ^ The other 'Coin'.
+    , spAmount   :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    , spResult   :: Amount B
+    , spSlippage :: Integer
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
+data SwapPreviewParams = SwapPreviewParams
+    { sppCoinA  :: Coin A
+    , sppCoinB  :: Coin B
+    , sppAmount :: Amount A
+    } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data IndirectSwapParams = IndirectSwapParams
-    { ispCoinA  :: Coin A         -- ^ One 'Coin' of the liquidity pair.
-    , ispCoinB  :: Coin B         -- ^ The other 'Coin'.
-    , ispAmount :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    { ispCoinA    :: Coin A         -- ^ One 'Coin' of the liquidity pair.
+    , ispCoinB    :: Coin B         -- ^ The other 'Coin'.
+    , ispAmount   :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    , ispResult   :: Amount B
+    , ispSlippage :: Integer
+    } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+data ISwapPreviewParams = ISwapPreviewParams
+    { isppCoinA  :: Coin A
+    , isppCoinB  :: Coin B
+    , isppAmount :: Amount A
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 
@@ -364,8 +385,14 @@ add us AddParams{..} = do
 
 
 
-
-
+swapPreview :: HasBlockchainActions s => Uniswap -> SwapPreviewParams ->  Contract w s Text ((Coin A, Amount A),(Coin B, Amount B))
+swapPreview us SwapPreviewParams{..} = do
+    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us sppCoinA sppCoinB
+    let outVal = txOutValue $ txOutTxOut o
+    let oldA = amountOf outVal sppCoinA
+        oldB = amountOf outVal sppCoinB
+    let outB = Amount $ findSwap oldA oldB sppAmount
+    return ((sppCoinA, sppAmount),(sppCoinB, outB))
 
 
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
@@ -376,13 +403,15 @@ swap us SwapParams{..} = do
     let outVal = txOutValue $ txOutTxOut o
     let oldA = amountOf outVal spCoinA
         oldB = amountOf outVal spCoinB
-    (newA, newB) <- do
+    (newA, newB, outB) <- do
         let outB = Amount $ findSwap oldA oldB spAmount
         when (outB == 0) $ throwError "no payout"
-        return (oldA + spAmount, oldB - outB)
+        return (oldA + spAmount, oldB - outB, outB)
 
     pkh <- pubKeyHash <$> ownPubKey
 
+    when ((100*unAmount outB `div` unAmount spResult) < (100 - spSlippage)) $
+      throwError "outB amount doesn't meet the slippage criteria"
     logInfo @String $ printf "oldA = %d, oldB = %d, old product = %d, newA = %d, newB = %d, new product = %d" oldA oldB (unAmount oldA * unAmount oldB) newA newB (unAmount newA * unAmount newB)
 
     let inst    = uniswapInstance us
@@ -402,7 +431,23 @@ swap us SwapParams{..} = do
 
 
 
+indirectSwapPreview :: HasBlockchainActions s => Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
+indirectSwapPreview us ISwapPreviewParams{..} = do
+    (oref, o, allPools) <- findUniswapFactory us
+    let outVal = txOutValue $ txOutTxOut o
 
+    relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp)) allPools
+
+    let abstractPools = Map.fromList $ nubBy (\((a1,a2),_) ((b1,b2),_) -> (a1,a2)==(b1,b2) || (a1,a2)==(b2,b1)) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
+            let pOutVal = txOutValue $ txOutTxOut pO
+            in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
+
+    let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
+    let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
+    (path,outB) <- case findBestSwap abstractPools (unCoin isppCoinA,unCoin isppCoinB) (unAmount isppAmount) of
+        Nothing -> throwError "No path found"
+        Just p  -> return p
+    return ((isppCoinA, isppAmount), (isppCoinB, Amount outB))
 
 indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams{..} = do
@@ -418,9 +463,12 @@ indirectSwap us IndirectSwapParams{..} = do
 
     let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
     let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
-    path <- case findBestSwap abstractPools (unCoin ispCoinA,unCoin ispCoinB) (unAmount ispAmount) of
+    (path,outB) <- case findBestSwap abstractPools (unCoin ispCoinA,unCoin ispCoinB) (unAmount ispAmount) of
         Nothing -> throwError "No path found"
         Just p  -> return p
+
+    when ((100* outB `div` unAmount ispResult) < (100 - ispSlippage)) $
+      throwError "outB amount doesn't meet the slippage criteria"
 
 
     logInfo @String (show path)
@@ -568,7 +616,7 @@ ownerEndpoint' = (startHandler) >> ownerEndpoint'
 
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
       startHandler = do
-    	   e <- runError $ (endpoint @"start" >>= start . Just)
+           e <- runError $ (endpoint @"start" >>= start . Just)
     	   tell $ Last $ Just $ case e of
             Left err -> Left err
             Right us -> Right us
@@ -591,7 +639,9 @@ userEndpoints us =
         `select`
     ((f (Proxy @"create") (const Created) create                 `select`
       f (Proxy @"swap")   (const Swapped) swap                   `select`
+      f (Proxy @"swapPreview") SwapPreview swapPreview                 `select`
       f (Proxy @"iSwap")  (const ISwapped) indirectSwap          `select`
+      f (Proxy @"iSwapPreview") ISwapPreview indirectSwapPreview                 `select`
       f (Proxy @"close")  (const Closed)  close                  `select`
       f (Proxy @"remove") (const Removed) remove                 `select`
       f (Proxy @"add")    (const Added)   add                    `select`
