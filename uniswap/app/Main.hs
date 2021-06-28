@@ -64,7 +64,7 @@ myTrace = do
         void $ callEndpoint @"create" h2 (CreateParams customCoin3 customCoin1  1000 1000)
         void $ waitNSlots 1
 
-        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 500)
+--        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 500)
         -- void $ waitNSlots 1
         --void $ callEndpoint @"add" h4 (AddParams customCoin2 customCoin1 1000 0)
         -- void $ waitNSlots 10
