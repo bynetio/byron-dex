@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -605,23 +606,16 @@ ownerEndpoint = (startHandler) >> ownerEndpoint
 
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
       startHandler = do
-    	   e <- runError $ (endpoint @"start" >> start Nothing)
-    	   tell $ Last $ Just $ case e of
-            Left err -> Left err
-            Right us -> Right us
+           e <- runError $ (endpoint @"start" >> start Nothing)
+           tell $ Last $ Just e
 
 ownerEndpoint' :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
 ownerEndpoint' = (startHandler) >> ownerEndpoint'
     where
-
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
       startHandler = do
            e <- runError $ (endpoint @"start" >>= start . Just)
-    	   tell $ Last $ Just $ case e of
-            Left err -> Left err
-            Right us -> Right us
-
-
+           tell $ Last $ Just e
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -637,24 +631,23 @@ userEndpoints :: Uniswap -> Contract (Last (Either Text UserContractState)) Unis
 userEndpoints us =
     stop
         `select`
-    ((f (Proxy @"create") (const Created) create                 `select`
-      f (Proxy @"swap")   (const Swapped) swap                   `select`
-      f (Proxy @"swapPreview") SwapPreview swapPreview                 `select`
-      f (Proxy @"iSwap")  (const ISwapped) indirectSwap          `select`
-      f (Proxy @"iSwapPreview") ISwapPreview indirectSwapPreview                 `select`
-      f (Proxy @"close")  (const Closed)  close                  `select`
-      f (Proxy @"remove") (const Removed) remove                 `select`
-      f (Proxy @"add")    (const Added)   add                    `select`
-      f (Proxy @"pools")  Pools           (\us' () -> pools us') `select`
-      f (Proxy @"funds")  Funds           (\_us () -> funds))    >> userEndpoints us)
+    ((f @"create" (const Created) create                 `select`
+      f @"swap"   (const Swapped) swap                   `select`
+      f @"swapPreview" SwapPreview swapPreview                 `select`
+      f @"iSwap"  (const ISwapped) indirectSwap          `select`
+      f @"iSwapPreview" ISwapPreview indirectSwapPreview                 `select`
+      f @"close"  (const Closed)  close                  `select`
+      f @"remove" (const Removed) remove                 `select`
+      f @"add"    (const Added)   add                    `select`
+      f @"pools"  Pools           (\us' () -> pools us') `select`
+      f @"funds"  Funds           (\_us () -> funds))    >> userEndpoints us)
   where
     f :: forall l a p.
          HasEndpoint l p UniswapUserSchema
-      => Proxy l
-      -> (a -> UserContractState)
+      => (a -> UserContractState)
       -> (Uniswap -> p -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Text a)
       -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
-    f _ g c = do
+    f g c = do
         e <- runError $ do
             p <- endpoint @l
             c us p
