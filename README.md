@@ -22,3 +22,19 @@ Start [plutus hoogle](http://localhost:8080/):
 nix-shell
 bin/start-hoogle
 ```
+
+Generate ctags
+```bash
+find vendor/plutus/ -name "*.*hs" \
+  |  grep -v 'fomega/app/Main.hs' \
+  | grep -v 'nofib/src/Plutus/Benchmark' \
+  | xargs  hs-tags --cabal uniswap/uniswap.cabal -c 
+```
+
+# vscode integration
+
+Plugins
+* [vscode-haskell](https://github.com/haskell/vscode-haskell)
+* [nix-env-selector](https://github.com/arrterian/nix-env-selector)
+* [ctagsx](https://github.com/jtanx/ctagsx)
+
