@@ -102,6 +102,7 @@ amountOf v = Amount . assetClassValueOf v . unCoin
 mkCoin:: CurrencySymbol -> TokenName -> Coin a
 mkCoin c = Coin . assetClass c
 
+-- | Wraps uniswap NFT Token
 newtype Uniswap = Uniswap
     { usCoin :: Coin U
     } deriving stock    (Show, Generic)
@@ -118,34 +119,42 @@ data LiquidityPool = LiquidityPool
     }
     deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
-
 PlutusTx.makeIsDataIndexed ''LiquidityPool [('LiquidityPool, 0)]
 PlutusTx.makeLift ''LiquidityPool
 
 
 liquidityPool :: (Coin A, Coin B) -> Fee -> LiquidityPool
-liquidityPool (Coin a,Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a b)) fee $ fromString $ show fee
+liquidityPool (Coin a, Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a b)) fee $ fromString $ show fee
 
-
+-- | just swap in place the coins not touching types
+swapCoins :: (Coin A, Coin B) -> (Coin A, Coin B)
+swapCoins (ca, cb) = (Coin $ unCoin cb, Coin $ unCoin ca)
 
 instance Eq LiquidityPool where
     {-# INLINABLE (==) #-}
-    x == y = (lpFee x == lpFee y && lpFeeByteString x == lpFeeByteString y) &&
-            ((lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
-             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y)))
+    x == y = cmpFee && cmpCoins (lpCoinA x, lpCoinB x) (lpCoinA y, lpCoinB y)
+      where
+        cmpFee :: Bool
+        cmpFee = lpFee x == lpFee y && lpFeeByteString x == lpFeeByteString y
+
+        cmpCoins :: (Coin A, Coin B) -> (Coin A, Coin B) -> Bool
+        cmpCoins lp1 lp2 = lp1 == lp2 || lp1 == swapCoins lp2
 
 
 instance Prelude.Eq LiquidityPool where
-    x == y = (lpFee x == lpFee y && lpFeeByteString x == lpFeeByteString y) &&
-            ((lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
-             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y)))
-
+    x == y = plutusEq x y
+      where
+        plutusEq :: Eq s => s -> s -> Bool
+        plutusEq s1 s2 = s1 == s2
 
 instance Prelude.Ord LiquidityPool where
   compare (LiquidityPool a b fee fbs) (LiquidityPool a2 b2 fee2 fbs2) =
-    let (a',b') = if unCoin a <= unCoin b then (a,b) else (Coin $ unCoin b,Coin $ unCoin a)
-        (a2',b2') = if unCoin a2 <= unCoin b2 then (a2,b2) else (Coin $ unCoin b2, Coin $ unCoin a2)
-    in Prelude.compare (a',b',fee, fbs) (a2',b2', fee2,fbs2)
+    let lp1   = order (a, b)
+        lp2   = order (a2, b2)
+    in Prelude.compare (lp1, fee, fbs) (lp2, fee2, fbs2)
+    where
+      order :: (Coin A, Coin B) -> (Coin A, Coin B)
+      order (ca, cb) =  if unCoin ca <= unCoin cb then (ca, cb) else swapCoins (ca, cb)
 
 data UniswapAction = Create LiquidityPool | Close | Swap | ISwap | Remove | Add
     deriving Show
@@ -158,6 +167,8 @@ PlutusTx.makeIsDataIndexed ''UniswapAction [ ('Create , 0)
                                            ]
 PlutusTx.makeLift ''UniswapAction
 
+-- | UniswapDatum keeps track of all available liquidity pools @Factory [LiquidityPool]@ or describes a given liquidity pool
+-- by coins pair @LiquidityPool@ and amount of liquidity using @Pool LiquidityPool (Amount Liquidity)@ data cosntructor
 data UniswapDatum =
       Factory [LiquidityPool]
     | Pool LiquidityPool (Amount Liquidity)
