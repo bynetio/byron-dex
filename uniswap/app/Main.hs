@@ -1,45 +1,47 @@
-{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE NumericUnderscores #-}
-{-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE TypeApplications   #-}
-module Main where
-import           Uniswap.OffChain
-import           Uniswap.Types
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TypeApplications #-}
 
-import           Control.Monad.Freer.Extras as Extras
-import           Data.Default
-import           Data.Functor               (void)
-import qualified Data.Map                   as Map
-import           Data.Monoid
-import           Ledger
-import           Plutus.Trace.Emulator      as Emulator
-import qualified Plutus.V1.Ledger.Ada       as Ada
-import qualified Plutus.V1.Ledger.Value     as Value
-import           Wallet.Emulator.Wallet     as Wallet
+module Main where
+
+import Control.Monad.Freer.Extras as Extras
+import Data.Default
+import Data.Functor (void)
+import qualified Data.Map as Map
+import Data.Monoid
+import Ledger
+import Plutus.Trace.Emulator as Emulator
+import qualified Plutus.V1.Ledger.Ada as Ada
+import qualified Plutus.V1.Ledger.Value as Value
+import Uniswap.OffChain
+import Uniswap.Types
+import Wallet.Emulator.Wallet as Wallet
+
 customSymbol = "ff"
+
 customToken = "PLN"
 
-customSymbolsAndTokens = [("ff","coin1"),("ee","coin2"),("dd","coin3"),("cc","coin4"),("bb","coin5")]
-[customCoin1,customCoin2,customCoin3,customCoin4,customCoin5] = map (Coin . uncurry Value.assetClass) customSymbolsAndTokens
+customSymbolsAndTokens = [("ff", "coin1"), ("ee", "coin2"), ("dd", "coin3"), ("cc", "coin4"), ("bb", "coin5")]
+
+[customCoin1, customCoin2, customCoin3, customCoin4, customCoin5] = map (Coin . uncurry Value.assetClass) customSymbolsAndTokens
+
 customSymbol2 = "ee"
+
 customToken2 = "BTC"
 
 customSymbol3 = "dd"
+
 customToken3 = "ETH"
-
-
 
 main :: IO ()
 main = runEmulatorTraceIO' def emulatorCfg myTrace
   where
-    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1..4]])
+    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1 .. 4]])
       where
-        v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
-
-
+        v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol, tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
 adaCoin = Coin $ Value.assetClass "" ""
-
 
 myTrace :: EmulatorTrace ()
 myTrace = do
@@ -49,10 +51,8 @@ myTrace = do
   maybePool <- getLast <$> observableState h1
   case maybePool of
     Just (Right pool) -> userTrace pool
-    _                 -> return ()
+    _ -> return ()
   void $ waitNSlots 10
-
-
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
