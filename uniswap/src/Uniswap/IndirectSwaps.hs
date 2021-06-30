@@ -7,13 +7,13 @@ import           Prelude          (div, (^))
 import           Uniswap.Pool
 import           Uniswap.Types
 
-findSwap :: Amount A -> Amount B -> Amount A -> Integer
-findSwap oldA oldB inA
+findSwap :: Amount A -> Amount B -> Amount A -> Fee -> Integer
+findSwap oldA oldB inA fee
     | ub' <= 1   = 0
     | otherwise  = go 1 ub'
   where
     cs :: Integer -> Bool
-    cs outB = checkSwap oldA oldB (oldA + inA) (oldB - Amount outB)
+    cs outB = checkSwap oldA oldB (oldA + inA) (oldB - Amount outB) fee
 
     ub' :: Integer
     ub' = head $ dropWhile cs [2 ^ i | i <- [0 :: Integer ..]]
@@ -31,16 +31,16 @@ findSwap oldA oldB inA
 
 
 
-findPaths :: (Eq c, Ord c) => (c,c) -> [(c,c)] -> [[(c,c)]]
-findPaths (start,goal) pairs = go start (pairs ++ map (\(a,b)->(b,a)) pairs)
+findPaths :: (Eq c, Ord c) => (c,c) -> [(c,c,Fee)] -> [[(c,c,Fee)]]
+findPaths (start,goal) keys = go start (keys ++ map (\(a,b,fee)->(b,a,fee)) keys)
    where
          go a availablePairs
              | a == goal = [[]]
              | otherwise = do
-            (a',b') <- availablePairs
+            (a',b',fee) <- availablePairs
             guard (a' == a)
-            rest <- go b' (filter ((a' /=) . fst) availablePairs)
-            return ((a',b') : rest)
+            rest <- go b' (filter (\(a,_,_)->a'/=a) availablePairs)
+            return ((a',b',fee) : rest)
 
 
 
@@ -57,15 +57,15 @@ findBestSwap pools (ca,cb) swapAmount =
 
   where
         paths = findPaths (ca,cb) (Map.keys pools)
-        allPools = Map.union pools (Map.fromList $ map (\((c1,c2),(a,b)) -> ((c2,c1),(b,a) )) $ Map.toList pools)
-        price' initialSwapAmount path = foldl' (\maybeAmount (a,b) ->
+        allPools = Map.union pools (Map.fromList $ map (\((c1,c2, fee),(a,b)) -> ((c2,c1,fee),(b,a) )) $ Map.toList pools)
+        price' initialSwapAmount path = foldl' (\maybeAmount (a,b,fee) ->
                                           case maybeAmount of
                                             Nothing -> Nothing
-                                            Just currentSwapAmount -> findSwap' currentSwapAmount (a,b)) (Just initialSwapAmount) path
+                                            Just currentSwapAmount -> findSwap' currentSwapAmount (a,b,fee)) (Just initialSwapAmount) path
 
-        findSwap' currentSwapAmount pair = do
-            (a,b) <- Map.lookup pair allPools
-            let out = findSwap (Amount a) (Amount b) (Amount currentSwapAmount)
+        findSwap' currentSwapAmount (ca,cb,fee) = do
+            (a,b) <- Map.lookup (ca,cb,fee) allPools
+            let out = findSwap (Amount a) (Amount b) (Amount currentSwapAmount) fee
             guard (out > 0)
             return out
 

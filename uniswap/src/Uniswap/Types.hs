@@ -22,15 +22,19 @@
 module Uniswap.Types
   where
 
+import           Data.String
 import           Ledger
 import           Ledger.Value        (AssetClass (..), assetClass,
                                       assetClassValue, assetClassValueOf)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude
-import           Prelude             (Show)
+import           Prelude             (Show, show)
 import qualified Prelude
 import           Text.Printf         (PrintfArg)
+
+
+type Fee = (Integer,Integer)
 
 -- | Uniswap coin token
 data U = U
@@ -107,8 +111,10 @@ PlutusTx.makeIsDataIndexed ''Uniswap [('Uniswap, 0)]
 PlutusTx.makeLift ''Uniswap
 
 data LiquidityPool = LiquidityPool
-    { lpCoinA :: Coin A
-    , lpCoinB :: Coin B
+    { lpCoinA         :: Coin A
+    , lpCoinB         :: Coin B
+    , lpFee           :: Fee
+    , lpFeeByteString :: ByteString
     }
     deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
@@ -117,29 +123,29 @@ PlutusTx.makeIsDataIndexed ''LiquidityPool [('LiquidityPool, 0)]
 PlutusTx.makeLift ''LiquidityPool
 
 
-liquidityPool :: (Coin A, Coin B) -> LiquidityPool
-liquidityPool (Coin a,Coin b) = LiquidityPool (Coin (min a b)) (Coin (max a b))
+liquidityPool :: (Coin A, Coin B) -> Fee -> LiquidityPool
+liquidityPool (Coin a,Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a b)) fee $ fromString $ show fee
 
 
 
 instance Eq LiquidityPool where
     {-# INLINABLE (==) #-}
-    x == y = (lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
-              -- Make sure the underlying coins aren't equal.
-             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y))
+    x == y = (lpFee x == lpFee y && lpFeeByteString x == lpFeeByteString y) &&
+            ((lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
+             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y)))
 
 
 instance Prelude.Eq LiquidityPool where
-    x == y = (lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
-              -- Make sure the underlying coins aren't equal.
-             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y))
+    x == y = (lpFee x == lpFee y && lpFeeByteString x == lpFeeByteString y) &&
+            ((lpCoinA x == lpCoinA y && lpCoinB x == lpCoinB y) ||
+             (unCoin (lpCoinA x) == unCoin (lpCoinB y) && unCoin (lpCoinB x) == unCoin (lpCoinA y)))
 
 
 instance Prelude.Ord LiquidityPool where
-  compare (LiquidityPool a b) (LiquidityPool a2 b2) =
+  compare (LiquidityPool a b fee fbs) (LiquidityPool a2 b2 fee2 fbs2) =
     let (a',b') = if unCoin a <= unCoin b then (a,b) else (Coin $ unCoin b,Coin $ unCoin a)
         (a2',b2') = if unCoin a2 <= unCoin b2 then (a2,b2) else (Coin $ unCoin b2, Coin $ unCoin a2)
-    in Prelude.compare (a',b') (a2',b2')
+    in Prelude.compare (a',b',fee, fbs) (a2',b2', fee2,fbs2)
 
 data UniswapAction = Create LiquidityPool | Close | Swap | ISwap | Remove | Add
     deriving Show
