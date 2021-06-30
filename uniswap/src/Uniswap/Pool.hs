@@ -10,12 +10,14 @@ module Uniswap.Pool
   , lpTicker
   ) where
 
-import           Ledger.Value     (TokenName (..), unAssetClass,
-                                   unCurrencySymbol)
+import           Data.ByteString   as BS
+import           Ledger.Value      (TokenName (..), unAssetClass,
+                                    unCurrencySymbol)
+import           PlutusTx.Builtins (String, charToString)
 import           PlutusTx.Prelude
 import           PlutusTx.Sqrt
+import           Prelude           (fromIntegral)
 import           Uniswap.Types
-
 {-# INLINABLE calculateInitialLiquidity #-}
 -- | The initial liquidity is 'ceil( sqrt(x*y) )' where 'x' is the amount of
 -- 'Coin A' and y the amount of 'Coin B'.  See Eq. 13 of the Uniswap v2 paper.
@@ -64,8 +66,8 @@ calculateRemoval inA inB liquidity' diff' = (f inA, f inB)
 {-# INLINABLE checkSwap #-}
 -- | A swap is valid if the fee is computed correctly, and we're swapping some
 -- positive amount of A for B.  See: <https://uniswap.org/whitepaper.pdf> Eq (11) (Page 7.)
-checkSwap :: Amount A -> Amount B -> Amount A -> Amount B -> Bool
-checkSwap oldA' oldB' newA' newB' =
+checkSwap :: Amount A -> Amount B -> Amount A -> Amount B -> (Integer,Integer) -> Bool
+checkSwap oldA' oldB' newA' newB' (feeNum, feeDen) =
     traceIfFalse "expected positive oldA" (oldA > 0) &&
     traceIfFalse "expected positive oldB" (oldB > 0) &&
     traceIfFalse "expected positive-newA" (newA > 0) &&
@@ -85,9 +87,6 @@ checkSwap oldA' oldB' newA' newB' =
     -- The uniswap fee is 0.3%; here it is multiplied by 1000, so that the
     -- on-chain code deals only in integers.
     -- See: <https://uniswap.org/whitepaper.pdf> Eq (11) (Page 7.)
-    feeNum, feeDen :: Integer
-    feeNum = 3
-    feeDen = 1000
 
 {-# INLINABLE lpTicker #-}
 -- | Generate a unique token name for this particular pool; based on the
@@ -106,4 +105,5 @@ lpTicker LiquidityPool{..}  = TokenName hash
       h2   = sha2_256 $ unTokenName y2
       h3   = sha2_256 $ unCurrencySymbol x1
       h4   = sha2_256 $ unCurrencySymbol x2
-      hash = sha2_256 $ h1 <> h2 <> h3 <> h4
+      h5   = sha2_256 $ lpFeeByteString
+      hash = sha2_256 $ h1 <> h2 <> h3 <> h4 <> h5

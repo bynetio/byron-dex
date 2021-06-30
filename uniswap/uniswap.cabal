@@ -45,6 +45,7 @@ library
                      , plutus-use-cases
                      , prettyprinter
                      , text		 
+                     , bytestring
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
@@ -117,4 +118,5 @@ executable uniswap-pab
     aeson -any,
     containers -any,
     text -any,
-    plutus-use-cases -any
+    plutus-use-cases -any,
+    plutus-ledger-api -any

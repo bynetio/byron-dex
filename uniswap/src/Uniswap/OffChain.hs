@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
@@ -35,10 +36,8 @@ import           Control.Applicative       ((<|>))
 import           Control.Monad             hiding (fmap, mapM, mapM_)
 import qualified Data.Map                  as Map
 import           Data.Monoid               (Last (..))
-import           Data.Proxy                (Proxy (..))
 import           Data.Text                 (Text, pack)
 import           Data.Void                 (Void)
-import           Debug.Trace
 import           Ledger                    hiding (singleton)
 import           Ledger.Constraints        as Constraints
 import qualified Ledger.Typed.Scripts      as Scripts
@@ -56,6 +55,8 @@ import           Uniswap.Pool
 import           Uniswap.Types
 
 import           Data.List                 (nubBy, scanl)
+import           Plutus.V1.Ledger.Value    (AssetClass)
+
 data Uniswapping
 instance Scripts.ScriptType Uniswapping where
     type instance RedeemerType Uniswapping = UniswapAction
@@ -90,11 +91,11 @@ type UniswapUserSchema =
 
 -- | Type of the Uniswap user contract state.
 data UserContractState =
-      Pools [((Coin A, Amount A), (Coin B, Amount B))]
+      Pools [((Coin A, Amount A), (Coin B, Amount B),Fee)]
     | Funds Value
     | Created
     | Swapped
-    | SwapPreview ((Coin A, Amount A), (Coin B, Amount B))
+    | SwapPreview ((Coin A, Amount A), (Coin B, Amount B),Fee)
     | ISwapped
     | ISwapPreview ((Coin A, Amount A), (Coin B, Amount B))
     | Added
@@ -150,13 +151,15 @@ poolStateCoinFromUniswapCurrency = poolStateCoin . uniswap
 liquidityCoin :: CurrencySymbol -- ^ The currency identifying the Uniswap instance.
               -> Coin A         -- ^ One coin in the liquidity pair.
               -> Coin B         -- ^ The other coin in the liquidity pair.
+              -> Fee -- ^ Numerator and denominator of the swap fee
               -> Coin Liquidity
-liquidityCoin cs coinA coinB = mkCoin (liquidityCurrency $ uniswap cs) $ lpTicker $ LiquidityPool coinA coinB
+liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpTicker $ liquidityPool (coinA, coinB) fee
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
     { cpCoinA   :: Coin A   -- ^ One 'Coin' of the liquidity pair.
     , cpCoinB   :: Coin B   -- ^ The other 'Coin'.
+    , cpFee     :: Fee -- ^ Numerator and denominator of the swap fee
     , cpAmountA :: Amount A -- ^ Amount of liquidity for the first 'Coin'.
     , cpAmountB :: Amount B -- ^ Amount of liquidity for the second 'Coin'.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
@@ -166,6 +169,7 @@ data CreateParams = CreateParams
 data SwapParams = SwapParams
     { spCoinA    :: Coin A         -- ^ One 'Coin' of the liquidity pair.
     , spCoinB    :: Coin B         -- ^ The other 'Coin'.
+    , spFee      :: Fee -- ^ Numerator and denominator of the swap fee
     , spAmount   :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
     , spResult   :: Amount B
     , spSlippage :: Integer
@@ -174,6 +178,7 @@ data SwapParams = SwapParams
 data SwapPreviewParams = SwapPreviewParams
     { sppCoinA  :: Coin A
     , sppCoinB  :: Coin B
+    , sppFee    :: Fee -- ^ Numerator and denominator of the swap fee
     , sppAmount :: Amount A
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
@@ -196,12 +201,14 @@ data ISwapPreviewParams = ISwapPreviewParams
 data CloseParams = CloseParams
     { clpCoinA :: Coin A         -- ^ One 'Coin' of the liquidity pair.
     , clpCoinB :: Coin B         -- ^ The other 'Coin' of the liquidity pair.
+    , clpFee   :: Fee -- ^ Numerator and denominator of the swap fee
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
     { rpCoinA :: Coin A           -- ^ One 'Coin' of the liquidity pair.
     , rpCoinB :: Coin B           -- ^ The other 'Coin' of the liquidity pair.
+    , rpFee   :: Fee -- ^ Numerator and denominator of the swap fee
     , rpDiff  :: Amount Liquidity -- ^ The amount of liquidity tokens to burn in exchange for liquidity from the pool.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
@@ -209,6 +216,7 @@ data RemoveParams = RemoveParams
 data AddParams = AddParams
     { apCoinA   :: Coin A         -- ^ One 'Coin' of the liquidity pair.
     , apCoinB   :: Coin B         -- ^ The other 'Coin' of the liquidity pair.
+    , apFee     :: Fee -- ^ Numerator and denominator of the swap fee
     , apAmountA :: Amount A       -- ^ The amount of coins of the first kind to add to the pool.
     , apAmountB :: Amount B       -- ^ The amount of coins of the second kind to add to the pool.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
@@ -242,7 +250,7 @@ create us CreateParams{..} = do
     when (cpAmountA <= 0 || cpAmountB <= 0) $ throwError "amounts must be positive"
     (oref, o, lps) <- findUniswapFactory us
     let liquidity = calculateInitialLiquidity cpAmountA cpAmountB
-        lp        = LiquidityPool {lpCoinA = cpCoinA, lpCoinB = cpCoinB}
+        lp        = liquidityPool (cpCoinA, cpCoinB) cpFee
     let usInst   = uniswapInstance us
         usScript = uniswapScript us
         usDat1   = Factory $ lp : lps
@@ -270,7 +278,7 @@ create us CreateParams{..} = do
 -- | Closes a liquidity pool by burning all remaining liquidity tokens in exchange for all liquidity remaining in the pool.
 close :: HasBlockchainActions s => Uniswap -> CloseParams -> Contract w s Text ()
 close us CloseParams{..} = do
-    ((oref1, o1, lps), (oref2, o2, lp, liquidity)) <- findUniswapFactoryAndPool us clpCoinA clpCoinB
+    ((oref1, o1, lps), (oref2, o2, lp, liquidity)) <- findUniswapFactoryAndPool us clpCoinA clpCoinB clpFee
     pkh                                            <- pubKeyHash <$> ownPubKey
     let usInst   = uniswapInstance us
         usScript = uniswapScript us
@@ -303,7 +311,7 @@ close us CloseParams{..} = do
 -- | Removes some liquidity from a liquidity pool in exchange for liquidity tokens.
 remove :: HasBlockchainActions s => Uniswap -> RemoveParams -> Contract w s Text ()
 remove us RemoveParams{..} = do
-    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us rpCoinA rpCoinB
+    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us rpCoinA rpCoinB rpFee
     pkh                           <- pubKeyHash <$> ownPubKey
     when (rpDiff < 1 || rpDiff >= liquidity) $ throwError "removed liquidity must be positive and less than total liquidity"
     let usInst       = uniswapInstance us
@@ -339,7 +347,7 @@ remove us RemoveParams{..} = do
 add :: HasBlockchainActions s => Uniswap -> AddParams -> Contract w s Text ()
 add us AddParams{..} = do
     pkh                           <- pubKeyHash <$> ownPubKey
-    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us apCoinA apCoinB
+    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us apCoinA apCoinB apFee
     logInfo @String $ printf "old liquidity = %d" $ unAmount liquidity
     when (apAmountA < 0 || apAmountB < 0) $ throwError "amounts must not be negative"
     let outVal = txOutValue $ txOutTxOut o
@@ -385,26 +393,26 @@ add us AddParams{..} = do
 
 
 
-swapPreview :: HasBlockchainActions s => Uniswap -> SwapPreviewParams ->  Contract w s Text ((Coin A, Amount A),(Coin B, Amount B))
+swapPreview :: HasBlockchainActions s => Uniswap -> SwapPreviewParams ->  Contract w s Text ((Coin A, Amount A),(Coin B, Amount B),Fee)
 swapPreview us SwapPreviewParams{..} = do
-    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us sppCoinA sppCoinB
+    (_, (_, o, _, _)) <- findUniswapFactoryAndPool us sppCoinA sppCoinB sppFee
     let outVal = txOutValue $ txOutTxOut o
     let oldA = amountOf outVal sppCoinA
         oldB = amountOf outVal sppCoinB
-    let outB = Amount $ findSwap oldA oldB sppAmount
-    return ((sppCoinA, sppAmount),(sppCoinB, outB))
+    let outB = Amount $ findSwap oldA oldB sppAmount sppFee
+    return ((sppCoinA, sppAmount),(sppCoinB, outB), sppFee)
 
 
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
 swap :: HasBlockchainActions s => Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams{..} = do
     unless (spAmount > 0) $ throwError "amount must be positive"
-    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us spCoinA spCoinB
+    (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us spCoinA spCoinB spFee
     let outVal = txOutValue $ txOutTxOut o
     let oldA = amountOf outVal spCoinA
         oldB = amountOf outVal spCoinB
     (newA, newB, outB) <- do
-        let outB = Amount $ findSwap oldA oldB spAmount
+        let outB = Amount $ findSwap oldA oldB spAmount spFee
         when (outB == 0) $ throwError "no payout"
         return (oldA + spAmount, oldB - outB, outB)
 
@@ -433,36 +441,38 @@ swap us SwapParams{..} = do
 
 indirectSwapPreview :: HasBlockchainActions s => Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
 indirectSwapPreview us ISwapPreviewParams{..} = do
-    (oref, o, allPools) <- findUniswapFactory us
-    let outVal = txOutValue $ txOutTxOut o
-
-    relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp)) allPools
-
-    let abstractPools = Map.fromList $ nubBy (\((a1,a2),_) ((b1,b2),_) -> (a1,a2)==(b1,b2) || (a1,a2)==(b2,b1)) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
-            let pOutVal = txOutValue $ txOutTxOut pO
-            in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
-
-    let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
-    let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
-    (path,outB) <- case findBestSwap abstractPools (unCoin isppCoinA,unCoin isppCoinB) (unAmount isppAmount) of
+    abstractPools <- uniquePools us
+    (_, outB) <- case findBestSwap abstractPools (unCoin isppCoinA,unCoin isppCoinB) (unAmount isppAmount) of
         Nothing -> throwError "No path found"
         Just p  -> return p
     return ((isppCoinA, isppAmount), (isppCoinB, Amount outB))
 
+uniquePools :: HasBlockchainActions s => Uniswap -> Contract w s Text (Map.Map (AssetClass, AssetClass,Fee) (Integer, Integer))
+uniquePools us = do
+    (_, _, allPools) <- findUniswapFactory us
+    relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp)) allPools
+    let uniquePools' = Map.fromList $ distinctPools $ map (\((_, pO,_), LiquidityPool {..}) ->
+            let pOutVal = txOutValue $ txOutTxOut pO
+                amountA = unAmount $ amountOf pOutVal lpCoinA
+                amountB = unAmount $ amountOf pOutVal lpCoinB
+            in ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (amountA, amountB))) relevantPools
+    return uniquePools'
+  where
+    distinctPools :: [((AssetClass, AssetClass, Fee), (Integer, Integer))] -> [((AssetClass, AssetClass, Fee), (Integer, Integer))]
+    distinctPools = nubBy eqPool
+      where
+       eqPool ((a1, a2, f1),_) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
+
+
 indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams{..} = do
     unless (ispAmount > 0) $ throwError "amount must be positive"
-    (oref, o, allPools) <- findUniswapFactory us
-    let outVal = txOutValue $ txOutTxOut o
-
+    (_, _, allPools) <- findUniswapFactory us
     relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x,lp)) allPools
+    abstractPools <- uniquePools us
+    let orefs = Map.fromList $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (pRef, pO))) relevantPools
+    let myPools = Map.fromList $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (pool,liquidity))) relevantPools
 
-    let abstractPools = Map.fromList $ nubBy (\((a1,a2),_) ((b1,b2),_) -> (a1,a2)==(b1,b2) || (a1,a2)==(b2,b1)) $ (map (\((pRef, pO,_), LiquidityPool {..}) ->
-            let pOutVal = txOutValue $ txOutTxOut pO
-            in ((unCoin lpCoinA, unCoin lpCoinB), (unAmount $ amountOf pOutVal lpCoinA, unAmount $ amountOf pOutVal lpCoinB)))) relevantPools
-
-    let orefs = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pRef, pO))) relevantPools
-    let pools = Map.fromList $ nubBy (\a b -> fst a == fst b) $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB), (pool,liquidity))) relevantPools
     (path,outB) <- case findBestSwap abstractPools (unCoin ispCoinA,unCoin ispCoinB) (unAmount ispAmount) of
         Nothing -> throwError "No path found"
         Just p  -> return p
@@ -472,7 +482,7 @@ indirectSwap us IndirectSwapParams{..} = do
 
 
     logInfo @String (show path)
-    let moneyToPay = zip path $ scanl (\amount (a,b) -> let Just (a',b') = Map.lookup (a,b) abstractPools <|> ((\(x,y)->(y,x)) <$> Map.lookup (b,a) abstractPools) in (Amount $ findSwap (Amount a') (Amount b') amount)) ispAmount path
+    let moneyToPay = zip path $ scanl (\amount (a,b, fee) -> let Just (a',b') = Map.lookup (a,b,fee) abstractPools <|> ((\(x,y)->(y,x)) <$> Map.lookup (b,a, fee) abstractPools) in (Amount $ findSwap (Amount a') (Amount b') amount fee)) ispAmount path
     pkh <- pubKeyHash <$> ownPubKey
 
     let inst    = uniswapInstance us
@@ -482,11 +492,12 @@ indirectSwap us IndirectSwapParams{..} = do
                   Constraints.unspentOutputs (Map.fromList $ map (\((oref,o,_),_) -> (oref,o)) relevantPools)      <>
                   Constraints.ownPubKeyHash pkh
 
-        tx      = mconcat $ map (\((a,b),amount) ->
-                                    let Just (oref,_) = Map.lookup (a,b) orefs <|> Map.lookup (b,a) orefs
-                                        Just (pool, liquidity) = Map.lookup (a,b) pools <|> Map.lookup (b,a) pools
-                                        Just (oldA,oldB) = Map.lookup (a,b) abstractPools <|> (let Just (b',a') = Map.lookup (b,a) abstractPools in Just (a',b'))
-                                        (newA,newB) = (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount)
+        tx      = mconcat $ map (\((a,b,fee),amount) ->
+                                    let Just (oref,_) = Map.lookup (a,b,fee) orefs <|> Map.lookup (b,a,fee) orefs
+                                        Just (pool, liquidity) = Map.lookup (a,b,fee) myPools <|> Map.lookup (b,a,fee) myPools
+                                        Just (oldA,oldB) = Map.lookup (a,b,fee) abstractPools <|> (let Just (b',a') = Map.lookup (b,a,fee) abstractPools in Just (a',b'))
+                                        (newA,newB) = (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount fee)
+
                                         val = valueOf (Coin a) (Amount newA) <> valueOf (Coin b) (Amount newB) <> unitValue (poolStateCoin us)
                                     in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
                                        Constraints.mustPayToTheScript (Pool pool liquidity) val
@@ -499,20 +510,14 @@ indirectSwap us IndirectSwapParams{..} = do
     ledgerTx <- submitTxConstraintsWith lookups tx
     void $ awaitTxConfirmed $ txId ledgerTx
 
-
-
-
-
-
-
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. HasBlockchainActions s => Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B))]
+pools :: forall w s. HasBlockchainActions s => Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
 pools us = do
     utxos <- utxoAt (uniswapAddress us)
     go $ snd <$> Map.toList utxos
   where
-    go :: [TxOutTx] -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B))]
+    go :: [TxOutTx] -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
     go []       = return []
     go (o : os) = do
         let v = txOutValue $ txOutTxOut o
@@ -526,7 +531,7 @@ pools us = do
                             coinB = lpCoinB lp
                             amtA  = amountOf v coinA
                             amtB  = amountOf v coinB
-                            s     = ((coinA, amtA), (coinB, amtB))
+                            s     = ((coinA, amtA), (coinB, amtB), lpFee lp)
                         logInfo $ "found pool: " ++ show s
                         ss <- go os
                         return $ s : ss
@@ -582,14 +587,15 @@ findUniswapFactoryAndPool :: HasBlockchainActions s
                           => Uniswap
                           -> Coin A
                           -> Coin B
+                          -> (Integer, Integer)
                           -> Contract w s Text ( (TxOutRef, TxOutTx, [LiquidityPool])
                                                , (TxOutRef, TxOutTx, LiquidityPool, Amount Liquidity)
                                                )
-findUniswapFactoryAndPool us coinA coinB = do
+findUniswapFactoryAndPool us coinA coinB fee = do
     (oref1, o1, lps) <- findUniswapFactory us
     case [ lp'
          | lp' <- lps
-         , lp' == LiquidityPool coinA coinB
+         , lp' == liquidityPool (coinA, coinB) fee
          ] of
         [lp] -> do
             (oref2, o2, a) <- findUniswapPool us lp
@@ -600,28 +606,21 @@ findUniswapFactoryAndPool us coinA coinB = do
 
 
 ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
-ownerEndpoint = (startHandler) >> ownerEndpoint
+ownerEndpoint = startHandler >> ownerEndpoint
     where
 
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
       startHandler = do
-    	   e <- runError $ (endpoint @"start" >> start Nothing)
-    	   tell $ Last $ Just $ case e of
-            Left err -> Left err
-            Right us -> Right us
+           e <- runError $ (endpoint @"start" >> start Nothing)
+           tell $ Last $ Just e
 
 ownerEndpoint' :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
-ownerEndpoint' = (startHandler) >> ownerEndpoint'
+ownerEndpoint' = startHandler >> ownerEndpoint'
     where
-
       startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
       startHandler = do
            e <- runError $ (endpoint @"start" >>= start . Just)
-    	   tell $ Last $ Just $ case e of
-            Left err -> Left err
-            Right us -> Right us
-
-
+           tell $ Last $ Just e
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -637,30 +636,29 @@ userEndpoints :: Uniswap -> Contract (Last (Either Text UserContractState)) Unis
 userEndpoints us =
     stop
         `select`
-    ((f (Proxy @"create") (const Created) create                 `select`
-      f (Proxy @"swap")   (const Swapped) swap                   `select`
-      f (Proxy @"swapPreview") SwapPreview swapPreview                 `select`
-      f (Proxy @"iSwap")  (const ISwapped) indirectSwap          `select`
-      f (Proxy @"iSwapPreview") ISwapPreview indirectSwapPreview                 `select`
-      f (Proxy @"close")  (const Closed)  close                  `select`
-      f (Proxy @"remove") (const Removed) remove                 `select`
-      f (Proxy @"add")    (const Added)   add                    `select`
-      f (Proxy @"pools")  Pools           (\us' () -> pools us') `select`
-      f (Proxy @"funds")  Funds           (\_us () -> funds))    >> userEndpoints us)
+    ((f @"create" (const Created) create                 `select`
+      f @"swap"   (const Swapped) swap                   `select`
+      f @"swapPreview" SwapPreview swapPreview                 `select`
+      f @"iSwap"  (const ISwapped) indirectSwap          `select`
+      f @"iSwapPreview" ISwapPreview indirectSwapPreview                 `select`
+      f @"close"  (const Closed)  close                  `select`
+      f @"remove" (const Removed) remove                 `select`
+      f @"add"    (const Added)   add                    `select`
+      f @"pools"  Pools           (\us' () -> pools us') `select`
+      f @"funds"  Funds           (\_us () -> funds))    >> userEndpoints us)
   where
     f :: forall l a p.
          HasEndpoint l p UniswapUserSchema
-      => Proxy l
-      -> (a -> UserContractState)
+      => (a -> UserContractState)
       -> (Uniswap -> p -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Text a)
       -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
-    f _ g c = do
+    f g c = do
         e <- runError $ do
             p <- endpoint @l
             c us p
 
         case e of
-            Left err -> logInfo @Text ("ERROR POLECIAL ERROR:      " <> err) >> (tell $ Last $ Just $ Left err)
+            Left err -> logInfo @Text ("Error during calling endpoint: " <> err) >> tell (Last $ Just $ Left err)
             Right a  -> tell $ Last $ Just $ Right $ g a
 
     stop :: Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
