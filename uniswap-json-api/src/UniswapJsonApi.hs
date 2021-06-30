@@ -1,44 +1,47 @@
-{-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
 
 module UniswapJsonApi where
 
-import           Control.Monad.Reader
-import           Data.Aeson
-import           Data.Text
-import           GHC.Generics
-import           Network.Wai.Handler.Warp
-import           Servant
+import Control.Monad.Reader
+import Data.Aeson
+import Data.Text
+import GHC.Generics
+import Network.Wai.Handler.Warp
+import Servant
+import UniswapJsonApi.Logic as Logic
+import UniswapJsonApi.Model as Model
 
-import           UniswapJsonApi.Logic     as Logic
-import           UniswapJsonApi.Model     as Model
-
-type SwapApi = "create"        :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-          :<|> "swap"          :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-          :<|> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-          :<|> "close"         :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text                                                           :> Post '[JSON] ()
-          :<|> "remove"        :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int                                :> Post '[JSON] ()
-          :<|> "add"           :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-          :<|> "pools"                                                                                                                           :> Get  '[JSON] ()
-          :<|> "funds"                                                                                                                           :> Get  '[JSON] ()
-          :<|> "stop"                                                                                                                            :> Get  '[JSON] ()
-          :<|> "todos"         :> Capture "id" Int                                                                                               :> Get  '[JSON] ()
-          :<|> "posts"         :> Capture "id" Int                                                                                               :> Get  '[JSON] ()
+type SwapApi =
+  Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "indirect_swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "close" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "remove" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "add" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
+    :<|> Capture "id" Text :> "pools" :> Get '[JSON] ()
+    :<|> Capture "id" Text :> "funds" :> Get '[JSON] ()
+    :<|> Capture "id" Text :> "stop" :> Get '[JSON] ()
+    :<|> Capture "id" Text :> "status" :> Get '[JSON] UniswapStatusResponse
 
 swapServer :: Config -> Server SwapApi
-swapServer c = Logic.create c
-          :<|> Logic.swap c
-          :<|> Logic.indirectSwap c
-          :<|> Logic.close c
-          :<|> Logic.remove c
-          :<|> Logic.add c
-          :<|> Logic.pools c
-          :<|> Logic.funds c
-          :<|> Logic.stop c
-          :<|> Logic.todos c
-          :<|> Logic.posts c
+swapServer c =
+  Logic.create c
+    :<|> Logic.swap c
+    :<|> Logic.swapPreview c
+    :<|> Logic.indirectSwap c
+    :<|> Logic.indirectSwapPreview c
+    :<|> Logic.close c
+    :<|> Logic.remove c
+    :<|> Logic.add c
+    :<|> Logic.pools c
+    :<|> Logic.funds c
+    :<|> Logic.stop c
+    :<|> Logic.status c
 
-swapApp :: Config ->  Application
+swapApp :: Config -> Application
 swapApp c = serve (Proxy :: Proxy SwapApi) (swapServer c)
 
 runApp :: Config -> IO ()

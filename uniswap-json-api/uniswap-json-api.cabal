@@ -11,10 +11,12 @@ library
                     , UniswapJsonApi.Client
                     , UniswapJsonApi.Model
   build-depends:      base
+                    , bytestring
                     , aeson
                     , http-client
                     , http-client-tls
                     , mtl
+                    , retry
                     , servant
                     , servant-client
                     , servant-server

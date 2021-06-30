@@ -1,41 +1,56 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module UniswapJsonApi.Model where
 
-import           Data.Aeson
-import qualified Data.Text as T
+import Data.Aeson
+import Data.Text
+import GHC.Generics
 
-data Config = Config { _port    :: Int
-                     , _apiUrl  :: String
-                     , _apiPort :: Int
-                     }
+data Config = Config
+  { _port :: Int,
+    _apiUrl :: String,
+    _apiPort :: Int
+  }
 
-data PlaceholderTodoResponse =
-  PlaceholderTodoResponse { tid        :: Int
-                          , tuserId    :: Int
-                          , ttitle     :: T.Text
-                          , tcompleted :: Bool
-                          } deriving (Eq, Show)
+type PABResponse a = Either Text a
 
-data PlaceholderPostResponse =
-  PlaceholderPostResponse { pid     :: Int
-                          , puserId :: Int
-                          , ptitle  :: T.Text
-                          , pbody   :: T.Text
-                          } deriving (Eq, Show)
+data UniswapStatusResponse = UniswapStatusResponse
+  { cicCurrentState :: UniswapCurrentState,
+    cicContract :: UniswapContract,
+    cicWallet :: UniswapWallet,
+    cicDefintion :: UniswapDefinition
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
 
-instance FromJSON PlaceholderTodoResponse where
-  parseJSON = withObject "response" $ \o -> do
-    i <- o .: "id"
-    u <- o .: "userId"
-    t <- o .: "title"
-    c <- o .: "completed"
-    return $ PlaceholderTodoResponse i u t c
+data UniswapHook = UniswapHook
+  { rqID :: Integer,
+    itID :: Integer,
+    rqRequest :: Value
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
 
-instance FromJSON PlaceholderPostResponse where
-  parseJSON = withObject "response" $ \o -> do
-    i <- o .: "id"
-    u <- o .: "userId"
-    t <- o .: "title"
-    b <- o .: "body"
-    return $ PlaceholderPostResponse i u t b
+data UniswapCurrentState = UniswapCurrentState
+  { observableState :: Either Text UniswapDefinition,
+    hooks :: [UniswapHook],
+    err :: Maybe Text,
+    logs :: [Text],
+    lastLogs :: [Text]
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+newtype UniswapContract = UniswapContract
+  { unContractInstanceId :: Text
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+newtype UniswapWallet = UniswapWallet
+  { getWallet :: Integer
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+data UniswapDefinition = UniswapDefinition
+  { contents :: Value,
+    tag :: Text
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)

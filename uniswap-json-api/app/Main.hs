@@ -6,9 +6,9 @@ import           UniswapJsonApi.Model (Config(..))
 import           UniswapJsonApi
 
 config :: Config
-config = Config { _port    = 8080
-                , _apiUrl  = "jsonplaceholder.typicode.com"
-                , _apiPort = 443
+config = Config { _port    = 3000
+                , _apiUrl  = "lambda"
+                , _apiPort = 8080
                 }
 
 main :: IO ()
