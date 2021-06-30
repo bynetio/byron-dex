@@ -463,6 +463,7 @@ uniquePools us = do
       where
        eqPool ((a1, a2, f1),_) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
 
+
 indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams{..} = do
     unless (ispAmount > 0) $ throwError "amount must be positive"
@@ -471,6 +472,7 @@ indirectSwap us IndirectSwapParams{..} = do
     abstractPools <- uniquePools us
     let orefs = Map.fromList $ map (\((pRef, pO,_), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (pRef, pO))) relevantPools
     let myPools = Map.fromList $ map (\((_,_,liquidity), pool@LiquidityPool{..}) -> ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (pool,liquidity))) relevantPools
+
     (path,outB) <- case findBestSwap abstractPools (unCoin ispCoinA,unCoin ispCoinB) (unAmount ispAmount) of
         Nothing -> throwError "No path found"
         Just p  -> return p
@@ -495,6 +497,7 @@ indirectSwap us IndirectSwapParams{..} = do
                                         Just (pool, liquidity) = Map.lookup (a,b,fee) myPools <|> Map.lookup (b,a,fee) myPools
                                         Just (oldA,oldB) = Map.lookup (a,b,fee) abstractPools <|> (let Just (b',a') = Map.lookup (b,a,fee) abstractPools in Just (a',b'))
                                         (newA,newB) = (oldA+ unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount fee)
+
                                         val = valueOf (Coin a) (Amount newA) <> valueOf (Coin b) (Amount newB) <> unitValue (poolStateCoin us)
                                     in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
                                        Constraints.mustPayToTheScript (Pool pool liquidity) val

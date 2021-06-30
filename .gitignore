@@ -1,5 +1,9 @@
 .pre-commit-config.yaml
 tmp
 */dist-newstyle/
+<<<<<<< HEAD
 tags
 uniswap/.hpc
+=======
+tags
+>>>>>>> f2d930a3940d69eed200a0555656905be5cbf855
