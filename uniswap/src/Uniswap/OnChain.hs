@@ -47,7 +47,7 @@ valueWithin = txOutValue . txInInfoResolved
 -- sure that the pool token is passed through.
 validateSwap :: LiquidityPool -> Coin PoolState -> ScriptContext -> Bool
 validateSwap LiquidityPool{..} c ctx =
-    checkSwap oldA oldB newA newB                                                       &&
+    checkSwap oldA oldB newA newB lpFee                                                      &&
     traceIfFalse "expected pool state token to be present in input" (isUnity inVal c)   &&
     traceIfFalse "expected pool state token to be present in output" (isUnity outVal c) &&
     traceIfFalse "did not expect Uniswap forging" noUniswapForging
