@@ -68,9 +68,7 @@ type UniswapOwnerSchema =
 
 type UniswapOwnerSchema' =
     BlockchainActions
-        .\/ Endpoint "start" (CurrencySymbol)
-
-
+        .\/ Endpoint "start" CurrencySymbol
 
 
 -- | Schema for the endpoints for users of Uniswap.
@@ -106,7 +104,7 @@ data UserContractState =
 
 
 uniswapTokenName, poolStateTokenName :: TokenName
-uniswapTokenName = "Uniswap"
+uniswapTokenName   = "Uniswap"
 poolStateTokenName = "Pool State"
 
 uniswapInstance :: Uniswap -> Scripts.ScriptInstance Uniswapping
@@ -127,6 +125,7 @@ uniswapScript = Scripts.validatorScript . uniswapInstance
 uniswapAddress :: Uniswap -> Ledger.Address
 uniswapAddress = Ledger.scriptAddress . uniswapScript
 
+-- | Given a currency symbol creates NFT token to identify a uniswap instance
 uniswap :: CurrencySymbol -> Uniswap
 uniswap cs = Uniswap $ mkCoin cs uniswapTokenName
 
@@ -169,10 +168,10 @@ data CreateParams = CreateParams
 data SwapParams = SwapParams
     { spCoinA    :: Coin A         -- ^ One 'Coin' of the liquidity pair.
     , spCoinB    :: Coin B         -- ^ The other 'Coin'.
-    , spFee      :: Fee -- ^ Numerator and denominator of the swap fee
+    , spFee      :: Fee            -- ^ Numerator and denominator of the swap fee
     , spAmount   :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
-    , spResult   :: Amount B
-    , spSlippage :: Integer
+    , spResult   :: Amount B       -- ^ The expected amount of swaped 'Coin B' (quoted amount)
+    , spSlippage :: Integer        -- ^ The expected % difference between quoted and executed prices.
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data SwapPreviewParams = SwapPreviewParams
@@ -185,7 +184,7 @@ data SwapPreviewParams = SwapPreviewParams
 data IndirectSwapParams = IndirectSwapParams
     { ispCoinA    :: Coin A         -- ^ One 'Coin' of the liquidity pair.
     , ispCoinB    :: Coin B         -- ^ The other 'Coin'.
-    , ispAmount   :: Amount A       -- ^ The amount the first 'Coin' that should be swapped.
+    , ispAmount   :: Amount A       -- ^ The amount of the first 'Coin' that should be swapped.
     , ispResult   :: Amount B
     , ispSlippage :: Integer
     } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
@@ -223,10 +222,10 @@ data AddParams = AddParams
 
 -- | Creates a Uniswap "factory". This factory will keep track of the existing liquidity pools and enforce that there will be at most one liquidity pool
 -- for any pair of tokens at any given time.
-start :: HasBlockchainActions s => Maybe CurrencySymbol -> Contract w s Text Uniswap
+start :: HasBlockchainActions s => Maybe CurrencySymbol        -- ^ for test purpose we can pass our currency symbol
+                                -> Contract w s Text Uniswap
 start mcs = do
     pkh <- pubKeyHash <$> ownPubKey
-
 
     cs  <- case mcs of
         Nothing -> fmap Currency.currencySymbol
@@ -234,7 +233,7 @@ start mcs = do
                         $ Currency.forgeContract pkh [(uniswapTokenName, 1)]
         Just jcs -> return jcs
     let c    = mkCoin cs uniswapTokenName
-        us   = uniswap cs
+        us   = uniswap cs   -- NFT token for a given uniswap instance
         inst = uniswapInstance us
         tx   = mustPayToTheScript (Factory []) $ unitValue c
     ledgerTx <- submitTxConstraints inst tx

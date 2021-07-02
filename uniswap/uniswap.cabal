@@ -91,6 +91,7 @@ test-suite uniswap-tests
                      , QuickCheck
                      , tasty
                      , tasty-quickcheck
+                     , tasty-hunit
                      , text
                      , uniswap
                      , plutus-ledger-api
