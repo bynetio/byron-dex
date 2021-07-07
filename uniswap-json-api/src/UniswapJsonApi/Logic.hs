@@ -21,55 +21,59 @@ processRawRequest action = do
   liftIO $ print response
   return response
 
-processRequest :: Show a => Config -> Text -> String -> (a -> b) -> IO (Either ClientError a) -> Handler b
-processRequest c uId errorMessage f action = do
-  let result _ = processRawRequest action
-  response <- retrying limitedBackoff (const $ return . isLeft) result
-  status <- processRawRequest $ pabStatus c uId
-  case response of
-    Right r -> return $ f r
+processRequest :: Show a => Config -> Text -> String -> IO (Either ClientError a) -> Handler UniswapStatusResponse
+processRequest c uId errorMessage action = do
+  let endpointResult _ = processRawRequest action
+  endpointResponse <- retrying limitedBackoff (const $ return . isLeft) endpointResult
+  case endpointResponse of
+    Right _ -> do
+      let statusResult _ = processRawRequest $ pabStatus c uId
+      statusResponse <- retrying limitedBackoff (const $ return . isLeft) statusResult
+      case statusResponse of
+        Right r -> return r
+        Left _ -> throwError err422 {errBody = encode . pack $ "cannot fetch status of last operation"}
     Left _ -> throwError err422 {errBody = encode . pack $ errorMessage}
 
-create :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler ()
-create c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot create a pool" (const ()) $ uniswapCreate c uId cA cB aA aB
+create :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
+create c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot create a pool" $ uniswapCreate c uId cA cB aA aB
 create c uId _ _ _ _ = throwError err400
 
-swap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler ()
-swap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make a swap" (const ()) $ uniswapSwap c uId cA cB aA aB s
+swap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
+swap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make a swap" $ uniswapSwap c uId cA cB aA aB s
 swap c uId _ _ _ _ _ = throwError err400
 
-swapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler ()
-swapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make a swap" (const ()) $ uniswapSwapPreview c uId cA cB a
+swapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
+swapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make a swap" $ uniswapSwapPreview c uId cA cB a
 swapPreview c uId _ _ _ = throwError err400
 
-indirectSwap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler ()
-indirectSwap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make an indirect swap" (const ()) $ uniswapIndirectSwap c uId cA cB aA aB s
+indirectSwap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
+indirectSwap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make an indirect swap" $ uniswapIndirectSwap c uId cA cB aA aB s
 indirectSwap c uId _ _ _ _ _ = throwError err400
 
-indirectSwapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler ()
-indirectSwapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make an indirect swap preview" (const ()) $ uniswapIndirectSwapPreview c uId cA cB a
+indirectSwapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
+indirectSwapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make an indirect swap preview" $ uniswapIndirectSwapPreview c uId cA cB a
 indirectSwapPreview c uId _ _ _ = throwError err400
 
-close :: Config -> Text -> Maybe Text -> Maybe Text -> Handler ()
-close c uId (Just cA) (Just cB) = processRequest c uId "cannot close a pool" (const ()) $ uniswapClose c uId cA cB
+close :: Config -> Text -> Maybe Text -> Maybe Text -> Handler UniswapStatusResponse
+close c uId (Just cA) (Just cB) = processRequest c uId "cannot close a pool" $ uniswapClose c uId cA cB
 close c uId _ _ = throwError err400
 
-remove :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler ()
-remove c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot remove liquidity tokens" (const ()) $ uniswapRemove c uId cA cB a
+remove :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
+remove c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot remove liquidity tokens" $ uniswapRemove c uId cA cB a
 remove c uId _ _ _ = throwError err400
 
-add :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler ()
-add c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot add coins to pool" (const ()) $ uniswapAdd c uId cA cB aA aB
+add :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
+add c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot add coins to pool" $ uniswapAdd c uId cA cB aA aB
 add c uId _ _ _ _ = throwError err400
 
-pools :: Config -> Text -> Handler ()
-pools c uId = processRequest c uId "cannot fetch uniwap pools" (const ()) $ uniswapPools c uId
+pools :: Config -> Text -> Handler UniswapStatusResponse
+pools c uId = processRequest c uId "cannot fetch uniwap pools" $ uniswapPools c uId
 
-funds :: Config -> Text -> Handler ()
-funds c uId = processRequest c uId "cannot fetch uniswap funds" (const ()) $ uniswapFunds c uId
+funds :: Config -> Text -> Handler UniswapStatusResponse
+funds c uId = processRequest c uId "cannot fetch uniswap funds" $ uniswapFunds c uId
 
-stop :: Config -> Text -> Handler ()
-stop c uId = processRequest c uId "cannot stop an uniswap instance" (const ()) $ uniswapStop c uId
+stop :: Config -> Text -> Handler UniswapStatusResponse
+stop c uId = processRequest c uId "cannot stop an uniswap instance" $ uniswapStop c uId
 
 status :: Config -> Text -> Handler UniswapStatusResponse
 status c uId = do

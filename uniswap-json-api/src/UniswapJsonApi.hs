@@ -13,17 +13,17 @@ import UniswapJsonApi.Logic as Logic
 import UniswapJsonApi.Model as Model
 
 type SwapApi =
-  Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "indirect_swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "close" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "remove" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "add" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] ()
-    :<|> Capture "id" Text :> "pools" :> Get '[JSON] ()
-    :<|> Capture "id" Text :> "funds" :> Get '[JSON] ()
-    :<|> Capture "id" Text :> "stop" :> Get '[JSON] ()
+  Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "indirect_swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "close" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "remove" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "add" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "pools" :> Get '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "funds" :> Get '[JSON] UniswapStatusResponse
+    :<|> Capture "id" Text :> "stop" :> Get '[JSON] UniswapStatusResponse
     :<|> Capture "id" Text :> "status" :> Get '[JSON] UniswapStatusResponse
 
 swapServer :: Config -> Server SwapApi
