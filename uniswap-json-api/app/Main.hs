@@ -2,14 +2,20 @@
 
 module Main where
 
-import           UniswapJsonApi.Model (Config(..))
-import           UniswapJsonApi
+import System.Environment (lookupEnv)
+import UniswapJsonApi (runApp)
+import UniswapJsonApi.Model (Config (..))
 
-config :: Config
-config = Config { _port    = 3000
-                , _apiUrl  = "lambda"
-                , _apiPort = 8080
-                }
+fetchConfig :: IO (Maybe Config)
+fetchConfig = do
+  port <- lookupEnv "APP_PORT"
+  apiUrl <- lookupEnv "APP_API_URL"
+  apiPort <- lookupEnv "APP_API_PORT"
+  return $ Config <$> (read <$> port) <*> apiUrl <*> (read <$> apiPort)
 
 main :: IO ()
-main = runApp config
+main = do
+  config <- fetchConfig
+  case config of
+    Just c -> runApp c
+    Nothing -> error "uniswap-json-api: no config available"
