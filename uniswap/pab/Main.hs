@@ -1,68 +1,52 @@
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DataKinds          #-}
+{-# LANGUAGE DeriveAnyClass     #-}
+{-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE RankNTypes         #-}
+{-# LANGUAGE TypeApplications   #-}
+{-# LANGUAGE TypeFamilies       #-}
+{-# LANGUAGE TypeOperators      #-}
 
 module Main (main) where
 
-import Control.Monad (forM, void)
-import Control.Monad.Freer
-  ( Eff,
-    Member,
-    interpret,
-    type (~>),
-  )
-import Control.Monad.Freer.Error (Error)
-import Control.Monad.Freer.Extras.Log (LogMsg)
-import Control.Monad.IO.Class (MonadIO (..))
-import Data.Aeson
-  ( FromJSON (..),
-    Options (..),
-    ToJSON (..),
-    Result(..),
-    fromJSON,
-    defaultOptions,
-    genericParseJSON,
-    genericToJSON,
-  )
-import qualified Data.Map as Map
-import qualified Data.Monoid as Monoid
-import qualified Data.Semigroup as Semigroup
-import Data.Text
-import Data.Text.Prettyprint.Doc (Pretty (..), viaShow)
-import GHC.Generics (Generic)
-import Ledger.Ada (adaSymbol, adaToken)
-import Plutus.Contract
-  ( BlockchainActions,
-    ContractError,
-    Empty,
-  )
-import qualified Plutus.Contracts.Currency as Currency
-import Plutus.PAB.Effects.Contract (ContractEffect (..))
-import Plutus.PAB.Effects.Contract.Builtin
-  ( Builtin,
-    SomeBuiltin (..),
-    type (.\\),
-  )
+import           Control.Monad                       (forM, void)
+import           Control.Monad.Freer                 (Eff, Member, interpret,
+                                                      type (~>))
+import           Control.Monad.Freer.Error           (Error)
+import           Control.Monad.Freer.Extras.Log      (LogMsg)
+import           Control.Monad.IO.Class              (MonadIO (..))
+import           Data.Aeson                          (FromJSON (..),
+                                                      Options (..), Result (..),
+                                                      ToJSON (..),
+                                                      defaultOptions, fromJSON,
+                                                      genericParseJSON,
+                                                      genericToJSON)
+import qualified Data.Map                            as Map
+import qualified Data.Monoid                         as Monoid
+import qualified Data.Semigroup                      as Semigroup
+import           Data.Text
+import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
+import           GHC.Generics                        (Generic)
+import           Ledger.Ada                          (adaSymbol, adaToken)
+import           Plutus.Contract                     (BlockchainActions,
+                                                      ContractError, Empty)
+import qualified Plutus.Contracts.Currency           as Currency
+import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
+import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
+                                                      type (.\\))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
-import Plutus.PAB.Monitoring.PABLogMsg (PABMultiAgentMsg)
-import Plutus.PAB.Simulator
-  ( SimulatorEffectHandlers,
-    logString,
-  )
-import qualified Plutus.PAB.Simulator as Simulator
-import Plutus.PAB.Types (PABError (..))
-import qualified Plutus.PAB.Webserver.Server as PAB.Server
-import qualified Uniswap.OffChain as Uniswap
-import qualified Uniswap.Trace as Uniswap
-import qualified Uniswap.Types as Uniswap
-import Wallet.Emulator.Types (Wallet (..))
+import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
+import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
+                                                      logString)
+import qualified Plutus.PAB.Simulator                as Simulator
+import           Plutus.PAB.Types                    (PABError (..))
+import qualified Plutus.PAB.Webserver.Server         as PAB.Server
+import qualified Uniswap.OffChain                    as Uniswap
+import qualified Uniswap.Trace                       as Uniswap
+import qualified Uniswap.Types                       as Uniswap
+import           Wallet.Emulator.Types               (Wallet (..))
 
 main :: IO ()
 main = void $
@@ -73,7 +57,7 @@ main = void $
     cidInit <- Simulator.activateContract (Wallet 1) UniswapInit
     cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
       Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
-      _ -> Nothing
+      _                                   -> Nothing
     _ <- Simulator.waitUntilFinished cidInit
 
     logString @(Builtin UniswapContracts) $ "Initialization finished. Minted: " ++ show cs
@@ -85,7 +69,7 @@ main = void $
     _ <- Simulator.callEndpointOnInstance cidStart "start" ()
     us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
       Success (Monoid.Last (Just (Right us))) -> Just us
-      _ -> Nothing
+      _                                       -> Nothing
     logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
 
     cids <- fmap Map.fromList $
@@ -96,7 +80,7 @@ main = void $
         _ <- Simulator.callEndpointOnInstance cid "funds" ()
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.UserContractState))) of
           Success (Monoid.Last (Just (Right (Uniswap.Funds v)))) -> Just v
-          _ -> Nothing
+          _                                                      -> Nothing
         logString @(Builtin UniswapContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
@@ -126,9 +110,9 @@ handleStarterContract = Builtin.handleBuiltin getSchema getContract
       UniswapUserContract _ -> Builtin.endpointsToSchemas @(Uniswap.UniswapUserSchema .\\ BlockchainActions)
       UniswapInit -> Builtin.endpointsToSchemas @Empty
     getContract = \case
-      UniswapOwnerContract -> SomeBuiltin Uniswap.ownerEndpoint
+      UniswapOwnerContract  -> SomeBuiltin Uniswap.ownerEndpoint
       UniswapUserContract u -> SomeBuiltin (Uniswap.userEndpoints u)
-      UniswapInit -> SomeBuiltin Uniswap.setupTokens
+      UniswapInit           -> SomeBuiltin Uniswap.setupTokens
 
 handlers :: SimulatorEffectHandlers (Builtin UniswapContracts)
 handlers =

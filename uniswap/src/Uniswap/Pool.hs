@@ -3,12 +3,13 @@
 {-# LANGUAGE RecordWildCards   #-}
 
 module Uniswap.Pool
-  ( calculateAdditionalLiquidity
-  , calculateInitialLiquidity
-  , calculateRemoval
-  , checkSwap
-  , lpTicker
-  ) where
+  ( calculateAdditionalLiquidity,
+    calculateInitialLiquidity,
+    calculateRemoval,
+    checkSwap,
+    lpTicker,
+  )
+where
 
 import           Data.ByteString   as BS
 import           Ledger.Value      (TokenName (..), unAssetClass,
@@ -18,18 +19,20 @@ import           PlutusTx.Prelude
 import           PlutusTx.Sqrt
 import           Prelude           (fromIntegral)
 import           Uniswap.Types
-{-# INLINABLE calculateInitialLiquidity #-}
+
+{-# INLINEABLE calculateInitialLiquidity #-}
+
 -- | The initial liquidity is 'ceil( sqrt(x*y) )' where 'x' is the amount of
 -- 'Coin A' and y the amount of 'Coin B'.  See Eq. 13 of the Uniswap v2 paper.
 calculateInitialLiquidity :: Amount A -> Amount B -> Amount Liquidity
 calculateInitialLiquidity outA outB = Amount $ case isqrt (unAmount outA * unAmount outB) of
-    Exactly l
-        | l > 0 -> l
-    Approximately l
-        | l > 0 -> l + 1
-    _           -> traceError "insufficient liquidity"
+  Exactly l
+    | l > 0 -> l
+  Approximately l
+    | l > 0 -> l + 1
+  _ -> traceError "insufficient liquidity"
 
-{-# INLINABLE calculateAdditionalLiquidity #-}
+{-# INLINEABLE calculateAdditionalLiquidity #-}
 calculateAdditionalLiquidity :: Amount A -> Amount B -> Amount Liquidity -> Amount A -> Amount B -> Amount Liquidity
 calculateAdditionalLiquidity oldA' oldB' liquidity delA' delB' =
   case rsqrt ratio of
@@ -49,7 +52,8 @@ calculateAdditionalLiquidity oldA' oldB' liquidity delA' delB' =
     oldProd = Amount $ oldA * oldB
     newProd = Amount $ (oldA + delA) * (oldB + delB)
 
-{-# INLINABLE calculateRemoval #-}
+{-# INLINEABLE calculateRemoval #-}
+
 -- | See Definition 3 of <https://github.com/runtimeverification/verified-smart-contracts/blob/c40c98d6ae35148b76742aaaa29e6eaa405b2f93/uniswap/x-y-k.pdf>.
 calculateRemoval :: Amount A -> Amount B -> Amount Liquidity -> Amount Liquidity -> (Amount A, Amount B)
 calculateRemoval inA inB liquidity' diff' = (f inA, f inB)
@@ -57,24 +61,27 @@ calculateRemoval inA inB liquidity' diff' = (f inA, f inB)
     f :: Amount a -> Amount a
     f = Amount . g . unAmount
 
-    diff      = unAmount diff'
+    diff = unAmount diff'
     liquidity = unAmount liquidity'
 
     g :: Integer -> Integer
     g x = x - divide (x * diff) liquidity
 
-{-# INLINABLE checkSwap #-}
+{-# INLINEABLE checkSwap #-}
+
 -- | A swap is valid if the fee is computed correctly, and we're swapping some
 -- positive amount of A for B.  See: <https://uniswap.org/whitepaper.pdf> Eq (11) (Page 7.)
-checkSwap :: Amount A -> Amount B -> Amount A -> Amount B -> (Integer,Integer) -> Bool
+checkSwap :: Amount A -> Amount B -> Amount A -> Amount B -> (Integer, Integer) -> Bool
 checkSwap oldA' oldB' newA' newB' (feeNum, feeDen) =
-    traceIfFalse "expected positive oldA" (oldA > 0) &&
-    traceIfFalse "expected positive oldB" (oldB > 0) &&
-    traceIfFalse "expected positive-newA" (newA > 0) &&
-    traceIfFalse "expected positive-newB" (newB > 0) &&
-    traceIfFalse "expected product to increase"
-        ((((newA * feeDen) - (inA * feeNum)) * ((newB * feeDen) - (inB * feeNum)))
-         >= (feeDen * feeDen * oldA * oldB))
+  traceIfFalse "expected positive oldA" (oldA > 0)
+    && traceIfFalse "expected positive oldB" (oldB > 0)
+    && traceIfFalse "expected positive-newA" (newA > 0)
+    && traceIfFalse "expected positive-newB" (newB > 0)
+    && traceIfFalse
+      "expected product to increase"
+      ( (((newA * feeDen) - (inA * feeNum)) * ((newB * feeDen) - (inB * feeNum)))
+          >= (feeDen * feeDen * oldA * oldB)
+      )
   where
     -- Unwrap; because we are mixing terms.
     oldA = unAmount oldA'
@@ -84,26 +91,28 @@ checkSwap oldA' oldB' newA' newB' (feeNum, feeDen) =
 
     inA = max 0 $ newA - oldA
     inB = max 0 $ newB - oldB
-    -- The uniswap fee is 0.3%; here it is multiplied by 1000, so that the
-    -- on-chain code deals only in integers.
-    -- See: <https://uniswap.org/whitepaper.pdf> Eq (11) (Page 7.)
 
-{-# INLINABLE lpTicker #-}
+-- The uniswap fee is 0.3%; here it is multiplied by 1000, so that the
+-- on-chain code deals only in integers.
+-- See: <https://uniswap.org/whitepaper.pdf> Eq (11) (Page 7.)
+
+{-# INLINEABLE lpTicker #-}
+
 -- | Generate a unique token name for this particular pool; based on the
 -- tokens it exchanges. This should be such that looking for a pool exchanging
 -- any two tokens always yields a unique name.
 lpTicker :: LiquidityPool -> TokenName
-lpTicker LiquidityPool{..}  = TokenName hash
-    where
-      cA@(csA, tokA) = unAssetClass (unCoin lpCoinA)
-      cB@(csB, tokB) = unAssetClass (unCoin lpCoinB)
-      ((x1, y1), (x2, y2))
-        | cA < cB   = ((csA, tokA), (csB, tokB))
-        | otherwise = ((csB, tokB), (csA, tokA))
+lpTicker LiquidityPool {..} = TokenName hash
+  where
+    cA@(csA, tokA) = unAssetClass (unCoin lpCoinA)
+    cB@(csB, tokB) = unAssetClass (unCoin lpCoinB)
+    ((x1, y1), (x2, y2))
+      | cA < cB = ((csA, tokA), (csB, tokB))
+      | otherwise = ((csB, tokB), (csA, tokA))
 
-      h1   = sha2_256 $ unTokenName y1
-      h2   = sha2_256 $ unTokenName y2
-      h3   = sha2_256 $ unCurrencySymbol x1
-      h4   = sha2_256 $ unCurrencySymbol x2
-      h5   = sha2_256 $ lpFeeByteString
-      hash = sha2_256 $ h1 <> h2 <> h3 <> h4 <> h5
+    h1 = sha2_256 $ unTokenName y1
+    h2 = sha2_256 $ unTokenName y2
+    h3 = sha2_256 $ unCurrencySymbol x1
+    h4 = sha2_256 $ unCurrencySymbol x2
+    h5 = sha2_256 $ lpFeeByteString
+    hash = sha2_256 $ h1 <> h2 <> h3 <> h4 <> h5
