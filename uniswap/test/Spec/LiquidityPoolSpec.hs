@@ -3,10 +3,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes        #-}
 
+{-# OPTIONS_GHC -Wno-orphans #-}
 module Spec.LiquidityPoolSpec where
 
-import           Data.List
-import           Data.Ord
 import           Data.String
 import           Ledger.Value
 import           Test.Tasty
@@ -53,7 +52,7 @@ unitTests = testGroup "Unit tests"
       let a = mkCoin "ff" "a1"
           b = mkCoin "aa" "a1"
           fee = (12, 1000)
-      in assert $ liquidityPool (a, b) fee == liquidityPool (reCoin b, reCoin a) fee
+      in assertBool "smart constructor handles coin order" $ liquidityPool (a, b) fee == liquidityPool (reCoin b, reCoin a) fee
   ]
 
 --------------Generators-------------------
@@ -65,19 +64,18 @@ hexCharGen :: Gen Char
 hexCharGen = elements hexChars
 
 currencySymbolGen :: Gen CurrencySymbol
-currencySymbolGen = fromString <$> foldr (++) "" <$> resize 7 (listOf pair)
+currencySymbolGen = fromString . concat <$> resize 7 (listOf pair)
   where
     pair :: Gen String
     pair = do
       n <- elements ['0'..'9']
       l <- elements ['a'..'f']
-      return $ l : n : []
+      return [l, n]
 
 assetClassGen :: Gen AssetClass
 assetClassGen = do
     cs <- currencySymbolGen
-    tn <- hexStr
-    return $ assetClass cs (fromString tn)
+    assetClass cs . fromString <$> hexStr
   where
     hexStr :: Gen String
     hexStr = resize 2 (listOf hexCharGen)
