@@ -11,13 +11,10 @@ module Uniswap.Pool
   )
 where
 
-import           Data.ByteString   as BS
-import           Ledger.Value      (TokenName (..), unAssetClass,
-                                    unCurrencySymbol)
-import           PlutusTx.Builtins (String, charToString)
+import           Ledger.Value     (TokenName (..), unAssetClass,
+                                   unCurrencySymbol)
 import           PlutusTx.Prelude
 import           PlutusTx.Sqrt
-import           Prelude           (fromIntegral)
 import           Uniswap.Types
 
 {-# INLINEABLE calculateInitialLiquidity #-}
@@ -40,7 +37,7 @@ calculateAdditionalLiquidity oldA' oldB' liquidity delA' delB' =
     Exactly x       -> Amount x - liquidity
     Approximately x -> Amount x - liquidity
   where
-    ratio = (unAmount (liquidity * liquidity * newProd)) % unAmount oldProd
+    ratio = unAmount (liquidity * liquidity * newProd) % unAmount oldProd
 
     -- Unwrap, as we're combining terms
     oldA = unAmount oldA'
@@ -114,5 +111,5 @@ lpTicker LiquidityPool {..} = TokenName hash
     h2 = sha2_256 $ unTokenName y2
     h3 = sha2_256 $ unCurrencySymbol x1
     h4 = sha2_256 $ unCurrencySymbol x2
-    h5 = sha2_256 $ lpFeeByteString
+    h5 = sha2_256 lpFeeByteString
     hash = sha2_256 $ h1 <> h2 <> h3 <> h4 <> h5

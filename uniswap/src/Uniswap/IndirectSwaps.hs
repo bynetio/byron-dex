@@ -5,6 +5,7 @@ import           Data.List        (foldl', sortOn)
 import qualified Data.Map         as Map
 import           PlutusTx.Prelude hiding (Semigroup (..), unless)
 import           Prelude          (div, (^))
+import qualified Prelude
 import           Uniswap.Pool
 import           Uniswap.Types
 
@@ -34,9 +35,10 @@ findPaths (start, goal) keys = go start (keys ++ map (\(a, b, fee) -> (b, a, fee
       | otherwise = do
         (a', b', fee) <- availablePairs
         guard (a' == a)
-        rest <- go b' (filter (\(a, _, _) -> a' /= a) availablePairs)
+        rest <- go b' (filter (\(a'', _, _) -> a' /= a'') availablePairs)
         return ((a', b', fee) : rest)
 
+findBestSwap :: (Prelude.Ord b, Ord b) => Map.Map (b, b, Fee) (Integer, Integer) -> (b, b) -> Integer -> Maybe ([(b, b, Fee)], Integer)
 findBestSwap pools (ca, cb) swapAmount =
   case sortOn
     (negate . snd)
@@ -56,8 +58,8 @@ findBestSwap pools (ca, cb) swapAmount =
         (Just initialSwapAmount)
         path
 
-    findSwap' currentSwapAmount (ca, cb, fee) = do
-      (a, b) <- Map.lookup (ca, cb, fee) allPools
+    findSwap' currentSwapAmount (ca', cb', fee) = do
+      (a, b) <- Map.lookup (ca', cb', fee) allPools
       let out = findSwap (Amount a) (Amount b) (Amount currentSwapAmount) fee
       guard (out > 0)
       return out

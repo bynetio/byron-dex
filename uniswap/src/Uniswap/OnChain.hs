@@ -1,19 +1,11 @@
-{-# LANGUAGE DataKinds                  #-}
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase                 #-}
-{-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE RecordWildCards            #-}
-{-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TemplateHaskell            #-}
-{-# LANGUAGE TypeApplications           #-}
-{-# LANGUAGE TypeFamilies               #-}
-{-# LANGUAGE TypeOperators              #-}
+{-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude     #-}
+{-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RecordWildCards       #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-strictness #-}
 
@@ -84,7 +76,7 @@ validateSwap LiquidityPool {..} c ctx =
     noUniswapForging =
       let AssetClass (cs, _) = unCoin c
           forged = txInfoForge info
-       in all (/= cs) $ symbols forged
+       in notElem cs $ symbols forged
 
 {-# INLINEABLE validateCreate #-}
 
@@ -110,7 +102,7 @@ validateCreate Uniswap {..} c lps lp@LiquidityPool {..} ctx =
   traceIfFalse "Uniswap coin not present" (isUnity (valueWithin $ findOwnInput' ctx) usCoin)
     && Constraints.checkOwnOutputConstraint ctx (OutputConstraint (Factory $ lp : lps) $ unitValue usCoin) -- 1.
     && (unCoin lpCoinA /= unCoin lpCoinB) -- 2.
-    && all (/= lp) lps -- 3.
+    && notElem lp lps -- 3.
     && isUnity forged c -- 4.
     && (amountOf forged liquidityCoin' == liquidity) -- 5.
     && (outA > 0) -- 6.

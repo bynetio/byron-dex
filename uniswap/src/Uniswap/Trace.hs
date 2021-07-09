@@ -1,7 +1,5 @@
 {-# LANGUAGE DataKinds         #-}
-{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
 {-| Example trace for the uniswap contract
 -}
 module Uniswap.Trace(
@@ -11,21 +9,12 @@ module Uniswap.Trace(
     ) where
 
 import           Control.Monad             (forM_, when)
-import           Control.Monad.Freer.Error (throwError)
-import qualified Data.Map                  as Map
-import qualified Data.Monoid               as Monoid
 import qualified Data.Semigroup            as Semigroup
 import           Ledger
-import           Ledger.Ada                (adaSymbol, adaToken)
 import           Ledger.Constraints
 import           Ledger.Value              as Value
 import           Plutus.Contract           hiding (throwError)
 import qualified Plutus.Contracts.Currency as Currency
-import           Plutus.Trace.Emulator     (EmulatorRuntimeError (GenericError),
-                                            EmulatorTrace)
-import qualified Plutus.Trace.Emulator     as Emulator
-import           Uniswap.OffChain          as OffChain
-import           Uniswap.Types             as Types
 import           Wallet.Emulator.Types     (Wallet (..), walletPubKey)
 
 
