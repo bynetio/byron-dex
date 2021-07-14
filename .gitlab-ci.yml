@@ -1,0 +1,172 @@
+image: 'silquenarmo/dex-plutus-dev:1.0'
+
+stages:
+  - lint
+  - build
+#  - test
+
+lint_uniswap_json_api:
+  stage: lint
+  script:
+    - nix-shell /build/default.nix --run 'hlint uniswap-json-api'
+
+lint_uniswap:
+  stage: lint
+  script:
+    - nix-shell /build/default.nix --run 'hlint uniswap'
+
+build_uniswap_json_api:
+  stage: build
+  script:
+    - nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal build'
+
+build_uniswap:
+  stage: build
+  script:
+    - nix-shell /build/default.nix --run 'cd uniswap && cabal build'
+
+#rspec:
+#  stage: test
+#  services:
+#    - postgres:11
+#  <<: *ruby_test_before_script
+#  script:
+#    - bundle exec rails db:schema:load
+#    - bundle exec rspec --format progress --format RspecJunitFormatter --out rspec.xml
+#  artifacts:
+#    when: always
+#    paths:
+#      - coverage/
+#      - rspec.xml
+#    reports:
+#      junit: rspec.xml
+#
+#jest:
+#  stage: test
+#  script:
+#    - npm i -g yarn
+#    - yarn install
+#    - yarn jest
+#
+#seeds-and-settings:
+#  stage: test
+#  services:
+#    - postgres:11
+#  <<: *ruby_test_before_script
+#  script:
+#    - bundle exec rails db:migrate
+#    - bundle exec rails db:seed
+#    - bundle exec rake app_settings:update
+#
+#rubocop:
+#  stage: lint
+#  <<: *ruby_test_before_script
+#  script:
+#    - bundle exec rubocop
+#
+#eslint:
+#  stage: lint
+#  script:
+#    - npm i -g yarn
+#    - yarn install
+#    - yarn eslint
+#
+#audit:
+#  stage: audit
+#  <<: *ruby_test_before_script
+#  script:
+#    # The request phase in OmniAuth is currently vulnerable to Cross-Site Request Forgery
+#    # and that issue was not patched since its discovery. Thus, we ignore the CVE-2015-9284.
+#    # https://github.com/omniauth/omniauth/pull/809#issuecomment-509302876
+#    # TODO: remove this ignore once https://github.com/omniauth/omniauth/pull/809 is resolved
+#    - bundle exec bundle audit check --update --ignore CVE-2015-9284
+#
+#recent_ruby:
+#  stage: audit
+#  <<: *ruby_test_before_script
+#  script:
+#    - bundle exec recent_ruby --version-string $(cat .ruby-version)
+#
+#yarn_audit:
+#  stage: audit
+#  script:
+#    - apt update -q && apt install jq -qy
+#    - npm i -g yarn
+#    # formik https://www.npmjs.com/advisories/1556
+#    # @rails/webpacker https://www.npmjs.com/advisories/1693
+#    # @rails/webpacker https://www.npmjs.com/advisories/565
+#    # jest https://www.npmjs.com/advisories/1748
+#    # @rails/webpacker https://www.npmjs.com/advisories/1753
+#    # cheerio https://www.npmjs.com/advisories/1754
+#    # @rails/webpacker https://www.npmjs.com/advisories/1751
+#    # @rails/webpacker https://www.npmjs.com/advisories/1755
+#    - ./bin/yarn-audit-with-ignore 1693 1556 565 1748 1753 1754 1751 1755
+#
+#brakeman:
+#  stage: audit
+#  <<: *ruby_test_before_script
+#  script:
+#    - bundle exec brakeman -q
+#
+#deploy_staging:
+#  stage: deploy
+#  environment:
+#    name: staging
+#    url: https://hub-staging.binarapps.com/
+#  tags:
+#    - staging-deploy
+#  only:
+#    - staging
+#  <<: *ruby_deployment_before_script
+#  script:
+#    - while ! bundle exec cap staging deploy:check_lock; do echo "Another deploy in progress!"; sleep 1; done
+#    - bundle exec cap staging deploy
+#
+#deploy_preproduction:
+#  stage: deploy
+#  environment:
+#    name: preproduction
+#    url: https://hub-preprod.binarapps.com/
+#  tags:
+#    - production-deploy
+#  only:
+#    - preproduction
+#  <<: *ruby_deployment_before_script
+#  script:
+#    - while ! bundle exec cap preproduction deploy:check_lock; do echo "Another deploy in progress!"; sleep 1; done
+#    - bundle exec cap preproduction deploy
+#
+#deploy_production:
+#  stage: deploy
+#  environment:
+#    name: production
+#    url: https://hub.binarapps.com/
+#  tags:
+#    - production-deploy
+#  only:
+#    - master
+#  <<: *ruby_deployment_before_script
+#  script:
+#    - while ! bundle exec cap production deploy:check_lock; do echo "Another deploy in progress!"; sleep 1; done
+#    - bundle exec cap production deploy
+#
+## Deploy API docs and Test Coverage on gitlab pages
+#pages:
+#  image: "binarapps/node:10"
+#  stage: deploy
+#  dependencies:
+#    - rspec
+#  only:
+#    - staging
+#  before_script:
+#    - mv public public-app || true; mkdir -p public/api
+#  script:
+#    - cp ./docs/api_doc.yml public/api/api_doc.yml
+#    - cp -R ./docs/react_api public/api/react_api
+#    - cp -R ./docs/utils public/api/utils
+#    - cp ./docs/api_doc.html public/api/index.html
+#    - mv coverage/ public/
+#  artifacts:
+#    paths:
+#      - public
+#

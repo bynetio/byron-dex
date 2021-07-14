@@ -101,6 +101,9 @@ let
   ]);
 
   devInputs = (with pkgs; [
+    git
+    wget
+
     haskellPackages.hoogle
     haskellPackages.hasktags
     haskellPackages.implicit-hie
