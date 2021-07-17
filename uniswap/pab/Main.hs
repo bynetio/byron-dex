@@ -4,21 +4,27 @@
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
 {-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE TypeOperators      #-}
-
+{-# LANGUAGE ViewPatterns       #-}
 module Main (main) where
 
 import           Control.Monad                       (forM, void)
-import           Control.Monad.Freer                 (Eff, Member, interpret, type (~>))
+import           Control.Monad.Freer                 (Eff, Member, interpret,
+                                                      type (~>))
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON (..), Options (..), Result (..), ToJSON (..),
-                                                      defaultOptions, fromJSON, genericParseJSON,
+import           Data.Aeson                          (FromJSON (..),
+                                                      Options (..), Result (..),
+                                                      ToJSON (..),
+                                                      defaultOptions, fromJSON,
+                                                      genericParseJSON,
                                                       genericToJSON)
+import           Data.ByteString                     (ByteString)
 import qualified Data.Map                            as Map
 import qualified Data.Monoid                         as Monoid
 import qualified Data.Semigroup                      as Semigroup
@@ -26,13 +32,16 @@ import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import           GHC.Generics                        (Generic)
 import           Ledger.Ada                          (adaSymbol, adaToken)
-import           Plutus.Contract                     (BlockchainActions, ContractError, Empty)
+import           Plutus.Contract                     (BlockchainActions,
+                                                      ContractError, Empty)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
-import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..), type (.\\))
+import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
+                                                      type (.\\))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
-import           Plutus.PAB.Simulator                (SimulatorEffectHandlers, logString)
+import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
+                                                      logString)
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
@@ -41,7 +50,6 @@ import qualified Uniswap.OffChain                    as Uniswap
 import qualified Uniswap.Trace                       as Uniswap
 import qualified Uniswap.Types                       as Uniswap
 import           Wallet.Emulator.Types               (Wallet (..))
-
 main :: IO ()
 main = void $
   Simulator.runSimulationWith handlers $ do
@@ -60,10 +68,10 @@ main = void $
         ada = Uniswap.mkCoin adaSymbol adaToken
 
     cidStart <- Simulator.activateContract (Wallet 1) UniswapOwnerContract
-    _ <- Simulator.callEndpointOnInstance cidStart "start" ()
-    us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.Uniswap))) of
-      Success (Monoid.Last (Just (Right us))) -> Just us
-      _                                       -> Nothing
+    _ <- Simulator.callEndpointOnInstance cidStart "start" ("startId" :: ByteString)
+    us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
+      Success (WH.lookup "startId" -> Just (Right us)) -> Just us
+      _                                                -> Nothing
     logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
 
     cids <- fmap Map.fromList $
@@ -71,10 +79,10 @@ main = void $
         cid <- Simulator.activateContract w $ UniswapUserContract us
         logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" ()
-        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (Monoid.Last (Either Text Uniswap.UserContractState))) of
-          Success (Monoid.Last (Just (Right (Uniswap.Funds v)))) -> Just v
-          _                                                      -> Nothing
+        _ <- Simulator.callEndpointOnInstance cid "funds" ("fundsId" :: ByteString)
+        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
+          Success (WH.lookup "fundsId" -> Just (Right v)) -> Just v
+          _                                               -> Nothing
         logString @(Builtin UniswapContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 

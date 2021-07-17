@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -61,15 +62,16 @@ import qualified Plutus.Contracts.Currency    as Currency
 import           Plutus.V1.Ledger.Value       (AssetClass)
 import qualified PlutusTx
 import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
-import           Prelude                      (Semigroup (..), String, div, show)
+import           Prelude                      (Semigroup (..), String, div,
+                                               show)
 import           Text.Printf                  (printf)
 import           Uniswap.Common.WalletHistory (History, HistoryId)
 import qualified Uniswap.Common.WalletHistory as WH
 import           Uniswap.IndirectSwaps
-import           Uniswap.OnChain              (mkUniswapValidator, validateLiquidityForging)
+import           Uniswap.OnChain              (mkUniswapValidator,
+                                               validateLiquidityForging)
 import           Uniswap.Pool
 import           Uniswap.Types
-
 data Uniswapping
 
 instance Scripts.ScriptType Uniswapping where
@@ -78,11 +80,13 @@ instance Scripts.ScriptType Uniswapping where
 
 type UniswapOwnerSchema =
   BlockchainActions
-    .\/ Endpoint "start" ()
+    .\/ Endpoint "start" HistoryId
 
 type UniswapOwnerSchema' =
   BlockchainActions
-    .\/ Endpoint "start" CurrencySymbol
+    .\/ Endpoint "start" (HistoryId,CurrencySymbol)
+
+
 
 -- | Schema for the endpoints for users of Uniswap.
 type UniswapUserSchema =
@@ -95,9 +99,10 @@ type UniswapUserSchema =
     .\/ Endpoint "close" CloseParams
     .\/ Endpoint "remove" RemoveParams
     .\/ Endpoint "add" AddParams
-    .\/ Endpoint "pools" ()
-    .\/ Endpoint "funds" ()
-    .\/ Endpoint "stop" ()
+    .\/ Endpoint "pools" HistoryId
+    .\/ Endpoint "funds" HistoryId
+    .\/ Endpoint "stop" HistoryId
+    .\/ Endpoint "clearState" (HistoryId, HistoryId)
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
@@ -112,6 +117,7 @@ data UserContractState
   | Removed
   | Closed
   | Stopped
+  | Cleared
   deriving (Show, Generic, FromJSON, ToJSON)
 
 uniswapTokenName, poolStateTokenName :: TokenName
@@ -178,7 +184,7 @@ liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpT
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
   { -- | Unique Identifier of Operation
-    cpOpId    :: ByteString,
+    cpOpId    :: HistoryId,
     -- | One 'Coin' of the liquidity pair.
     cpCoinA   :: Coin A,
     -- | The other 'Coin'.
@@ -196,7 +202,7 @@ data CreateParams = CreateParams
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
   { -- | Unique Identifier of Operation
-    spOpId     :: ByteString,
+    spOpId     :: HistoryId,
     -- | One 'Coin' of the liquidity pair.
     spCoinA    :: Coin A,
     -- | The other 'Coin'.
@@ -214,7 +220,7 @@ data SwapParams = SwapParams
 
 data SwapPreviewParams = SwapPreviewParams
   { -- | Unique Identifier of Operation
-    sppOpId   :: ByteString,
+    sppOpId   :: HistoryId,
     sppCoinA  :: Coin A,
     sppCoinB  :: Coin B,
     -- | Numerator and denominator of the swap fee
@@ -225,7 +231,7 @@ data SwapPreviewParams = SwapPreviewParams
 
 data IndirectSwapParams = IndirectSwapParams
   { -- | Unique Identifier of Operation
-    ispOpId     :: ByteString,
+    ispOpId     :: HistoryId,
     -- | One 'Coin' of the liquidity pair.
     ispCoinA    :: Coin A,
     -- | The other 'Coin'.
@@ -239,7 +245,7 @@ data IndirectSwapParams = IndirectSwapParams
 
 data ISwapPreviewParams = ISwapPreviewParams
   { -- | Unique Identifier of Operation
-    isppOpId   :: ByteString,
+    isppOpId   :: HistoryId,
     isppCoinA  :: Coin A,
     isppCoinB  :: Coin B,
     isppAmount :: Amount A
@@ -249,7 +255,7 @@ data ISwapPreviewParams = ISwapPreviewParams
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
   { -- | Unique Identifier of Operation
-    clpOpId  :: ByteString,
+    clpOpId  :: HistoryId,
     -- | One 'Coin' of the liquidity pair.
     clpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -262,7 +268,7 @@ data CloseParams = CloseParams
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
   { -- | Unique Identifier of Operation
-    rpOpId  :: ByteString,
+    rpOpId  :: HistoryId,
      -- | One 'Coin' of the liquidity pair.
     rpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -277,7 +283,7 @@ data RemoveParams = RemoveParams
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
 data AddParams = AddParams
   { -- | Unique Identifier of Operation
-    apOpId    :: ByteString,
+    apOpId    :: HistoryId,
      -- | One 'Coin' of the liquidity pair.
     apCoinA   :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -597,8 +603,8 @@ indirectSwap us IndirectSwapParams {..} = do
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. HasBlockchainActions s => Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
-pools us = do
+pools :: forall w s. HasBlockchainActions s => Uniswap -> HistoryId -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools us _ = do
   utxos <- utxoAt (uniswapAddress us)
   go $ snd <$> Map.toList utxos
   where
@@ -626,11 +632,15 @@ pools us = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds :: HasBlockchainActions s => Contract w s Text Value
-funds = do
+funds :: HasBlockchainActions s => HistoryId -> Contract w s Text Value
+funds _ = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
   return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+
+clearState :: HasBlockchainActions s => (HistoryId, HistoryId) -> Contract (History (Either Text UserContractState)) s Text ()
+clearState (_,historyId) = do
+  tell $ WH.remove historyId
 
 getUniswapDatum :: TxOutTx -> Contract w s Text UniswapDatum
 getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
@@ -700,17 +710,20 @@ ownerEndpoint = startHandler >> ownerEndpoint
   where
     startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >> start Nothing)
-      -- FIXME: Add generate unique hash...
-      tell $ WH.append "uniqueHash" e
+      e <- runError (endpoint @"start" >>= \guid -> (guid,) <$> start Nothing)
+      case e of
+        Left err           -> tell $ WH.append "ERROR" $ Left err
+        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
 
 ownerEndpoint' :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
 ownerEndpoint' = startHandler >> ownerEndpoint'
   where
     startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >>= start . Just)
-      tell $ WH.append "uniqueHash" e
+      e <- runError (endpoint @"start" >>= \(guid,currency) -> (guid,) <$> start (Just currency))
+      case e of
+        Left err           -> tell $ WH.append "ERROR" $ Left err
+        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -725,16 +738,17 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
 userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
   stop
-    `select` ( ( f (Proxy @"create") (const Created) create
-                   `select` f (Proxy @"swap") (const Swapped) swap
-                   `select` f (Proxy @"swapPreview") SwapPreview swapPreview
-                   `select` f (Proxy @"iSwap") (const ISwapped) indirectSwap
-                   `select` f (Proxy @"iSwapPreview") ISwapPreview indirectSwapPreview
-                   `select` f (Proxy @"close") (const Closed) close
-                   `select` f (Proxy @"remove") (const Removed) remove
-                   `select` f (Proxy @"add") (const Added) add
-                   `select` f (Proxy @"pools") Pools (\us' () -> pools us')
-                   `select` f (Proxy @"funds") Funds (\_us () -> funds)
+    `select` ( ( f (Proxy @"create") cpOpId (const Created) create
+                   `select` f (Proxy @"swap") spOpId (const Swapped) swap
+                   `select` f (Proxy @"swapPreview") sppOpId SwapPreview swapPreview
+                   `select` f (Proxy @"iSwap") ispOpId (const ISwapped) indirectSwap
+                   `select` f (Proxy @"iSwapPreview") isppOpId ISwapPreview indirectSwapPreview
+                   `select` f (Proxy @"close") clpOpId (const Closed) close
+                   `select` f (Proxy @"remove") rpOpId (const Removed) remove
+                   `select` f (Proxy @"add") apOpId (const Added) add
+                   `select` f (Proxy @"pools") id Pools pools
+                   `select` f (Proxy @"funds") id Funds (\_us historyId -> funds historyId)
+                   `select` f (Proxy @"clearState") fst (const Cleared) (const clearState)
                )
                  >> userEndpoints us
              )
@@ -743,27 +757,27 @@ userEndpoints us =
       forall l a p.
       HasEndpoint l p UniswapUserSchema =>
       Proxy l ->
+      (p -> ByteString) ->
       (a -> UserContractState) ->
       (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
       Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
-    f _ g c = do
+    f _ getGuid g c = do
+
       e <- runError $ do
         p <- endpoint @l
-        c us p
+        (getGuid p,) <$> c us p
 
       case e of
         Left err -> do
           logInfo @Text ("Error during calling endpoint: " <> err)
-          tell $ WH.append "uniqueHash" . Left $ err
-        Right a ->
-          tell $ WH.append "uniqueHash" . Right . g $ a
+          tell $ WH.append "ERROR" . Left $ err
+        Right (guid,a) ->
+          tell $ WH.append guid . Right . g $ a
 
     stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     stop = do
       e <- runError $ endpoint @"stop"
-      tell $
-        WH.append "uniqueHash" $
-          case e of
-            Left err -> Left err
-            Right () -> Right Stopped
+      tell $ case e of
+        Left err   -> WH.append "ERROR" $ Left err
+        Right guid -> WH.append guid $ Right Stopped
 

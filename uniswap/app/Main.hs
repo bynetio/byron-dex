@@ -5,20 +5,22 @@
 
 module Main where
 
-import           Control.Monad.Freer.Extras as Extras
+import           Control.Monad.Freer.Extras   as Extras
 import           Data.Default
-import           Data.Functor               (void)
-import qualified Data.Map                   as Map
+import           Data.Functor                 (void)
+import qualified Data.Map                     as Map
 import           Data.Monoid
-import           Data.Text                  (Text)
-import           Data.Void                  (Void)
-import           Plutus.Trace.Emulator      as Emulator
-import qualified Plutus.V1.Ledger.Ada       as Ada
-import qualified Plutus.V1.Ledger.Value     as Value
+import           Data.Text                    (Text)
+import           Data.Void                    (Void)
+import           Plutus.Trace.Emulator        as Emulator
+import qualified Plutus.V1.Ledger.Ada         as Ada
+import qualified Plutus.V1.Ledger.Value       as Value
 import           Uniswap.OffChain
 import           Uniswap.Types
-import           Wallet.Emulator.Wallet     as Wallet
+import           Wallet.Emulator.Wallet       as Wallet
 
+import           Uniswap.Common.WalletHistory (History, HistoryId)
+import qualified Uniswap.Common.WalletHistory as WH
 
 customSymbol :: [Char]
 customSymbol = "ff"
@@ -73,9 +75,9 @@ adaCoin = Coin $ Value.assetClass "" ""
 iswapTrace :: EmulatorTrace ()
 iswapTrace = do
   h1 <- activateContractWallet (Wallet 1) ownerEndpoint
-  void $ callEndpoint @"start" h1 ()
+  void $ callEndpoint @"start" h1 "guid1"
   void $ waitNSlots 10
-  maybePool <- getLast <$> observableState h1
+  maybePool <- WH.lookup "guid1" <$> observableState h1
   case maybePool of
     Just (Right pool) -> userTrace pool
     _                 -> return ()
@@ -85,17 +87,17 @@ iswapTrace = do
     userTrace pool = do
         h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
         h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
-        void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin1 (3,1000) 100 500)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
-        void $ callEndpoint @"create" h2 (CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin3 customCoin1 (3,1000) 1000 1000)
         void $ waitNSlots 1
 
-        void $ callEndpoint @"iSwapPreview" h4 (ISwapPreviewParams customCoin1 customCoin3 500)
+        void $ callEndpoint @"iSwapPreview" h4 (ISwapPreviewParams "guid2" customCoin1 customCoin3 500)
         void $ waitNSlots 5
-        maybePreview <- getLast <$> observableState h4
+        maybePreview <- WH.lookup "guid2" <$> observableState h4
         case maybePreview of
           Just (Right (ISwapPreview ((ca,a),(cb,b)))) ->
-            void $ callEndpoint @"iSwap" h4 (IndirectSwapParams ca cb a b 0)
+            void $ callEndpoint @"iSwap" h4 (IndirectSwapParams "" ca cb a b 0)
           _ ->
             return ()
 
@@ -103,9 +105,9 @@ iswapTrace = do
 slippageTrace :: EmulatorTrace ()
 slippageTrace = do
   h1 <- activateContractWallet (Wallet 1) ownerEndpoint
-  void $ callEndpoint @"start" h1 ()
+  void $ callEndpoint @"start" h1 "guid3"
   void $ waitNSlots 10
-  maybePool <- getLast <$> observableState h1
+  maybePool <- WH.lookup "guid3" <$> observableState h1
   case maybePool of
     Just (Right pool) -> userTrace pool
     _                 -> return ()
@@ -115,11 +117,11 @@ slippageTrace = do
     userTrace pool = do
         h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
         h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
-        void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin1 (3,1000) 100 500)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
-        void $ callEndpoint @"create" h2 (CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin3 customCoin1 (3,1000) 1000 1000)
         void $ waitNSlots 1
-        void $ callEndpoint @"iSwapPreview" h3 (ISwapPreviewParams customCoin1 customCoin3 500)
+        void $ callEndpoint @"iSwapPreview" h3 (ISwapPreviewParams "guid4" customCoin1 customCoin3 500)
         void $ waitNSlots 5
 
         -- void $ callEndpoint @"iSwapPreview" h4 (ISwapPreviewParams customCoin1 customCoin3 500)
@@ -131,10 +133,10 @@ slippageTrace = do
         --   _ ->
         --     return ()
 
-        maybePreview <- getLast <$> observableState h3
+        maybePreview <- WH.lookup "guid4" <$> observableState h3
         case maybePreview of
           Just (Right (ISwapPreview ((ca,a),(cb,b)))) ->
-            void $ callEndpoint @"iSwap" h3 (IndirectSwapParams ca cb a b 5)
+            void $ callEndpoint @"iSwap" h3 (IndirectSwapParams "" ca cb a b 5)
           _ ->
             return ()
 
@@ -142,9 +144,9 @@ slippageTrace = do
 customFeesTrace :: EmulatorTrace ()
 customFeesTrace = do
   h1 <- activateContractWallet (Wallet 1) ownerEndpoint
-  void $ callEndpoint @"start" h1 ()
+  void $ callEndpoint @"start" h1 "guid5"
   void $ waitNSlots 10
-  maybePool <- getLast <$> observableState h1
+  maybePool <- WH.lookup "guid5" <$> observableState h1
   case maybePool of
     Just (Right pool) -> userTrace pool
     _                 -> return ()
@@ -154,26 +156,26 @@ customFeesTrace = do
     userTrace pool = do
         h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
         h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
-        void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin1 (3,1000) 100 500)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
-        void $ callEndpoint @"create" h2 (CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin3 customCoin1 (3,1000) 1000 1000)
         void $ waitNSlots 1
 
-        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 500 333 5)
+        void $ callEndpoint @"iSwap" h3 (IndirectSwapParams "" customCoin1 customCoin3 500 333 5)
         void $ waitNSlots 5
 
-        void $ callEndpoint @"close" h2 (CloseParams customCoin2 customCoin1 (3,1000))
+        void $ callEndpoint @"close" h2 (CloseParams "" customCoin2 customCoin1 (3,1000))
         void $ waitNSlots 1
-        void $ callEndpoint @"close" h2 (CloseParams customCoin3 customCoin1 (3,1000))
+        void $ callEndpoint @"close" h2 (CloseParams "" customCoin3 customCoin1 (3,1000))
         void $ waitNSlots 1
 
 
 mixedTrace :: EmulatorTrace ()
 mixedTrace = do
   h1 <- activateContractWallet (Wallet 1) ownerEndpoint
-  void $ callEndpoint @"start" h1 ()
+  void $ callEndpoint @"start" h1 "guid6"
   void $ waitNSlots 10
-  maybePool <- getLast <$> observableState h1
+  maybePool <- WH.lookup "guid6" <$> observableState h1
   case maybePool of
     Just (Right pool) -> userTrace pool
     _                 -> return ()
@@ -185,36 +187,36 @@ mixedTrace = do
         h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
         h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
         let fee = (3,1000)
-        void $ callEndpoint @"create" h2 (CreateParams customCoin2 customCoin1 fee 100 500)
+        void $ callEndpoint @"create" h2 (CreateParams "" customCoin2 customCoin1 fee 100 500)
         void $ waitNSlots 1
-        void $ callEndpoint @"create" h4 (CreateParams customCoin3 customCoin1 fee 1000 1000)
+        void $ callEndpoint @"create" h4 (CreateParams "" customCoin3 customCoin1 fee 1000 1000)
         void $ waitNSlots 1
-        callEndpoint @"swapPreview" h3 (SwapPreviewParams customCoin1 customCoin2 fee 500)
-        maybePreview <- getContractState' h3
+        callEndpoint @"swapPreview" h3 (SwapPreviewParams "guid7" customCoin1 customCoin2 fee 500)
+        maybePreview <- getContractState' "guid7" h3
         logInfo $ "swapPreview: " ++ show maybePreview
         let Right (SwapPreview (_, (_, amount), _)) = maybePreview
-        callEndpoint @"swap" h3 (SwapParams customCoin1 customCoin2 fee 500 amount 1)
+        callEndpoint @"swap" h3 (SwapParams "" customCoin1 customCoin2 fee 500 amount 1)
         void $ waitNSlots 10
-        callEndpoint @"iSwapPreview" h3 (ISwapPreviewParams customCoin1 customCoin3 600)
+        callEndpoint @"iSwapPreview" h3 (ISwapPreviewParams "guid8" customCoin1 customCoin3 600)
         void $ waitNSlots 10
-        maybeISwapPreview <- getContractState' h3
+        maybeISwapPreview <- getContractState' "guid8" h3
         logInfo $ "iSwapPreview: " ++ show maybeISwapPreview
         let Right (ISwapPreview (_, (_, amount'))) = maybeISwapPreview
-        callEndpoint @"iSwap" h3 (IndirectSwapParams customCoin1 customCoin3 (Amount 600) amount' 1)
-        void $ callEndpoint @"add" h4 (AddParams customCoin2 customCoin1 fee 1000 1000)
+        callEndpoint @"iSwap" h3 (IndirectSwapParams "" customCoin1 customCoin3 (Amount 600) amount' 1)
+        void $ callEndpoint @"add" h4 (AddParams "" customCoin2 customCoin1 fee 1000 1000)
         void $ waitNSlots 10
-        void $ callEndpoint @"close" h2 (CloseParams customCoin2 customCoin1 fee)
+        void $ callEndpoint @"close" h2 (CloseParams "" customCoin2 customCoin1 fee)
         void $ waitNSlots 10
 
-getContractState' ::  ContractHandle (Last (Either Text UserContractState)) UniswapUserSchema Void -> EmulatorTrace (Either Text UserContractState)
-getContractState' h = do
+getContractState' :: HistoryId -> ContractHandle (History (Either Text UserContractState)) UniswapUserSchema Void -> EmulatorTrace (Either Text UserContractState)
+getContractState' guid h = do
     void $ waitNSlots 1
     go 10
   where
     go :: Int -> EmulatorTrace (Either Text UserContractState)
     go 0 = return $ Left "Can't get state"
     go n = do
-      maybeState <- getLast <$> observableState h
+      maybeState <- WH.lookup guid <$> observableState h
       case maybeState of
         Just s -> return s
         Nothing -> do
