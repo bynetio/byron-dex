@@ -1,19 +1,19 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE TypeOperators     #-}
 
 module UniswapJsonApi.Client where
 
-import Data.Aeson
-import Data.Proxy
-import Data.Text
-import Network.HTTP.Client (newManager)
-import qualified Network.HTTP.Client as Network.HTTP.Client.Types
-import Network.HTTP.Client.TLS (tlsManagerSettings)
-import Servant.API
-import Servant.Client
-import System.Environment
-import UniswapJsonApi.Model
+import           Data.Aeson
+import           Data.Proxy
+import           Data.Text
+import           Network.HTTP.Client     (newManager)
+import qualified Network.HTTP.Client     as Network.HTTP.Client.Types
+import           Network.HTTP.Client.TLS (tlsManagerSettings)
+import           Servant.API
+import           Servant.Client
+import           System.Environment
+import           UniswapJsonApi.Model
 
 type UniswapAPI =
   "api" :> "new" :> "contract" :> "instance" :> Capture "instance-id" Text :> "status" :> Get '[JSON] UniswapStatusResponse
@@ -147,3 +147,4 @@ uniswapStop :: Config -> Text -> IO (Either ClientError ())
 uniswapStop c i = pabEndpoint c i "stop" v
   where
     v = object []
+

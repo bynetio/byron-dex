@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
 module UniswapJsonApi where
@@ -9,8 +9,8 @@ import Data.Text
 import GHC.Generics
 import Network.Wai.Handler.Warp
 import Servant
-import UniswapJsonApi.Logic as Logic
-import UniswapJsonApi.Model as Model
+import UniswapJsonApi.Logic     as Logic
+import UniswapJsonApi.Model     as Model
 
 type SwapApi =
   Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapStatusResponse
@@ -46,3 +46,4 @@ swapApp c = serve (Proxy :: Proxy SwapApi) (swapServer c)
 
 runApp :: Config -> IO ()
 runApp c = run (_port c) (swapApp c)
+

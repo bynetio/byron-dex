@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-
 module Main where
 
-import System.Environment (lookupEnv)
-import UniswapJsonApi (runApp)
+import System.Environment   (lookupEnv)
+import UniswapJsonApi       (runApp)
 import UniswapJsonApi.Model (Config (..))
 
 fetchConfig :: IO (Maybe Config)

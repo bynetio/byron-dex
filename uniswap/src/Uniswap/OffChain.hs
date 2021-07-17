@@ -45,28 +45,28 @@ module Uniswap.OffChain
   )
 where
 
-import           Control.Applicative       ((<|>))
-import           Control.Monad             hiding (fmap, mapM, mapM_)
-import           Data.List                 (nubBy, scanl)
-import qualified Data.Map                  as Map
-import           Data.Monoid               (Last (..))
-import           Data.Proxy                (Proxy (..))
-import           Data.Text                 (Text, pack)
-import           Data.Void                 (Void)
-import           Ledger                    hiding (singleton)
-import           Ledger.Constraints        as Constraints
-import qualified Ledger.Typed.Scripts      as Scripts
+import           Control.Applicative          ((<|>))
+import           Control.Monad                hiding (fmap, mapM, mapM_)
+import           Data.List                    (nubBy, scanl)
+import qualified Data.Map                     as Map
+import           Data.Proxy                   (Proxy (..))
+import           Data.Text                    (Text, pack)
+import           Data.Void                    (Void)
+import           Ledger                       hiding (singleton)
+import           Ledger.Constraints           as Constraints
+import qualified Ledger.Typed.Scripts         as Scripts
 import           Playground.Contract
-import           Plutus.Contract           hiding (when)
-import qualified Plutus.Contracts.Currency as Currency
-import           Plutus.V1.Ledger.Value    (AssetClass)
+import           Plutus.Contract              hiding (when)
+import qualified Plutus.Contracts.Currency    as Currency
+import           Plutus.V1.Ledger.Value       (AssetClass)
 import qualified PlutusTx
-import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..), String, div, show)
-import           Text.Printf               (printf)
+import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
+import           Prelude                      (Semigroup (..), String, div, show)
+import           Text.Printf                  (printf)
+import           Uniswap.Common.WalletHistory (History, HistoryId)
+import qualified Uniswap.Common.WalletHistory as WH
 import           Uniswap.IndirectSwaps
-import           Uniswap.OnChain           (mkUniswapValidator,
-                                            validateLiquidityForging)
+import           Uniswap.OnChain              (mkUniswapValidator, validateLiquidityForging)
 import           Uniswap.Pool
 import           Uniswap.Types
 
@@ -177,7 +177,9 @@ liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpT
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    cpOpId    :: ByteString,
+    -- | One 'Coin' of the liquidity pair.
     cpCoinA   :: Coin A,
     -- | The other 'Coin'.
     cpCoinB   :: Coin B,
@@ -193,7 +195,9 @@ data CreateParams = CreateParams
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    spOpId     :: ByteString,
+    -- | One 'Coin' of the liquidity pair.
     spCoinA    :: Coin A,
     -- | The other 'Coin'.
     spCoinB    :: Coin B,
@@ -209,7 +213,9 @@ data SwapParams = SwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data SwapPreviewParams = SwapPreviewParams
-  { sppCoinA  :: Coin A,
+  { -- | Unique Identifier of Operation
+    sppOpId   :: ByteString,
+    sppCoinA  :: Coin A,
     sppCoinB  :: Coin B,
     -- | Numerator and denominator of the swap fee
     sppFee    :: Fee,
@@ -218,7 +224,9 @@ data SwapPreviewParams = SwapPreviewParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data IndirectSwapParams = IndirectSwapParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    ispOpId     :: ByteString,
+    -- | One 'Coin' of the liquidity pair.
     ispCoinA    :: Coin A,
     -- | The other 'Coin'.
     ispCoinB    :: Coin B,
@@ -230,7 +238,9 @@ data IndirectSwapParams = IndirectSwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data ISwapPreviewParams = ISwapPreviewParams
-  { isppCoinA  :: Coin A,
+  { -- | Unique Identifier of Operation
+    isppOpId   :: ByteString,
+    isppCoinA  :: Coin A,
     isppCoinB  :: Coin B,
     isppAmount :: Amount A
   }
@@ -238,7 +248,9 @@ data ISwapPreviewParams = ISwapPreviewParams
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    clpOpId  :: ByteString,
+    -- | One 'Coin' of the liquidity pair.
     clpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     clpCoinB :: Coin B,
@@ -249,7 +261,9 @@ data CloseParams = CloseParams
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    rpOpId  :: ByteString,
+     -- | One 'Coin' of the liquidity pair.
     rpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     rpCoinB :: Coin B,
@@ -262,7 +276,9 @@ data RemoveParams = RemoveParams
 
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
 data AddParams = AddParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    apOpId    :: ByteString,
+     -- | One 'Coin' of the liquidity pair.
     apCoinA   :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     apCoinB   :: Coin B,
@@ -679,21 +695,22 @@ findUniswapFactoryAndPool us coinA coinB fee = do
         )
     _ -> throwError "liquidity pool not found"
 
-ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+ownerEndpoint :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
 ownerEndpoint = startHandler >> ownerEndpoint
   where
-    startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
     startHandler = do
       e <- runError (endpoint @"start" >> start Nothing)
-      tell $ Last $ Just e
+      -- FIXME: Add generate unique hash...
+      tell $ WH.append "uniqueHash" e
 
-ownerEndpoint' :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+ownerEndpoint' :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
 ownerEndpoint' = startHandler >> ownerEndpoint'
   where
-    startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
     startHandler = do
       e <- runError (endpoint @"start" >>= start . Just)
-      tell $ Last $ Just e
+      tell $ WH.append "uniqueHash" e
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -705,7 +722,7 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
 --      [@pools@]: Finds all liquidity pools and their liquidity belonging to the Uniswap instance. This merely inspects the blockchain and does not issue any transactions.
 --      [@funds@]: Gets the caller's funds. This merely inspects the blockchain and does not issue any transactions.
 --      [@stop@]: Stops the contract.
-userEndpoints :: Uniswap -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
+userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
   stop
     `select` ( ( f (Proxy @"create") (const Created) create
@@ -727,22 +744,26 @@ userEndpoints us =
       HasEndpoint l p UniswapUserSchema =>
       Proxy l ->
       (a -> UserContractState) ->
-      (Uniswap -> p -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Text a) ->
-      Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
+      (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
+      Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     f _ g c = do
       e <- runError $ do
         p <- endpoint @l
         c us p
 
       case e of
-        Left err -> logInfo @Text ("Error during calling endpoint: " <> err) >> tell (Last $ Just $ Left err)
-        Right a -> tell $ Last $ Just $ Right $ g a
+        Left err -> do
+          logInfo @Text ("Error during calling endpoint: " <> err)
+          tell $ WH.append "uniqueHash" . Left $ err
+        Right a ->
+          tell $ WH.append "uniqueHash" . Right . g $ a
 
-    stop :: Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
+    stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     stop = do
       e <- runError $ endpoint @"stop"
       tell $
-        Last $
-          Just $ case e of
+        WH.append "uniqueHash" $
+          case e of
             Left err -> Left err
             Right () -> Right Stopped
+

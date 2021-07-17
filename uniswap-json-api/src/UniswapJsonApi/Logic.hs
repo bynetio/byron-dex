@@ -4,9 +4,10 @@ module UniswapJsonApi.Logic where
 
 import Control.Monad.IO.Class
 import Control.Retry
-import Data.Aeson (encode)
-import Data.Either (isLeft)
+import Data.Aeson             (encode)
+import Data.Either            (isLeft)
 import Data.Text
+import Data.UUID              (UUID)
 import Servant
 import Servant.Client
 import UniswapJsonApi.Client

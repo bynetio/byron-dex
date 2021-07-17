@@ -29,6 +29,7 @@ library
                      , prettyprinter
                      , text
                      , bytestring
+                     , uniswap-common
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
@@ -83,6 +84,7 @@ executable uniswap-pab
     plutus-contract -any,
     plutus-pab -any,
     uniswap -any,
+    uniswap-common -any,
     aeson -any,
     freer-simple -any,
     prettyprinter -any,

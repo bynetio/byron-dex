@@ -22,6 +22,7 @@ library
                     , servant-server
                     , text
                     , warp
+                    , uuid
   default-language:   Haskell2010
 
 executable uniswap-json-api
