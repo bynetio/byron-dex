@@ -9,7 +9,7 @@ library
   exposed-modules:    UniswapJsonApi
                     , UniswapJsonApi.Logic
                     , UniswapJsonApi.Client
-                    , UniswapJsonApi.Model
+                    , UniswapJsonApi.Types
   build-depends:      base
                     , bytestring
                     , aeson
@@ -22,6 +22,8 @@ library
                     , servant-server
                     , text
                     , warp
+                    , uuid
+                    , either
   default-language:   Haskell2010
 
 executable uniswap-json-api

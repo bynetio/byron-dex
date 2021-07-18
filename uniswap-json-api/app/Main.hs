@@ -1,21 +1,29 @@
+{-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
-
+{-# LANGUAGE TypeApplications  #-}
 module Main where
 
-import System.Environment (lookupEnv)
-import UniswapJsonApi (runApp)
-import UniswapJsonApi.Model (Config (..))
+import Control.Exception    (Exception, throwIO)
+import System.Environment   (lookupEnv, setEnv)
+import UniswapJsonApi       (runApp)
+import UniswapJsonApi.Types
 
-fetchConfig :: IO (Maybe Config)
-fetchConfig = do
-  port <- lookupEnv "APP_PORT"
-  apiUrl <- lookupEnv "APP_API_URL"
-  apiPort <- lookupEnv "APP_API_PORT"
-  return $ Config <$> (read <$> port) <*> apiUrl <*> (read <$> apiPort)
+data NoConfigFoundException = NoConfigFoundException deriving (Show, Exception)
+
+
+mkAppContext :: IO AppContext
+mkAppContext = do
+  port    <- lookupEnv "APP_PORT"
+  pabUrl  <- lookupEnv "APP_API_URL"
+  pabPort <- lookupEnv "APP_API_PORT"
+  let maybePab = MkPabConfig <$> pabUrl <*> (read <$> pabPort)
+      maybeCtx = MkAppContext <$> maybePab <*> (read <$> port)
+  case maybeCtx of
+    Just ctx -> pure ctx
+    Nothing  -> throwIO NoConfigFoundException
 
 main :: IO ()
 main = do
-  config <- fetchConfig
-  case config of
-    Just c -> runApp c
-    Nothing -> error "uniswap-json-api: no config available"
+  context <- mkAppContext
+  runApp context
+
