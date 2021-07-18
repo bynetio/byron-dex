@@ -10,6 +10,7 @@ library
                     , UniswapJsonApi.Logic
                     , UniswapJsonApi.Client
                     , UniswapJsonApi.Model
+                    , UniswapJsonApi.Types
   build-depends:      base
                     , bytestring
                     , aeson
