@@ -5,16 +5,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module UniswapJsonApi.Types where
 
-import Control.Monad.Except     (ExceptT, MonadError)
-import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import Data.Aeson
-import Data.ByteString          (ByteString)
-import Data.List                (find)
-import Data.Text                (Text)
-import Data.UUID                (UUID)
-import GHC.Generics
-import Network.Wai.Handler.Warp (HostPreference)
-import Servant                  (ServerError)
+import           Control.Monad.Except     (ExceptT, MonadError)
+import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import           Data.Aeson
+import           Data.ByteString          (ByteString)
+import           Data.List                (find)
+import           Data.Text                (Text)
+import           Data.UUID                (UUID)
+import           GHC.Generics
+import           Network.Wai.Handler.Warp (HostPreference)
+import           Servant                  (ServerError)
 
 type Instance = Text
 
@@ -26,11 +26,13 @@ data History a = History [(OperationId, a)] [OperationId]
 lookupHistory :: OperationId -> History a -> Maybe a
 lookupHistory opId (History hs _) = snd <$> find (\h' -> opId == fst h') (reverse hs)
 
-newtype UniswapStatusResponse = UniswapStatusResponse
-  { cicCurrentState :: UniswapCurrentState
+data UniswapStatusResponse = UniswapStatusResponse
+  { cicCurrentState :: UniswapCurrentState,
+    cicContract     :: UniswapContract,
+    cicWallet       :: UniswapWallet,
+    cicDefintion    :: UniswapDefinition
   }
-  deriving newtype (FromJSON, ToJSON)
-  deriving (Generic, Show)
+  deriving (Generic, Show, FromJSON, ToJSON)
 
 data UniswapHook = UniswapHook
   { rqID      :: Integer,
@@ -54,14 +56,26 @@ data UniswapDefinition = UniswapDefinition
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
+data UniswapContract = UniswapContract
+  { unContractInstanceId :: Text
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+data UniswapWallet = UniswapWallet
+  { getWallet :: Integer
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+
+
 data PabConfig = MkPabConfig
   { pabUrl  :: String
   , pabPort :: Int
   } deriving Show
 
 data AppContext = MkAppContext
-  { pab   :: PabConfig
-  , port  :: Int
+  { pab  :: PabConfig
+  , port :: Int
   } deriving (Show)
 
 newtype (MonadIO m) => AppM m a = AppM
