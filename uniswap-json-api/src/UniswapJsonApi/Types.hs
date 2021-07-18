@@ -18,7 +18,7 @@ import Servant                  (ServerError)
 
 type Instance = Text
 
-type OperationId = UUID
+type OperationId = Text
 
 data History a = History [(OperationId, a)] [OperationId]
   deriving (Show, Generic, FromJSON, ToJSON)
@@ -26,13 +26,11 @@ data History a = History [(OperationId, a)] [OperationId]
 lookupHistory :: OperationId -> History a -> Maybe a
 lookupHistory opId (History hs _) = snd <$> find (\h' -> opId == fst h') (reverse hs)
 
-data UniswapStatusResponse = UniswapStatusResponse
-  { cicCurrentState :: UniswapCurrentState,
-    cicContract     :: UniswapContract,
-    cicWallet       :: UniswapWallet,
-    cicDefintion    :: UniswapDefinition
+newtype UniswapStatusResponse = UniswapStatusResponse
+  { cicCurrentState :: UniswapCurrentState
   }
-  deriving (Show, Generic, FromJSON, ToJSON)
+  deriving newtype (FromJSON, ToJSON)
+  deriving (Generic, Show)
 
 data UniswapHook = UniswapHook
   { rqID      :: Integer,
@@ -50,23 +48,11 @@ data UniswapCurrentState = UniswapCurrentState
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
-newtype UniswapContract = UniswapContract
-  { unContractInstanceId :: Text
-  }
-  deriving (Show, Generic, FromJSON, ToJSON)
-
-newtype UniswapWallet = UniswapWallet
-  { getWallet :: Integer
-  }
-  deriving (Show, Generic, FromJSON, ToJSON)
-
 data UniswapDefinition = UniswapDefinition
   { contents :: Value,
     tag      :: Text
   }
   deriving (Show, Generic, FromJSON, ToJSON)
-
-
 
 data PabConfig = MkPabConfig
   { pabUrl  :: String
@@ -80,7 +66,7 @@ data AppContext = MkAppContext
 
 newtype (MonadIO m) => AppM m a = AppM
   { unAppM :: ReaderT AppContext (ExceptT ServerError m) a
-  } deriving ( Functor
+  } deriving newtype ( Functor
              , Applicative
              , Monad
              , MonadReader AppContext
