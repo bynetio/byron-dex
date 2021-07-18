@@ -24,7 +24,6 @@ import           Data.Aeson                          (FromJSON (..),
                                                       defaultOptions, fromJSON,
                                                       genericParseJSON,
                                                       genericToJSON)
-import           Data.ByteString                     (ByteString)
 import qualified Data.Map                            as Map
 import qualified Data.Monoid                         as Monoid
 import qualified Data.Semigroup                      as Semigroup
@@ -68,7 +67,7 @@ main = void $
         ada = Uniswap.mkCoin adaSymbol adaToken
 
     cidStart <- Simulator.activateContract (Wallet 1) UniswapOwnerContract
-    _ <- Simulator.callEndpointOnInstance cidStart "start" ("startId" :: ByteString)
+    _ <- Simulator.callEndpointOnInstance cidStart "start" ("startId" :: Text)
     us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
       Success (WH.lookup "startId" -> Just (Right us)) -> Just us
       _                                                -> Nothing
@@ -79,7 +78,7 @@ main = void $
         cid <- Simulator.activateContract w $ UniswapUserContract us
         logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" ("fundsId" :: ByteString)
+        _ <- Simulator.callEndpointOnInstance cid "funds" ("fundsId" :: Text)
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
           Success (WH.lookup "fundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing

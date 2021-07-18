@@ -1,19 +1,18 @@
 module Spec.WalletHistorySpec (tests) where
 
-import           Data.ByteString              (ByteString, pack)
-
+import           Data.Text                    (Text, pack)
 import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck
 import           Uniswap.Common.WalletHistory
 
-nonEmptyBS :: Gen ByteString
-nonEmptyBS = pack <$> listOf1 arbitrary
+nonEmptyText :: Gen Text
+nonEmptyText = pack <$> listOf1 arbitrary
 
 instance Arbitrary a => Arbitrary (History a) where
   arbitrary = do
     a   <- arbitrary
-    hid <- nonEmptyBS
+    hid <- nonEmptyText
     oneof [ pure $ append hid a
           , pure $ remove hid
           ]

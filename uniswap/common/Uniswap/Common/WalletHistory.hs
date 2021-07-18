@@ -11,13 +11,11 @@ module Uniswap.Common.WalletHistory
   ) where
 
 import           Data.List           (nub)
+import           Data.List           hiding (lookup)
+import           Data.Text           (Text)
 import           Playground.Contract (FromJSON, Generic, ToJSON)
-import           PlutusTx.Prelude    (ByteString, Maybe, filter, find, flip,
-                                      fst, map, notElem, reverse, snd, ($), (.),
-                                      (<$>), (==))
-import           Prelude             (Eq, Monoid (..), Semigroup (..), Show)
-
-type HistoryId = ByteString
+import           Prelude             hiding (lookup)
+type HistoryId = Text
 data History a = History [(HistoryId, a)] [HistoryId]
   deriving ( Eq
            , Show
@@ -48,5 +46,4 @@ instance Semigroup (History a) where
 
 instance Monoid (History a) where
    mempty = History [] []
-
 

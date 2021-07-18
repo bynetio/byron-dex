@@ -757,7 +757,7 @@ userEndpoints us =
       forall l a p.
       HasEndpoint l p UniswapUserSchema =>
       Proxy l ->
-      (p -> ByteString) ->
+      (p -> Text) ->
       (a -> UserContractState) ->
       (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
       Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
