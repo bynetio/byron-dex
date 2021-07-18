@@ -16,7 +16,6 @@ import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.API
 import           Servant.Client
 import           System.Environment
-import           UniswapJsonApi.Model
 import           UniswapJsonApi.Types
 
 type UniswapAPI =

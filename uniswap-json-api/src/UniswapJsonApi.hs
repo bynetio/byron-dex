@@ -14,22 +14,21 @@ import qualified Network.Wai.Handler.Warp as W
 import           Servant
 import           Servant.Server
 import           UniswapJsonApi.Logic     as Logic
-import           UniswapJsonApi.Model     (Config (..))
-import           UniswapJsonApi.Model     as Model
-import           UniswapJsonApi.Types     (AppContext (..), AppM (..))
+import           UniswapJsonApi.Types     (AppContext (..), AppM (..), UniswapDefinition,
+                                           UniswapStatusResponse)
 
 type SwapApi =
-  Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "indirect_swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "close" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "remove" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "add" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "pools" :> Get '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "funds" :> Get '[JSON] UniswapStatusResponse
-    :<|> Capture "id" Text :> "stop" :> Get '[JSON] UniswapStatusResponse
+  Capture "id" Text :> "create" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "indirect_swap" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> QueryParam "slippage" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "indirect_swap_preview" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "close" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "remove" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "add" :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount_a" Int :> QueryParam "amount_a" Int :> Post '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "pools" :> Get '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "funds" :> Get '[JSON] UniswapDefinition
+    :<|> Capture "id" Text :> "stop" :> Get '[JSON] UniswapDefinition
     :<|> Capture "id" Text :> "status" :> Get '[JSON] UniswapStatusResponse
 
 server :: ServerT SwapApi (AppM IO)
