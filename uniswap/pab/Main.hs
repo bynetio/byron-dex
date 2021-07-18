@@ -78,7 +78,7 @@ main = void $
         cid <- Simulator.activateContract w $ UniswapUserContract us
         logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" ("fundsId" :: Text)
+        _ <- Simulator.callEndpointOnInstance cid "funds" (Uniswap.FundsParams "fundsId")
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
           Success (WH.lookup "fundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing

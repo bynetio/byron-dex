@@ -1,15 +1,15 @@
 {-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveGeneric  #-}
 
 module UniswapJsonApi.Model where
 
-import Data.Aeson
-import Data.Text
-import GHC.Generics
+import           Data.Aeson
+import           Data.Text
+import           GHC.Generics
 
 data Config = Config
-  { _port :: Int,
-    _apiUrl :: String,
+  { _port    :: Int,
+    _apiUrl  :: String,
     _apiPort :: Int
   }
 
@@ -17,25 +17,25 @@ type PABResponse a = Either Text a
 
 data UniswapStatusResponse = UniswapStatusResponse
   { cicCurrentState :: UniswapCurrentState,
-    cicContract :: UniswapContract,
-    cicWallet :: UniswapWallet,
-    cicDefintion :: UniswapDefinition
+    cicContract     :: UniswapContract,
+    cicWallet       :: UniswapWallet,
+    cicDefintion    :: UniswapDefinition
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
 data UniswapHook = UniswapHook
-  { rqID :: Integer,
-    itID :: Integer,
+  { rqID      :: Integer,
+    itID      :: Integer,
     rqRequest :: Value
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
 data UniswapCurrentState = UniswapCurrentState
-  { observableState :: Either Text UniswapDefinition,
-    hooks :: [UniswapHook],
-    err :: Maybe Text,
-    logs :: [Text],
-    lastLogs :: [Text]
+  { observableState :: ([(Text,Either Text UniswapDefinition)],[Text]),
+    hooks           :: [UniswapHook],
+    err             :: Maybe Text,
+    logs            :: [Text],
+    lastLogs        :: [Text]
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
@@ -51,6 +51,6 @@ newtype UniswapWallet = UniswapWallet
 
 data UniswapDefinition = UniswapDefinition
   { contents :: Value,
-    tag :: Text
+    tag      :: Text
   }
   deriving (Show, Generic, FromJSON, ToJSON)

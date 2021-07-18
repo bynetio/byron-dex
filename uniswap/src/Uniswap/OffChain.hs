@@ -27,6 +27,10 @@ module Uniswap.OffChain
     CloseParams (..),
     RemoveParams (..),
     AddParams (..),
+    FundsParams (..),
+    PoolsParams (..),
+    StopParams (..),
+    ClearStateParams (..),
     UniswapUserSchema,
     UserContractState (..),
     UniswapOwnerSchema,
@@ -99,10 +103,10 @@ type UniswapUserSchema =
     .\/ Endpoint "close" CloseParams
     .\/ Endpoint "remove" RemoveParams
     .\/ Endpoint "add" AddParams
-    .\/ Endpoint "pools" HistoryId
-    .\/ Endpoint "funds" HistoryId
-    .\/ Endpoint "stop" HistoryId
-    .\/ Endpoint "clearState" (HistoryId, HistoryId)
+    .\/ Endpoint "pools" PoolsParams
+    .\/ Endpoint "funds" FundsParams
+    .\/ Endpoint "stop" StopParams
+    .\/ Endpoint "clearState" ClearStateParams
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
@@ -296,6 +300,33 @@ data AddParams = AddParams
     apAmountB :: Amount B
   }
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @pools-@endpoint, which lookups available pools
+data PoolsParams = PoolsParams
+  { -- | Unique Identifier of Operation
+    plOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @funds-@endpoint, which lookups funds of the current wallet
+data FundsParams = FundsParams
+  { -- | Unique Identifier of Operation
+    fsOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @stop-@endpoint, which stops the uniswap instance
+data StopParams = StopParams
+  { -- | Unique Identifier of Operation
+    stOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
+data ClearStateParams = ClearStateParams
+  { -- | Unique Identifier of Operation
+    clsOpId     :: HistoryId,
+    -- | Identifier of Operation that should be removed from state
+    clsRemoveId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
 
 -- | Creates a Uniswap "factory". This factory will keep track of the existing liquidity pools and enforce that there will be at most one liquidity pool
 -- for any pair of tokens at any given time.
@@ -603,7 +634,7 @@ indirectSwap us IndirectSwapParams {..} = do
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. HasBlockchainActions s => Uniswap -> HistoryId -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools :: forall w s. HasBlockchainActions s => Uniswap -> PoolsParams -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
 pools us _ = do
   utxos <- utxoAt (uniswapAddress us)
   go $ snd <$> Map.toList utxos
@@ -632,15 +663,15 @@ pools us _ = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds :: HasBlockchainActions s => HistoryId -> Contract w s Text Value
+funds :: HasBlockchainActions s => FundsParams -> Contract w s Text Value
 funds _ = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
   return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
 
-clearState :: HasBlockchainActions s => (HistoryId, HistoryId) -> Contract (History (Either Text UserContractState)) s Text ()
-clearState (_,historyId) = do
-  tell $ WH.remove historyId
+clearState :: HasBlockchainActions s => ClearStateParams -> Contract (History (Either Text UserContractState)) s Text ()
+clearState ClearStateParams{..} = do
+  tell $ WH.remove clsRemoveId
 
 getUniswapDatum :: TxOutTx -> Contract w s Text UniswapDatum
 getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
@@ -746,9 +777,9 @@ userEndpoints us =
                    `select` f (Proxy @"close") clpOpId (const Closed) close
                    `select` f (Proxy @"remove") rpOpId (const Removed) remove
                    `select` f (Proxy @"add") apOpId (const Added) add
-                   `select` f (Proxy @"pools") id Pools pools
-                   `select` f (Proxy @"funds") id Funds (\_us historyId -> funds historyId)
-                   `select` f (Proxy @"clearState") fst (const Cleared) (const clearState)
+                   `select` f (Proxy @"pools") plOpId Pools pools
+                   `select` f (Proxy @"funds") fsOpId Funds (\_us historyId -> funds historyId)
+                   `select` f (Proxy @"clearState") clsOpId (const Cleared) (const clearState)
                )
                  >> userEndpoints us
              )
@@ -778,6 +809,6 @@ userEndpoints us =
     stop = do
       e <- runError $ endpoint @"stop"
       tell $ case e of
-        Left err   -> WH.append "ERROR" $ Left err
-        Right guid -> WH.append guid $ Right Stopped
+        Left err               -> WH.append "ERROR" $ Left err
+        Right (StopParams{..}) -> WH.append stOpId $ Right Stopped
 

@@ -385,7 +385,7 @@ instance ContractModel UModel where
                 Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB),fee))) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams "" coinA coinB fee amountA amountB slippage)
                 _ -> return ()
             delay 1
-            callEndpoint @"clearState" (h $ UseKey w) ("", "swapPreview")
+            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "swapPreview")
             delay 2
 
 
@@ -395,7 +395,7 @@ instance ContractModel UModel where
                 Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams "" coinA coinB amountA amountB slippage)
                 _ -> return ()
             delay 1
-            callEndpoint @"clearState" (h $ UseKey w) ("", "iSwapPreview")
+            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "iSwapPreview")
             delay 5
 
     precondition s (StartA _)          = isNothing $ s ^. contractState . uniswap
