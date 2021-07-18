@@ -1,84 +1,134 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module UniswapJsonApi.Logic where
 
+import Control.Monad.Except   (MonadError, throwError)
 import Control.Monad.IO.Class
+import Control.Monad.Reader
 import Control.Retry
 import Data.Aeson             (encode)
 import Data.Either            (isLeft)
 import Data.Text
 import Data.UUID              (UUID)
+import Data.UUID.V4           as UUID
 import Servant
 import Servant.Client
 import UniswapJsonApi.Client
 import UniswapJsonApi.Model
+import UniswapJsonApi.Types
 
-limitedBackoff :: RetryPolicy
-limitedBackoff = exponentialBackoff 50 <> limitRetries 5
 
-processRawRequest :: Show a => IO a -> Handler a
-processRawRequest action = do
-  response <- liftIO action
-  liftIO $ print response
-  return response
-
-processRequest :: Show a => Config -> Text -> String -> IO (Either ClientError a) -> Handler UniswapStatusResponse
-processRequest c uId errorMessage action = do
-  let endpointResult _ = processRawRequest action
-  endpointResponse <- retrying limitedBackoff (const $ return . isLeft) endpointResult
+processRequest :: (MonadIO m, MonadError ServerError m, Show a) => PabConfig
+               -> Instance
+               -> UUID
+               -> String
+               -> m (Either ClientError a)
+               -> m UniswapStatusResponse
+processRequest c uId opId errorMessage endpoint = do
+  endpointResponse <- retrying limitedBackoff (const $ pure . isLeft) (const endpoint)
   case endpointResponse of
     Right _ -> do
-      let statusResult _ = processRawRequest $ pabStatus c uId
+      let statusResult _ = pabStatus c uId
       statusResponse <- retrying limitedBackoff (const $ return . isLeft) statusResult
       case statusResponse of
-        Right r -> return r
-        Left _ -> throwError err422 {errBody = encode . pack $ "cannot fetch status of last operation"}
-    Left _ -> throwError err422 {errBody = encode . pack $ errorMessage}
+        Right r -> pure r
+        Left _ -> throwError err422{errBody = encode . pack $ "cannot fetch status of last operation"}
+    Left _ -> throwError err422{errBody = encode . pack $ errorMessage}
+  where
+    limitedBackoff :: RetryPolicy
+    limitedBackoff = exponentialBackoff 50 <> limitRetries 5
 
-create :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
-create c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot create a pool" $ uniswapCreate c uId cA cB aA aB
-create c uId _ _ _ _ = throwError err400
+create :: (MonadIO m) => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> AppM m UniswapStatusResponse
+create uId (Just cA) (Just cB) (Just aA) (Just aB) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapCreate pabCfg uId opId cA cB aA aB
+  processRequest pabCfg uId opId "cannot create a pool" req
+create uId _ _ _ _ = throwError err400
 
-swap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
-swap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make a swap" $ uniswapSwap c uId cA cB aA aB s
-swap c uId _ _ _ _ _ = throwError err400
+swap :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> AppM m UniswapStatusResponse
+swap uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapSwap pabCfg uId opId cA cB aA aB s
+  processRequest pabCfg uId opId "cannot make a swap" req
+swap uId _ _ _ _ _ = throwError err400
 
-swapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
-swapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make a swap" $ uniswapSwapPreview c uId cA cB a
-swapPreview c uId _ _ _ = throwError err400
+swapPreview :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> AppM m UniswapStatusResponse
+swapPreview uId (Just cA) (Just cB) (Just a) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapSwapPreview pabCfg uId opId cA cB a
+  processRequest pabCfg uId opId "cannot make a swap (preview)" req
+swapPreview uId _ _ _ = throwError err400
 
-indirectSwap :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
-indirectSwap c uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = processRequest c uId "cannot make an indirect swap" $ uniswapIndirectSwap c uId cA cB aA aB s
-indirectSwap c uId _ _ _ _ _ = throwError err400
+indirectSwap :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Maybe Int -> AppM m UniswapStatusResponse
+indirectSwap uId (Just cA) (Just cB) (Just aA) (Just aB) (Just s) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapIndirectSwap pabCfg uId opId cA cB aA aB s
+  processRequest pabCfg uId opId "cannot make an indirect swap" req
+indirectSwap uId _ _ _ _ _ = throwError err400
 
-indirectSwapPreview :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
-indirectSwapPreview c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot make an indirect swap preview" $ uniswapIndirectSwapPreview c uId cA cB a
-indirectSwapPreview c uId _ _ _ = throwError err400
+indirectSwapPreview :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> AppM m UniswapStatusResponse
+indirectSwapPreview uId (Just cA) (Just cB) (Just a) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapIndirectSwapPreview pabCfg uId opId cA cB a
+  processRequest pabCfg uId opId "cannot make an indirect swap preview" req
+indirectSwapPreview uId _ _ _ = throwError err400
 
-close :: Config -> Text -> Maybe Text -> Maybe Text -> Handler UniswapStatusResponse
-close c uId (Just cA) (Just cB) = processRequest c uId "cannot close a pool" $ uniswapClose c uId cA cB
-close c uId _ _ = throwError err400
+close :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> AppM m UniswapStatusResponse
+close uId (Just cA) (Just cB) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapClose pabCfg uId opId cA cB
+  processRequest pabCfg uId opId "cannot close a pool" req
+close uId _ _ = throwError err400
 
-remove :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Handler UniswapStatusResponse
-remove c uId (Just cA) (Just cB) (Just a) = processRequest c uId "cannot remove liquidity tokens" $ uniswapRemove c uId cA cB a
-remove c uId _ _ _ = throwError err400
+remove :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> AppM m UniswapStatusResponse
+remove uId (Just cA) (Just cB) (Just a) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapRemove pabCfg uId opId cA cB a
+  processRequest pabCfg uId opId "cannot remove liquidity tokens" req
+remove uId _ _ _ = throwError err400
 
-add :: Config -> Text -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> Handler UniswapStatusResponse
-add c uId (Just cA) (Just cB) (Just aA) (Just aB) = processRequest c uId "cannot add coins to pool" $ uniswapAdd c uId cA cB aA aB
-add c uId _ _ _ _ = throwError err400
+add :: MonadIO m => Instance -> Maybe Text -> Maybe Text -> Maybe Int -> Maybe Int -> AppM m UniswapStatusResponse
+add uId (Just cA) (Just cB) (Just aA) (Just aB) = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapAdd pabCfg uId opId cA cB aA aB
+  processRequest pabCfg uId opId "cannot add coins to pool" req
+add uId _ _ _ _ = throwError err400
 
-pools :: Config -> Text -> Handler UniswapStatusResponse
-pools c uId = processRequest c uId "cannot fetch uniwap pools" $ uniswapPools c uId
+pools :: MonadIO m => Instance -> AppM m UniswapStatusResponse
+pools uId =do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapPools pabCfg uId opId
+  processRequest pabCfg uId opId "cannot fetch uniwap pools" req
 
-funds :: Config -> Text -> Handler UniswapStatusResponse
-funds c uId = processRequest c uId "cannot fetch uniswap funds" $ uniswapFunds c uId
+funds :: MonadIO m => Instance -> AppM m UniswapStatusResponse
+funds uId = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapFunds pabCfg uId opId
+  processRequest pabCfg uId opId "cannot fetch uniswap funds" req
 
-stop :: Config -> Text -> Handler UniswapStatusResponse
-stop c uId = processRequest c uId "cannot stop an uniswap instance" $ uniswapStop c uId
+stop :: MonadIO m => Instance -> AppM m UniswapStatusResponse
+stop uId = do
+  pabCfg <- asks pab
+  opId <- liftIO UUID.nextRandom
+  let req = uniswapStop pabCfg uId opId
+  processRequest pabCfg uId opId "cannot stop an uniswap instance" req
 
-status :: Config -> Text -> Handler UniswapStatusResponse
-status c uId = do
-  result <- processRawRequest $ pabStatus c uId
+status :: (MonadIO m) => Instance -> AppM m UniswapStatusResponse
+status uId = do
+  pabCfg <- asks pab
+  result <- pabStatus pabCfg uId
   case result of
-    Left _ -> undefined
-    Right r -> return r
+    Left _ -> throwError err400{errBody = encode . pack $ "Provided Uniswap Instance not found"}
+    Right r -> pure r
+
