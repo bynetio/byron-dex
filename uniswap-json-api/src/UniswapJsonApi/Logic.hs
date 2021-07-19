@@ -30,7 +30,7 @@ processRequest c uId opId errorMessage endpoint = do
   case endpointResponse of
     Right _ -> do
       let statusResult _ = pabStatus c uId
-      statusResponse <- retrying limitedBackoff notSuccess statusResult
+      statusResponse <- retrying limitedBackoff statusNotReady statusResult
       case extractStatus statusResponse of
         Right r -> pure r
         Left err -> throwError err422{errBody = encode . pack $ show err}
@@ -39,14 +39,15 @@ processRequest c uId opId errorMessage endpoint = do
     limitedBackoff :: RetryPolicy
     limitedBackoff = exponentialBackoff 50 <> limitRetries 5
 
-    notSuccess = const $ pure . isLeft
+    notSuccess     = const $ pure . isLeft
+    statusNotReady = const $ pure . isLeft . extractStatus
 
     history = observableState . cicCurrentState
 
     extractUniswapDef :: UniswapStatusResponse -> Either Text UniswapDefinition
     extractUniswapDef = join . maybeToRight "Operation ID not found in history" . lookupHistory opId . history
 
-    extractStatus :: Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition-- -> UniswapDefinition
+    extractStatus :: Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition
     extractStatus e = extractUniswapDef =<< mapLeft (pack . show) e
 
 
