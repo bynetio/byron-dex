@@ -22,7 +22,6 @@ import           Control.Monad
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe                         (isJust, isNothing)
-import           Data.Monoid                        (Last (..))
 import           Data.String                        (IsString (..))
 import           Data.Text                          (Text)
 import           Data.Void
@@ -41,7 +40,6 @@ import qualified Uniswap.OffChain
 import           Uniswap.Pool
 import           Uniswap.Types
 
-import           Uniswap.Common.WalletHistory       (History, HistoryId)
 import qualified Uniswap.Common.WalletHistory       as WH
 
 type PoolData = ((Coin A, Integer),(Coin B, Integer),Integer, Fee)
@@ -143,8 +141,8 @@ instance ContractModel UModel where
         deriving (Show, Eq)
 
     data ContractInstanceKey UModel w s e where
-        StartKey :: Wallet           -> ContractInstanceKey UModel (History (Either Text Uniswap)) UniswapOwnerSchema' Void
-        UseKey   :: Wallet           -> ContractInstanceKey UModel (History (Either Text UserContractState)) UniswapUserSchema    Void
+        StartKey :: Wallet           -> ContractInstanceKey UModel (WH.History (Either Text Uniswap)) UniswapOwnerSchema' Void
+        UseKey   :: Wallet           -> ContractInstanceKey UModel (WH.History (Either Text UserContractState)) UniswapUserSchema    Void
 
     instanceTag key _ = fromString $ "instance tag for: " ++ show key
 
@@ -365,8 +363,6 @@ instance ContractModel UModel where
             _ -> return ()
         walletState w $= Just ISwapped
         wait 5
-
-    nextState _ = return ()
 
     perform h _ cmd = case cmd of
         (StartA w)          -> callEndpoint @"start" (h $ StartKey w) ("",uniswapCurrencySymbol) >> delay 1

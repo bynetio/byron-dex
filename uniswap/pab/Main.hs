@@ -31,8 +31,7 @@ import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import           GHC.Generics                        (Generic)
 import           Ledger.Ada                          (adaSymbol, adaToken)
-import           Plutus.Contract                     (BlockchainActions,
-                                                      ContractError, Empty)
+import           Plutus.Contract                     (ContractError, Empty)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
 import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
@@ -69,7 +68,7 @@ main = void $
     cidStart <- Simulator.activateContract (Wallet 1) UniswapOwnerContract
     _ <- Simulator.callEndpointOnInstance cidStart "start" ("startId" :: Text)
     us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
-      Success (WH.lookup "startId" -> Just (Right us)) -> Just us
+      Success (WH.lookup "StartId" -> Just (Right us)) -> Just us
       _                                                -> Nothing
     logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
 
@@ -80,7 +79,7 @@ main = void $
         Simulator.waitForEndpoint cid "funds"
         _ <- Simulator.callEndpointOnInstance cid "funds" (Uniswap.FundsParams "fundsId")
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
-          Success (WH.lookup "fundsId" -> Just (Right v)) -> Just v
+          Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing
         logString @(Builtin UniswapContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
@@ -107,8 +106,8 @@ handleStarterContract ::
 handleStarterContract = Builtin.handleBuiltin getSchema getContract
   where
     getSchema = \case
-      UniswapOwnerContract -> Builtin.endpointsToSchemas @(Uniswap.UniswapOwnerSchema .\\ BlockchainActions)
-      UniswapUserContract _ -> Builtin.endpointsToSchemas @(Uniswap.UniswapUserSchema .\\ BlockchainActions)
+      UniswapOwnerContract -> Builtin.endpointsToSchemas @(Uniswap.UniswapOwnerSchema)
+      UniswapUserContract _ -> Builtin.endpointsToSchemas @(Uniswap.UniswapUserSchema)
       UniswapInit -> Builtin.endpointsToSchemas @Empty
     getContract = \case
       UniswapOwnerContract  -> SomeBuiltin Uniswap.ownerEndpoint
