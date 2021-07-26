@@ -45,10 +45,15 @@ data UniswapCurrentState = UniswapCurrentState
   { observableState :: History (Either Text UniswapDefinition),
     hooks           :: [UniswapHook],
     err             :: Maybe Text,
-    logs            :: [Text],
-    lastLogs        :: [Text]
+    logs            :: [UniswapLog],
+    lastLogs        :: [UniswapLog]
   }
   deriving (Show, Generic, FromJSON, ToJSON)
+
+data UniswapLog = UniswapLog
+  { _logMessageContent :: Text,
+    _logLevel          :: Text
+  } deriving (Show, Generic, FromJSON, ToJSON)
 
 data UniswapDefinition = UniswapDefinition
   { contents :: Value,
