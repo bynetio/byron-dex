@@ -13,10 +13,11 @@ library
   exposed-modules:    UniswapJsonApi
                     , UniswapJsonApi.Logic
                     , UniswapJsonApi.Client
-                    , UniswapJsonApi.Model
+                    , UniswapJsonApi.Types
   build-depends:      base
-                    , bytestring
                     , aeson
+                    , bytestring
+                    , either
                     , http-client
                     , http-client-tls
                     , mtl
@@ -25,6 +26,7 @@ library
                     , servant-client
                     , servant-server
                     , text
+                    , uuid
                     , warp
   import:             shared-properties
 

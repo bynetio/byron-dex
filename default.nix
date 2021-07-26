@@ -3,7 +3,7 @@
 , config ? { allowUnfreePredicate = (import ./vendor/plutus/nix/lib/unfree.nix).unfreePredicate; }
 , rev ? "in-nix-shell"
 , sourcesOverride ? { }
-, packages ? import ./vendor/plutus { inherit crossSystem config sourcesOverride rev enableHaskellProfiling; }
+, packages ? import ./vendor/plutus { inherit crossSystem config sourcesOverride enableHaskellProfiling; }
 , enableHaskellProfiling ? false
 }:
 let

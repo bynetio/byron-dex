@@ -16,7 +16,7 @@ import           Test.Hspec.Wai.Matcher
 
 import           UniswapJsonApi
 import           UniswapJsonApi.Logic
-import           UniswapJsonApi.Model
+import           UniswapJsonApi.Types
 
 config = Config 3001 "localhost" 8080
 

@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
@@ -26,6 +27,10 @@ module Uniswap.OffChain
     CloseParams (..),
     RemoveParams (..),
     AddParams (..),
+    FundsParams (..),
+    PoolsParams (..),
+    StopParams (..),
+    ClearStateParams (..),
     UniswapUserSchema,
     UserContractState (..),
     UniswapOwnerSchema,
@@ -45,49 +50,48 @@ module Uniswap.OffChain
   )
 where
 
-import           Control.Applicative       ((<|>))
-import           Control.Monad             hiding (fmap, mapM, mapM_)
-import           Data.List                 (nubBy, scanl)
-import qualified Data.Map                  as Map
-import           Data.Monoid               (Last (..))
-import           Data.Proxy                (Proxy (..))
-import           Data.Text                 (Text, pack)
-import           Data.Void                 (Void)
-import           Ledger                    hiding (singleton)
-import           Ledger.Constraints        as Constraints
-import qualified Ledger.Typed.Scripts      as Scripts
+import           Control.Applicative          ((<|>))
+import           Control.Monad                hiding (fmap, mapM, mapM_)
+import           Data.List                    (scanl)
+import qualified Data.Map                     as Map
+import           Data.Proxy                   (Proxy (..))
+import           Data.Text                    (Text, pack)
+import           Data.Void                    (Void)
+import           Ledger                       hiding (fee, singleton)
+import           Ledger.Constraints           as Constraints
+import qualified Ledger.Typed.Scripts         as Scripts
 import           Playground.Contract
-import           Plutus.Contract           hiding (when)
-import qualified Plutus.Contracts.Currency as Currency
-import           Plutus.V1.Ledger.Value    (AssetClass)
+import           Plutus.Contract
+import qualified Plutus.Contracts.Currency    as Currency
 import qualified PlutusTx
-import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..), String, div, show)
-import           Text.Printf               (printf)
+import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
+import           Prelude                      (Semigroup (..), String, div,
+                                               show)
+import           Text.Printf                  (printf)
+import           Uniswap.Common.WalletHistory (History, HistoryId)
+import qualified Uniswap.Common.WalletHistory as WH
 import           Uniswap.IndirectSwaps
-import           Uniswap.OnChain           (mkUniswapValidator,
-                                            validateLiquidityForging)
+import           Uniswap.OnChain              (mkUniswapValidator,
+                                               validateLiquidityForging)
 import           Uniswap.Pool
 import           Uniswap.Types
-
 data Uniswapping
 
-instance Scripts.ScriptType Uniswapping where
+instance Scripts.ValidatorTypes Uniswapping where
   type RedeemerType Uniswapping = UniswapAction
   type DatumType Uniswapping = UniswapDatum
 
 type UniswapOwnerSchema =
-  BlockchainActions
-    .\/ Endpoint "start" ()
+    Endpoint "start" HistoryId
 
 type UniswapOwnerSchema' =
-  BlockchainActions
-    .\/ Endpoint "start" CurrencySymbol
+    Endpoint "start" (HistoryId,CurrencySymbol)
+
+
 
 -- | Schema for the endpoints for users of Uniswap.
 type UniswapUserSchema =
-  BlockchainActions
-    .\/ Endpoint "create" CreateParams
+    Endpoint "create" CreateParams
     .\/ Endpoint "swap" SwapParams
     .\/ Endpoint "swapPreview" SwapPreviewParams
     .\/ Endpoint "iSwapPreview" ISwapPreviewParams
@@ -95,9 +99,10 @@ type UniswapUserSchema =
     .\/ Endpoint "close" CloseParams
     .\/ Endpoint "remove" RemoveParams
     .\/ Endpoint "add" AddParams
-    .\/ Endpoint "pools" ()
-    .\/ Endpoint "funds" ()
-    .\/ Endpoint "stop" ()
+    .\/ Endpoint "pools" PoolsParams
+    .\/ Endpoint "funds" FundsParams
+    .\/ Endpoint "stop" StopParams
+    .\/ Endpoint "clearState" ClearStateParams
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
@@ -112,15 +117,16 @@ data UserContractState
   | Removed
   | Closed
   | Stopped
+  | Cleared
   deriving (Show, Generic, FromJSON, ToJSON)
 
 uniswapTokenName, poolStateTokenName :: TokenName
 uniswapTokenName = "Uniswap"
 poolStateTokenName = "Pool State"
 
-uniswapInstance :: Uniswap -> Scripts.ScriptInstance Uniswapping
+uniswapInstance :: Uniswap -> Scripts.TypedValidator Uniswapping
 uniswapInstance us =
-  Scripts.validator @Uniswapping
+  Scripts.mkTypedValidator  @Uniswapping
     ( $$(PlutusTx.compile [||mkUniswapValidator||])
         `PlutusTx.applyCode` PlutusTx.liftCode us
         `PlutusTx.applyCode` PlutusTx.liftCode c
@@ -177,7 +183,9 @@ liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpT
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    cpOpId    :: HistoryId,
+    -- | One 'Coin' of the liquidity pair.
     cpCoinA   :: Coin A,
     -- | The other 'Coin'.
     cpCoinB   :: Coin B,
@@ -193,7 +201,9 @@ data CreateParams = CreateParams
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    spOpId     :: HistoryId,
+    -- | One 'Coin' of the liquidity pair.
     spCoinA    :: Coin A,
     -- | The other 'Coin'.
     spCoinB    :: Coin B,
@@ -209,7 +219,9 @@ data SwapParams = SwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data SwapPreviewParams = SwapPreviewParams
-  { sppCoinA  :: Coin A,
+  { -- | Unique Identifier of Operation
+    sppOpId   :: HistoryId,
+    sppCoinA  :: Coin A,
     sppCoinB  :: Coin B,
     -- | Numerator and denominator of the swap fee
     sppFee    :: Fee,
@@ -218,7 +230,9 @@ data SwapPreviewParams = SwapPreviewParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data IndirectSwapParams = IndirectSwapParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    ispOpId     :: HistoryId,
+    -- | One 'Coin' of the liquidity pair.
     ispCoinA    :: Coin A,
     -- | The other 'Coin'.
     ispCoinB    :: Coin B,
@@ -230,7 +244,9 @@ data IndirectSwapParams = IndirectSwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data ISwapPreviewParams = ISwapPreviewParams
-  { isppCoinA  :: Coin A,
+  { -- | Unique Identifier of Operation
+    isppOpId   :: HistoryId,
+    isppCoinA  :: Coin A,
     isppCoinB  :: Coin B,
     isppAmount :: Amount A
   }
@@ -238,7 +254,9 @@ data ISwapPreviewParams = ISwapPreviewParams
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    clpOpId  :: HistoryId,
+    -- | One 'Coin' of the liquidity pair.
     clpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     clpCoinB :: Coin B,
@@ -249,7 +267,9 @@ data CloseParams = CloseParams
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    rpOpId  :: HistoryId,
+     -- | One 'Coin' of the liquidity pair.
     rpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     rpCoinB :: Coin B,
@@ -262,7 +282,9 @@ data RemoveParams = RemoveParams
 
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
 data AddParams = AddParams
-  { -- | One 'Coin' of the liquidity pair.
+  { -- | Unique Identifier of Operation
+    apOpId    :: HistoryId,
+     -- | One 'Coin' of the liquidity pair.
     apCoinA   :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
     apCoinB   :: Coin B,
@@ -275,10 +297,36 @@ data AddParams = AddParams
   }
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
+-- | Parameters for the @pools-@endpoint, which lookups available pools
+data PoolsParams = PoolsParams
+  { -- | Unique Identifier of Operation
+    plOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @funds-@endpoint, which lookups funds of the current wallet
+data FundsParams = FundsParams
+  { -- | Unique Identifier of Operation
+    fsOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @stop-@endpoint, which stops the uniswap instance
+data StopParams = StopParams
+  { -- | Unique Identifier of Operation
+    stOpId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+-- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
+data ClearStateParams = ClearStateParams
+  { -- | Unique Identifier of Operation
+    clsOpId     :: HistoryId,
+    -- | Identifier of Operation that should be removed from state
+    clsRemoveId :: HistoryId
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+
 -- | Creates a Uniswap "factory". This factory will keep track of the existing liquidity pools and enforce that there will be at most one liquidity pool
 -- for any pair of tokens at any given time.
 start ::
-  HasBlockchainActions s =>
   -- | for test purpose we can pass our currency symbol
   Maybe CurrencySymbol ->
   Contract w s Text Uniswap
@@ -302,7 +350,7 @@ start mcs = do
   return us
 
 -- | Creates a liquidity pool for a pair of coins. The creator provides liquidity for both coins and gets liquidity tokens in return.
-create :: HasBlockchainActions s => Uniswap -> CreateParams -> Contract w s Text ()
+create :: Uniswap -> CreateParams -> Contract w s Text ()
 create us CreateParams {..} = do
   when (unCoin cpCoinA == unCoin cpCoinB) $ throwError "coins must be different"
   when (cpAmountA <= 0 || cpAmountB <= 0) $ throwError "amounts must be positive"
@@ -319,7 +367,7 @@ create us CreateParams {..} = do
       lpVal = valueOf cpCoinA cpAmountA <> valueOf cpCoinB cpAmountB <> unitValue psC
 
       lookups =
-        Constraints.scriptInstanceLookups usInst
+        Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
           <> Constraints.monetaryPolicy (liquidityPolicy us)
           <> Constraints.unspentOutputs (Map.singleton oref o)
@@ -336,7 +384,7 @@ create us CreateParams {..} = do
   logInfo $ "created liquidity pool: " ++ show lp
 
 -- | Closes a liquidity pool by burning all remaining liquidity tokens in exchange for all liquidity remaining in the pool.
-close :: HasBlockchainActions s => Uniswap -> CloseParams -> Contract w s Text ()
+close :: Uniswap -> CloseParams -> Contract w s Text ()
 close us CloseParams {..} = do
   ((oref1, o1, lps), (oref2, o2, lp, liquidity)) <- findUniswapFactoryAndPool us clpCoinA clpCoinB clpFee
   pkh <- pubKeyHash <$> ownPubKey
@@ -352,7 +400,7 @@ close us CloseParams {..} = do
       redeemer = Redeemer $ PlutusTx.toData Close
 
       lookups =
-        Constraints.scriptInstanceLookups usInst
+        Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
           <> Constraints.monetaryPolicy (liquidityPolicy us)
           <> Constraints.ownPubKeyHash pkh
@@ -371,7 +419,7 @@ close us CloseParams {..} = do
   logInfo $ "closed liquidity pool: " ++ show lp
 
 -- | Removes some liquidity from a liquidity pool in exchange for liquidity tokens.
-remove :: HasBlockchainActions s => Uniswap -> RemoveParams -> Contract w s Text ()
+remove :: Uniswap -> RemoveParams -> Contract w s Text ()
 remove us RemoveParams {..} = do
   (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us rpCoinA rpCoinB rpFee
   pkh <- pubKeyHash <$> ownPubKey
@@ -391,7 +439,7 @@ remove us RemoveParams {..} = do
       redeemer = Redeemer $ PlutusTx.toData Remove
 
       lookups =
-        Constraints.scriptInstanceLookups usInst
+        Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
           <> Constraints.monetaryPolicy (liquidityPolicy us)
           <> Constraints.unspentOutputs (Map.singleton oref o)
@@ -408,7 +456,7 @@ remove us RemoveParams {..} = do
   logInfo $ "removed liquidity from pool: " ++ show lp
 
 -- | Adds some liquidity to an existing liquidity pool in exchange for newly minted liquidity tokens.
-add :: HasBlockchainActions s => Uniswap -> AddParams -> Contract w s Text ()
+add :: Uniswap -> AddParams -> Contract w s Text ()
 add us AddParams {..} = do
   pkh <- pubKeyHash <$> ownPubKey
   (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us apCoinA apCoinB apFee
@@ -435,7 +483,7 @@ add us AddParams {..} = do
       redeemer = Redeemer $ PlutusTx.toData Add
 
       lookups =
-        Constraints.scriptInstanceLookups usInst
+        Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
           <> Constraints.monetaryPolicy (liquidityPolicy us)
           <> Constraints.ownPubKeyHash pkh
@@ -455,7 +503,7 @@ add us AddParams {..} = do
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
-swapPreview :: HasBlockchainActions s => Uniswap -> SwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B), Fee)
+swapPreview :: Uniswap -> SwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B), Fee)
 swapPreview us SwapPreviewParams {..} = do
   (_, (_, o, _, _)) <- findUniswapFactoryAndPool us sppCoinA sppCoinB sppFee
   let outVal = txOutValue $ txOutTxOut o
@@ -465,7 +513,7 @@ swapPreview us SwapPreviewParams {..} = do
   return ((sppCoinA, sppAmount), (sppCoinB, outB), sppFee)
 
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
-swap :: HasBlockchainActions s => Uniswap -> SwapParams -> Contract w s Text ()
+swap :: Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams {..} = do
   unless (spAmount > 0) $ throwError "amount must be positive"
   (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us spCoinA spCoinB spFee
@@ -487,7 +535,7 @@ swap us SwapParams {..} = do
       val = valueOf spCoinA newA <> valueOf spCoinB newB <> unitValue (poolStateCoin us)
 
       lookups =
-        Constraints.scriptInstanceLookups inst
+        Constraints.typedValidatorLookups inst
           <> Constraints.otherScript (Scripts.validatorScript inst)
           <> Constraints.unspentOutputs (Map.singleton oref o)
           <> Constraints.ownPubKeyHash pkh
@@ -500,7 +548,7 @@ swap us SwapParams {..} = do
   void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "swapped with: " ++ show lp
 
-indirectSwapPreview :: HasBlockchainActions s => Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
+indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
 indirectSwapPreview us ISwapPreviewParams {..} = do
   abstractPools <- uniquePools us
   (_, outB) <- case findBestSwap abstractPools (unCoin isppCoinA, unCoin isppCoinB) (unAmount isppAmount) of
@@ -508,7 +556,7 @@ indirectSwapPreview us ISwapPreviewParams {..} = do
     Just p  -> return p
   return ((isppCoinA, isppAmount), (isppCoinB, Amount outB))
 
-uniquePools :: HasBlockchainActions s => Uniswap -> Contract w s Text (Map.Map (AssetClass, AssetClass, Fee) (Integer, Integer))
+uniquePools :: Uniswap -> Contract w s Text (Map.Map (AssetClass, AssetClass, Fee) (Integer, Integer))
 uniquePools us = do
   (_, _, allPools) <- findUniswapFactory us
   relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x, lp)) allPools
@@ -530,7 +578,7 @@ uniquePools us = do
       where
         eqPool ((a1, a2, f1), _) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
 
-indirectSwap :: HasBlockchainActions s => Uniswap -> IndirectSwapParams -> Contract w s Text ()
+indirectSwap :: Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams {..} = do
   unless (ispAmount > 0) $ throwError "amount must be positive"
   (_, _, allPools) <- findUniswapFactory us
@@ -553,7 +601,7 @@ indirectSwap us IndirectSwapParams {..} = do
   let inst = uniswapInstance us
 
       lookups =
-        Constraints.scriptInstanceLookups inst
+        Constraints.typedValidatorLookups inst
           <> Constraints.otherScript (Scripts.validatorScript inst)
           <> Constraints.unspentOutputs (Map.fromList $ map (\((oref, o, _), _) -> (oref, o)) relevantPools)
           <> Constraints.ownPubKeyHash pkh
@@ -581,8 +629,8 @@ indirectSwap us IndirectSwapParams {..} = do
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. HasBlockchainActions s => Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
-pools us = do
+pools :: forall w s. Uniswap -> PoolsParams -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools us _ = do
   utxos <- utxoAt (uniswapAddress us)
   go $ snd <$> Map.toList utxos
   where
@@ -610,11 +658,15 @@ pools us = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds :: HasBlockchainActions s => Contract w s Text Value
-funds = do
+funds :: FundsParams -> Contract w s Text Value
+funds _ = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
   return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+
+clearState :: ClearStateParams -> Contract (History (Either Text UserContractState)) s Text ()
+clearState ClearStateParams{..} = do
+  tell $ WH.remove clsRemoveId
 
 getUniswapDatum :: TxOutTx -> Contract w s Text UniswapDatum
 getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
@@ -625,7 +677,7 @@ getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
       Nothing -> throwError "datum has wrong type"
       Just d  -> return d
 
-findUniswapInstance :: HasBlockchainActions s => Uniswap -> Coin b -> (UniswapDatum -> Maybe a) -> Contract w s Text (TxOutRef, TxOutTx, a)
+findUniswapInstance :: Uniswap -> Coin b -> (UniswapDatum -> Maybe a) -> Contract w s Text (TxOutRef, TxOutTx, a)
 findUniswapInstance us c f = do
   let addr = uniswapAddress us
   logInfo @String $ printf "looking for Uniswap instance at address %s containing coin %s " (show addr) (show c)
@@ -641,19 +693,18 @@ findUniswapInstance us c f = do
           logInfo @String $ printf "found Uniswap instance with datum: %s" (show d)
           return (oref, o, a)
 
-findUniswapFactory :: HasBlockchainActions s => Uniswap -> Contract w s Text (TxOutRef, TxOutTx, [LiquidityPool])
+findUniswapFactory :: Uniswap -> Contract w s Text (TxOutRef, TxOutTx, [LiquidityPool])
 findUniswapFactory us@Uniswap {..} = findUniswapInstance us usCoin $ \case
   Factory lps -> Just lps
   Pool _ _    -> Nothing
 
-findUniswapPool :: HasBlockchainActions s => Uniswap -> LiquidityPool -> Contract w s Text (TxOutRef, TxOutTx, Amount Liquidity)
+findUniswapPool :: Uniswap -> LiquidityPool -> Contract w s Text (TxOutRef, TxOutTx, Amount Liquidity)
 findUniswapPool us lp = findUniswapInstance us (poolStateCoin us) $ \case
   Pool lp' l
     | lp == lp' -> Just l
   _ -> Nothing
 
 findUniswapFactoryAndPool ::
-  HasBlockchainActions s =>
   Uniswap ->
   Coin A ->
   Coin B ->
@@ -679,21 +730,25 @@ findUniswapFactoryAndPool us coinA coinB fee = do
         )
     _ -> throwError "liquidity pool not found"
 
-ownerEndpoint :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+ownerEndpoint :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
 ownerEndpoint = startHandler >> ownerEndpoint
   where
-    startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema Void ()
+    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >> start Nothing)
-      tell $ Last $ Just e
+      e <- runError (endpoint @"start" >>= \guid -> (guid,) <$> start Nothing)
+      case e of
+        Left err           -> tell $ WH.append "ERROR" $ Left err
+        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
 
-ownerEndpoint' :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+ownerEndpoint' :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
 ownerEndpoint' = startHandler >> ownerEndpoint'
   where
-    startHandler :: Contract (Last (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >>= start . Just)
-      tell $ Last $ Just e
+      e <- runError (endpoint @"start" >>= \(guid,currency) -> (guid,) <$> start (Just currency))
+      case e of
+        Left err           -> tell $ WH.append "ERROR" $ Left err
+        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -705,44 +760,49 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
 --      [@pools@]: Finds all liquidity pools and their liquidity belonging to the Uniswap instance. This merely inspects the blockchain and does not issue any transactions.
 --      [@funds@]: Gets the caller's funds. This merely inspects the blockchain and does not issue any transactions.
 --      [@stop@]: Stops the contract.
-userEndpoints :: Uniswap -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
+userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
   stop
-    `select` ( ( f (Proxy @"create") (const Created) create
-                   `select` f (Proxy @"swap") (const Swapped) swap
-                   `select` f (Proxy @"swapPreview") SwapPreview swapPreview
-                   `select` f (Proxy @"iSwap") (const ISwapped) indirectSwap
-                   `select` f (Proxy @"iSwapPreview") ISwapPreview indirectSwapPreview
-                   `select` f (Proxy @"close") (const Closed) close
-                   `select` f (Proxy @"remove") (const Removed) remove
-                   `select` f (Proxy @"add") (const Added) add
-                   `select` f (Proxy @"pools") Pools (\us' () -> pools us')
-                   `select` f (Proxy @"funds") Funds (\_us () -> funds)
+    `select` ( ( f (Proxy @"create") cpOpId (const Created) create
+                   `select` f (Proxy @"swap") spOpId (const Swapped) swap
+                   `select` f (Proxy @"swapPreview") sppOpId SwapPreview swapPreview
+                   `select` f (Proxy @"iSwap") ispOpId (const ISwapped) indirectSwap
+                   `select` f (Proxy @"iSwapPreview") isppOpId ISwapPreview indirectSwapPreview
+                   `select` f (Proxy @"close") clpOpId (const Closed) close
+                   `select` f (Proxy @"remove") rpOpId (const Removed) remove
+                   `select` f (Proxy @"add") apOpId (const Added) add
+                   `select` f (Proxy @"pools") plOpId Pools pools
+                   `select` f (Proxy @"funds") fsOpId Funds (\_us historyId -> funds historyId)
+                   `select` f (Proxy @"clearState") clsOpId (const Cleared) (const clearState)
                )
                  >> userEndpoints us
              )
   where
     f ::
       forall l a p.
-      HasEndpoint l p UniswapUserSchema =>
+      (HasEndpoint l p UniswapUserSchema, FromJSON p) =>
       Proxy l ->
+      (p -> Text) ->
       (a -> UserContractState) ->
-      (Uniswap -> p -> Contract (Last (Either Text UserContractState)) UniswapUserSchema Text a) ->
-      Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
-    f _ g c = do
+      (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
+      Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
+    f _ getGuid g c = do
+
       e <- runError $ do
         p <- endpoint @l
-        c us p
+        (getGuid p,) <$> c us p
 
       case e of
-        Left err -> logInfo @Text ("Error during calling endpoint: " <> err) >> tell (Last $ Just $ Left err)
-        Right a -> tell $ Last $ Just $ Right $ g a
+        Left err -> do
+          logInfo @Text ("Error during calling endpoint: " <> err)
+          tell $ WH.append "ERROR" . Left $ err
+        Right (guid,a) ->
+          tell $ WH.append guid . Right . g $ a
 
-    stop :: Contract (Last (Either Text UserContractState)) UniswapUserSchema Void ()
+    stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     stop = do
       e <- runError $ endpoint @"stop"
-      tell $
-        Last $
-          Just $ case e of
-            Left err -> Left err
-            Right () -> Right Stopped
+      tell $ case e of
+        Left err               -> WH.append "ERROR" $ Left err
+        Right (StopParams{..}) -> WH.append stOpId $ Right Stopped
+

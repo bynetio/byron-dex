@@ -22,7 +22,6 @@ import           Control.Monad
 import           Data.Map                           (Map)
 import qualified Data.Map                           as Map
 import           Data.Maybe                         (isJust, isNothing)
-import           Data.Monoid                        (Last (..))
 import           Data.String                        (IsString (..))
 import           Data.Text                          (Text)
 import           Data.Void
@@ -40,6 +39,8 @@ import           Uniswap.OffChain                   hiding (pools, uniswap)
 import qualified Uniswap.OffChain
 import           Uniswap.Pool
 import           Uniswap.Types
+
+import qualified Uniswap.Common.WalletHistory       as WH
 
 type PoolData = ((Coin A, Integer),(Coin B, Integer),Integer, Fee)
 
@@ -140,8 +141,8 @@ instance ContractModel UModel where
         deriving (Show, Eq)
 
     data ContractInstanceKey UModel w s e where
-        StartKey :: Wallet           -> ContractInstanceKey UModel (Last (Either Text Uniswap)) UniswapOwnerSchema' Void
-        UseKey   :: Wallet           -> ContractInstanceKey UModel (Last (Either Text UserContractState)) UniswapUserSchema    Void
+        StartKey :: Wallet           -> ContractInstanceKey UModel (WH.History (Either Text Uniswap)) UniswapOwnerSchema' Void
+        UseKey   :: Wallet           -> ContractInstanceKey UModel (WH.History (Either Text UserContractState)) UniswapUserSchema    Void
 
     instanceTag key _ = fromString $ "instance tag for: " ++ show key
 
@@ -363,31 +364,34 @@ instance ContractModel UModel where
         walletState w $= Just ISwapped
         wait 5
 
-    nextState _ = return ()
-
     perform h _ cmd = case cmd of
-        (StartA w)          -> callEndpoint @"start" (h $ StartKey w) uniswapCurrencySymbol >> delay 1
-        (CreateA w (coinA,coinB,fee) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (CreateParams coinA coinB fee (Amount amountA) (Amount amountB))    >> delay 2
-        (AddA w (coinA,coinB,fee) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (AddParams coinA coinB fee (Amount amountA) (Amount amountB))               >> delay 2
-        (RemoveA w (coinA,coinB,fee) liquidity')  -> callEndpoint @"remove" (h $ UseKey w) (RemoveParams coinA coinB fee (Amount liquidity'))                  >> delay 2
-        (CloseA w (coinA,coinB,fee)) -> callEndpoint @"close"   (h $ UseKey w) (CloseParams coinA coinB fee)   >> delay 2
+        (StartA w)          -> callEndpoint @"start" (h $ StartKey w) ("",uniswapCurrencySymbol) >> delay 1
+        (CreateA w (coinA,coinB,fee) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (CreateParams "" coinA coinB fee (Amount amountA) (Amount amountB))    >> delay 2
+        (AddA w (coinA,coinB,fee) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (AddParams "" coinA coinB fee (Amount amountA) (Amount amountB))               >> delay 2
+        (RemoveA w (coinA,coinB,fee) liquidity')  -> callEndpoint @"remove" (h $ UseKey w) (RemoveParams "" coinA coinB fee (Amount liquidity'))                  >> delay 2
+        (CloseA w (coinA,coinB,fee)) -> callEndpoint @"close"   (h $ UseKey w) (CloseParams "" coinA coinB fee)   >> delay 2
         (SwapA w slippage) -> swapTrace w slippage
-        (SwapPreviewA w (coinA,coinB,fee) amountA) -> callEndpoint @"swapPreview" (h $ UseKey w) (SwapPreviewParams coinA coinB fee (Amount amountA)) >> delay 2
+        (SwapPreviewA w (coinA,coinB,fee) amountA) -> callEndpoint @"swapPreview" (h $ UseKey w) (SwapPreviewParams "swapPreview" coinA coinB fee (Amount amountA)) >> delay 2
         (ISwapA w slippage) -> iSwapTrace w slippage
-        (ISwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"iSwapPreview" (h $ UseKey w) (ISwapPreviewParams coinA coinB (Amount amountA)) >> delay 2
+        (ISwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"iSwapPreview" (h $ UseKey w) (ISwapPreviewParams "iSwapPreview" coinA coinB (Amount amountA)) >> delay 2
       where
         swapTrace w slippage = do
-            state <- getLast <$> observableState (h $ UseKey w)
+            state <- WH.lookup "swapPreview" <$> observableState (h $ UseKey w)
             case state of
-                Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB),fee))) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams coinA coinB fee amountA amountB slippage)
+                Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB),fee))) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams "" coinA coinB fee amountA amountB slippage)
                 _ -> return ()
+            delay 1
+            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "swapPreview")
             delay 2
 
+
         iSwapTrace w slippage = do
-            state <- getLast <$> observableState (h $ UseKey w)
+            state <- WH.lookup "iSwapPreview" <$> observableState (h $ UseKey w)
             case state of
-                Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams coinA coinB amountA amountB slippage)
+                Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams "" coinA coinB amountA amountB slippage)
                 _ -> return ()
+            delay 1
+            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "iSwapPreview")
             delay 5
 
     precondition s (StartA _)          = isNothing $ s ^. contractState . uniswap
