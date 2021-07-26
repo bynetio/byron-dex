@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds     #-}
 {-# LANGUAGE TypeOperators #-}
 
-module UniswapJsonApi where
+module UniswapJsonApi
+  where
 
 import           Control.Exception        (try)
 import           Control.Monad.Except
@@ -9,7 +10,7 @@ import           Control.Monad.Reader     (runReaderT)
 import           Data.Aeson
 import           Data.Text
 import           GHC.Generics
-import           Network.Wai.Handler.Warp
+import           Network.Wai.Handler.Warp (run)
 import qualified Network.Wai.Handler.Warp as W
 import           Servant
 import           Servant.Server

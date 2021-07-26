@@ -3,18 +3,20 @@
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module UniswapJsonApi.Types where
+module UniswapJsonApi.Types
+  where
 
-import           Control.Monad.Except     (ExceptT, MonadError)
-import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import           Data.Aeson
-import           Data.ByteString          (ByteString)
-import           Data.List                (find)
-import           Data.Text                (Text)
-import           Data.UUID                (UUID)
-import           GHC.Generics
-import           Network.Wai.Handler.Warp (HostPreference)
-import           Servant                  (ServerError)
+import Control.DeepSeq
+import Control.Monad.Except     (ExceptT, MonadError)
+import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import Data.Aeson
+import Data.ByteString          (ByteString)
+import Data.List                (find)
+import Data.Text                (Text)
+import Data.UUID                (UUID)
+import GHC.Generics
+import Network.Wai.Handler.Warp (HostPreference)
+import Servant                  (ServerError)
 
 type Instance = Text
 
@@ -34,6 +36,7 @@ data UniswapStatusResponse = UniswapStatusResponse
   }
   deriving (Generic, Show, FromJSON, ToJSON)
 
+instance NFData UniswapStatusResponse where rnf = rwhnf
 data UniswapHook = UniswapHook
   { rqID      :: Integer,
     itID      :: Integer,

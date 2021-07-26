@@ -64,14 +64,12 @@ import           Plutus.Contract
 import qualified Plutus.Contracts.Currency    as Currency
 import qualified PlutusTx
 import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
-import           Prelude                      (Semigroup (..), String, div,
-                                               show)
+import           Prelude                      (Semigroup (..), String, div, show)
 import           Text.Printf                  (printf)
 import           Uniswap.Common.WalletHistory (History, HistoryId)
 import qualified Uniswap.Common.WalletHistory as WH
 import           Uniswap.IndirectSwaps
-import           Uniswap.OnChain              (mkUniswapValidator,
-                                               validateLiquidityForging)
+import           Uniswap.OnChain              (mkUniswapValidator, validateLiquidityForging)
 import           Uniswap.Pool
 import           Uniswap.Types
 data Uniswapping

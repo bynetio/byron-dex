@@ -22,8 +22,7 @@ module Uniswap.Types where
 
 import           Data.String
 import           Ledger
-import           Ledger.Value        (AssetClass (..), assetClass,
-                                      assetClassValue, assetClassValueOf)
+import           Ledger.Value        (AssetClass (..), assetClass, assetClassValue, assetClassValueOf)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude

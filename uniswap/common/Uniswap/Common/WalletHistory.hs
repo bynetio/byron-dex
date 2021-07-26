@@ -10,11 +10,11 @@ module Uniswap.Common.WalletHistory
   , lookup
   ) where
 
-import           Data.List           (nub)
-import           Data.List           hiding (lookup)
-import           Data.Text           (Text)
-import           Playground.Contract (FromJSON, Generic, ToJSON)
-import           Prelude             hiding (lookup)
+import Data.List           (nub)
+import Data.List           hiding (lookup)
+import Data.Text           (Text)
+import Playground.Contract (FromJSON, Generic, ToJSON)
+import Prelude             hiding (lookup)
 type HistoryId = Text
 data History a = History [(HistoryId, a)] [HistoryId]
   deriving ( Eq

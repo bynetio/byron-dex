@@ -3,7 +3,8 @@
 {-# LANGUAGE TypeOperators     #-}
 
 {-# LANGUAGE RecordWildCards   #-}
-module UniswapJsonApi.Client where
+module UniswapJsonApi.Client
+  where
 
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Aeson
