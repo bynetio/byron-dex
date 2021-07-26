@@ -7,6 +7,7 @@ module UniswapJsonApi.Client where
 
 import           Control.Monad.IO.Class  (MonadIO, liftIO)
 import           Data.Aeson
+import           Data.Aeson.Types
 import           Data.Proxy
 import           Data.Text
 import           Network.HTTP.Client     (newManager)
@@ -53,11 +54,13 @@ uniswapCreate c i opId coinA coinB amountA amountB = pabEndpoint c i "create" v
   where
     v =
       object
-        [ "cpOpId"    .= opId
-        , "cpCoinA"   .= coinA
-        , "cpCoinB"   .= coinB
-        , "cpAmountA" .= amountA
-        , "cpAmountB" .= amountB
+        [ "historyId"    .= opId
+        , "content" .= object
+          [ "cpCoinA"   .= coinA
+          , "cpCoinB"   .= coinB
+          , "cpAmountA" .= amountA
+          , "cpAmountB" .= amountB
+          ]
         ]
 
 uniswapSwap :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
@@ -65,12 +68,14 @@ uniswapSwap c i opId coinA coinB amount result slippage = pabEndpoint c i "swap"
   where
     v =
       object
-        [ "spOpId"     .= opId
-        , "spCoinA"    .= coinA
-        , "spCoinB"    .= coinB
-        , "spAmount"   .= amount
-        , "spResult"   .= result
-        , "spSlippage" .= slippage
+        [ "historyId"     .= opId
+        , "content" .= object
+          [ "spCoinA"    .= coinA
+          , "spCoinB"    .= coinB
+          , "spAmount"   .= amount
+          , "spResult"   .= result
+          , "spSlippage" .= slippage
+          ]
         ]
 
 uniswapSwapPreview :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
@@ -78,10 +83,12 @@ uniswapSwapPreview c i opId coinA coinB amount = pabEndpoint c i "swapPreview" v
   where
     v =
       object
-        [ "spoOpId"   .= opId
-        , "sppCoinA"  .= coinA
-        , "sppCoinB"  .= coinB
-        , "sppAmount" .= amount
+        [ "historyId"   .= opId
+        , "content" .= object
+          [ "sppCoinA"  .= coinA
+          , "sppCoinB"  .= coinB
+          , "sppAmount" .= amount
+          ]
         ]
 
 uniswapIndirectSwap :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
@@ -89,12 +96,14 @@ uniswapIndirectSwap c i opId coinA coinB amount result slippage = pabEndpoint c 
   where
     v =
       object
-        [ "ispOpId"     .= opId
-        , "ispCoinA"    .= coinA
-        , "ispCoinB"    .= coinB
-        , "ispAmount"   .= amount
-        , "ispResult"   .= result
-        , "ispSlippage" .= slippage
+        [ "historyId"     .= opId
+        , "content" .= object
+          [ "ispCoinA"    .= coinA
+          , "ispCoinB"    .= coinB
+          , "ispAmount"   .= amount
+          , "ispResult"   .= result
+          , "ispSlippage" .= slippage
+          ]
         ]
 
 uniswapIndirectSwapPreview :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
@@ -102,10 +111,12 @@ uniswapIndirectSwapPreview c i opId coinA coinB amount = pabEndpoint c i "iSwapP
   where
     v =
       object
-        [ "sppOpId"   .= opId
-        , "sppCoinA"  .= coinA
-        , "sppCoinB"  .= coinB
-        , "sppAmount" .= amount
+        [ "historyId"   .= opId
+        , "content" .= object
+          [ "sppCoinA"  .= coinA
+          , "sppCoinB"  .= coinB
+          , "sppAmount" .= amount
+          ]
         ]
 
 uniswapClose :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> m (Either ClientError ())
@@ -113,9 +124,11 @@ uniswapClose c i opId coinA coinB = pabEndpoint c i "close" v
   where
     v =
       object
-        [ "clpOpId"  .= opId
-        , "clpCoinA" .= coinA
-        , "clpCoinB" .= coinB
+        [ "historyId"  .= opId
+        , "content" .= object
+          [ "clpCoinA" .= coinA
+          , "clpCoinB" .= coinB
+          ]
         ]
 
 uniswapRemove :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
@@ -123,10 +136,12 @@ uniswapRemove c i opId coinA coinB amount = pabEndpoint c i "remove" v
   where
     v =
       object
-        [ "rpOpId"  .= opId
-        , "rpCoinA" .= coinA
-        , "rpCoinB" .= coinB
-        , "rpDiff"  .= amount
+        [ "historyId"  .= opId
+        , "content" .= object
+          [ "rpCoinA" .= coinA
+          , "rpCoinB" .= coinB
+          , "rpDiff"  .= amount
+          ]
         ]
 
 uniswapAdd :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> m (Either ClientError ())
@@ -134,25 +149,27 @@ uniswapAdd c i opId coinA coinB amountA amountB = pabEndpoint c i "add" v
   where
     v =
       object
-        [ "apOpId"    .= opId
-        , "apCoinA"   .= coinA
-        , "apCoinB"   .= coinB
-        , "apAmountA" .= amountA
-        , "apAmountB" .= amountB
+        [ "historyId"    .= opId
+        , "content" .= object
+          [ "apCoinA"   .= coinA
+          , "apCoinB"   .= coinB
+          , "apAmountA" .= amountA
+          , "apAmountB" .= amountB
+          ]
         ]
 
 uniswapPools :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
 uniswapPools c i opId = pabEndpoint c i "pools" v
   where
-    v = object [ "plOpId" .= opId ]
+    v = object [ "historyId" .= opId, "content" .= emptyArray ]
 
 uniswapFunds :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
 uniswapFunds c i opId = pabEndpoint c i "funds" v
   where
-    v = object [ "fsOpId" .= opId ]
+    v = object [ "historyId" .= opId, "content" .= emptyArray ]
 
 uniswapStop :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
 uniswapStop c i opId = pabEndpoint c i "stop" v
   where
-    v = object [ "stOpId" .= opId ]
+    v = object [ "historyId" .= opId, "content" .= emptyArray ]
 
