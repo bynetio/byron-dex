@@ -3,9 +3,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: ./Dockerfile
-      args:
-        - SUBPROJECT=uniswap-json-api
+      dockerfile: ./uniswap-json-api/Dockerfile
     command:
       - "cabal run uniswap-json-api"
     env_file:
@@ -15,9 +13,7 @@ services:
   node:
     build:
       context: .
-      dockerfile: ./Dockerfile
-      args:
-        - SUBPROJECT=uniswap
+      dockerfile: ./uniswap/Dockerfile
     command:
       - "cabal run uniswap-pab"
     ports:

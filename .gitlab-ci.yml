@@ -1,6 +1,4 @@
-image:
-  name: 'silquenarmo/dex-plutus-dev:1.2'
-  entrypoint: ["nix-shell", "/build/default.nix", "--run"]
+image: 'silquenarmo/dex-plutus-dev:1.4'
 
 stages:
   - lint
@@ -10,12 +8,12 @@ stages:
 lint_uniswap_json_api:
   stage: lint
   script:
-    - hlint uniswap-json-api
+    - nix-shell /build/default.nix --run 'hlint uniswap-json-api'
 
 lint_uniswap:
   stage: lint
   script:
-    - hlint uniswap
+    - nix-shell /build/default.nix --run 'hlint uniswap'
 
 build_uniswap_json_api:
   stage: build

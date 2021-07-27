@@ -7,3 +7,7 @@ WORKDIR /build
 COPY default.nix /build
 COPY vendor /build/vendor
 RUN ["nix-shell", "default.nix", "--run", "cabal update"]
+
+COPY ./uniswap-json-api /build/uniswap-json-api
+WORKDIR /build/uniswap-json-api
+RUN ["nix-shell", "/build/default.nix", "--run", "cabal build all"]
