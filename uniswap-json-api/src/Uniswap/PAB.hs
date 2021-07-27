@@ -10,9 +10,11 @@ import Control.Monad.Freer.Error
 import Control.Monad.Freer.TH       (makeEffect)
 import Control.Monad.IO.Class       (MonadIO, liftIO)
 import Data.Aeson                   (ToJSON (toJSON), Value)
+import Data.Aeson.Text
 import Data.Either.Combinators
 import Data.Functor
 import Data.Text                    (Text, pack)
+import Data.Text.Lazy               (toStrict)
 import PyF
 import Servant                      (Capture, Get, JSON, Post, Proxy (..), Put, ReqBody, type (:<|>),
                                      type (:>))
@@ -93,21 +95,21 @@ getPools
   => Instance
   -> Eff effs UniswapDefinition
 getPools uId =
-  doReq uId PoolsParams "pools" "cannot fetch uniswap pools"
+  doReq uId () "pools" "cannot fetch uniswap pools"
 
 getFunds
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
   -> Eff effs UniswapDefinition
 getFunds uId =
-  doReq uId FundsParams "funds" "cannot fetch uniswap funds"
+  doReq uId () "funds" "cannot fetch uniswap funds"
 
 doStop
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
   -> Eff effs UniswapDefinition
 doStop uId =
-  doReq uId StopParams "stop" "cannot stop an uniswap instance"
+  doReq uId () "stop" "cannot stop an uniswap instance"
 
 doCreate
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -115,7 +117,7 @@ doCreate
   -> CreateParams
   -> Eff effs UniswapDefinition
 doCreate uId params = do
-  doReq' uId params cpOpId "create" "cannot create a pool"
+  doReq uId params  "create" "cannot create a pool"
 
 doClose
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -123,7 +125,7 @@ doClose
   -> CloseParams
   -> Eff effs UniswapDefinition
 doClose uId params = do
-  doReq' uId params clpOpId "close" "cannot close a pool"
+  doReq uId params "close" "cannot close a pool"
 
 doAdd
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -131,7 +133,7 @@ doAdd
   -> AddParams
   -> Eff effs UniswapDefinition
 doAdd uId params = do
-  doReq' uId params apOpId "add" "cannot add coins to pool"
+  doReq uId params "add" "cannot add coins to pool"
 
 doRemove
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -139,7 +141,7 @@ doRemove
   -> RemoveParams
   -> Eff effs UniswapDefinition
 doRemove uId params = do
-  doReq' uId params rpOpId "remove" "cannot remove liquidity tokens"
+  doReq uId params "remove" "cannot remove liquidity tokens"
 
 doSwap
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -147,7 +149,7 @@ doSwap
   -> SwapParams
   -> Eff effs UniswapDefinition
 doSwap uId params = do
-  doReq' uId params spOpId "swap" "cannot make a swap"
+  doReq uId params "swap" "cannot make a swap"
 
 doSwapPreview
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -155,7 +157,7 @@ doSwapPreview
   -> SwapPreviewParams
   -> Eff effs UniswapDefinition
 doSwapPreview uId params = do
-  doReq' uId params sppOpId "swapPreview" "cannot make a swap (preview)"
+  doReq uId params "swapPreview" "cannot make a swap (preview)"
 
 doIndirectSwap
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -163,7 +165,7 @@ doIndirectSwap
   -> IndirectSwapParams
   -> Eff effs UniswapDefinition
 doIndirectSwap uId params = do
-  doReq' uId params ispOpId "iSwap" "cannot make a indirect swap"
+  doReq uId params "iSwap" "cannot make a indirect swap"
 
 doIndirectSwapPreview
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -171,38 +173,24 @@ doIndirectSwapPreview
   -> ISwapPreviewParams
   -> Eff effs UniswapDefinition
 doIndirectSwapPreview uId params = do
-  doReq' uId params isppOpId "iSwapPreview" "cannot make a indirect swap (preview)"
-
+  doReq uId params "iSwapPreview" "cannot make a indirect swap (preview)"
 
 doReq
-  :: forall m effs p. (ToJSON p, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
+  :: forall m effs a. (ToJSON a, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
-  -> (OperationId -> p)
+  -> a
   -> Text
   -> Text
   -> Eff effs UniswapDefinition
-doReq uId p endpoint errMsg = do
+doReq uId a endpoint errMsg = do
   opId <- next
-  let value = toJSON . p $ opId
+  let ahid  = WithHistoryId opId a
+      value = toJSON ahid
+  logDebug $ toStrict . encodeToLazyText $ ahid
   callRes <- runClient' $ endpointAPI uId endpoint value
   fromEither $ mapLeft (EndpointRequestFailed errMsg) callRes
   response <- fetchStatus uId
   fromEither $ mapLeft (EndpointRequestFailedRes errMsg) (extractUniswapDef opId response)
-
-doReq'
-  :: forall m effs p. (ToJSON p, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
-  => Instance
-  -> p
-  -> (p -> OperationId)
-  -> Text
-  -> Text
-  -> Eff effs UniswapDefinition
-doReq' uId p opId endpoint errMsg = do
-  let value = toJSON p
-  callRes <- runClient' $ endpointAPI uId endpoint value
-  fromEither $ mapLeft (EndpointRequestFailed errMsg) callRes
-  response <- fetchStatus uId
-  fromEither $ mapLeft (EndpointRequestFailedRes errMsg) (extractUniswapDef (opId p) response)
 
 fetchStatus
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -317,5 +305,3 @@ doEndpointRequest
   -> Eff effs (Either ClientError ())
 doEndpointRequest uId opId req =
   retryRequest 5 $ doSingleEndpointRequest uId opId req
-
-
