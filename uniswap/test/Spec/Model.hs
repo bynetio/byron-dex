@@ -365,33 +365,33 @@ instance ContractModel UModel where
         wait 5
 
     perform h _ cmd = case cmd of
-        (StartA w)          -> callEndpoint @"start" (h $ StartKey w) ("",uniswapCurrencySymbol) >> delay 1
-        (CreateA w (coinA,coinB,fee) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (CreateParams "" coinA coinB fee (Amount amountA) (Amount amountB))    >> delay 2
-        (AddA w (coinA,coinB,fee) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (AddParams "" coinA coinB fee (Amount amountA) (Amount amountB))               >> delay 2
-        (RemoveA w (coinA,coinB,fee) liquidity')  -> callEndpoint @"remove" (h $ UseKey w) (RemoveParams "" coinA coinB fee (Amount liquidity'))                  >> delay 2
-        (CloseA w (coinA,coinB,fee)) -> callEndpoint @"close"   (h $ UseKey w) (CloseParams "" coinA coinB fee)   >> delay 2
+        (StartA w)          -> callEndpoint @"start" (h $ StartKey w) (WithHistoryId "" uniswapCurrencySymbol) >> delay 1
+        (CreateA w (coinA,coinB,fee) amountA amountB)   -> callEndpoint @"create"  (h $ UseKey w) (WithHistoryId "" $ CreateParams coinA coinB fee (Amount amountA) (Amount amountB))    >> delay 2
+        (AddA w (coinA,coinB,fee) amountA amountB)  -> callEndpoint @"add" (h $ UseKey w) (WithHistoryId "" $ AddParams coinA coinB fee (Amount amountA) (Amount amountB))               >> delay 2
+        (RemoveA w (coinA,coinB,fee) liquidity')  -> callEndpoint @"remove" (h $ UseKey w) (WithHistoryId "" $ RemoveParams coinA coinB fee (Amount liquidity'))                  >> delay 2
+        (CloseA w (coinA,coinB,fee)) -> callEndpoint @"close"   (h $ UseKey w) (WithHistoryId "" $ CloseParams coinA coinB fee)   >> delay 2
         (SwapA w slippage) -> swapTrace w slippage
-        (SwapPreviewA w (coinA,coinB,fee) amountA) -> callEndpoint @"swapPreview" (h $ UseKey w) (SwapPreviewParams "swapPreview" coinA coinB fee (Amount amountA)) >> delay 2
+        (SwapPreviewA w (coinA,coinB,fee) amountA) -> callEndpoint @"swapPreview" (h $ UseKey w) (WithHistoryId "swapPreview" $ SwapPreviewParams coinA coinB fee (Amount amountA)) >> delay 2
         (ISwapA w slippage) -> iSwapTrace w slippage
-        (ISwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"iSwapPreview" (h $ UseKey w) (ISwapPreviewParams "iSwapPreview" coinA coinB (Amount amountA)) >> delay 2
+        (ISwapPreviewA w (coinA,coinB) amountA) -> callEndpoint @"iSwapPreview" (h $ UseKey w) (WithHistoryId "iSwapPreview" $ ISwapPreviewParams coinA coinB (Amount amountA)) >> delay 2
       where
         swapTrace w slippage = do
             state <- WH.lookup "swapPreview" <$> observableState (h $ UseKey w)
             case state of
-                Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB),fee))) -> callEndpoint @"swap" (h $ UseKey w) (SwapParams "" coinA coinB fee amountA amountB slippage)
+                Just (Right (SwapPreview ((coinA, amountA),(coinB, amountB),fee))) -> callEndpoint @"swap" (h $ UseKey w) (WithHistoryId "" $ SwapParams coinA coinB fee amountA amountB slippage)
                 _ -> return ()
             delay 1
-            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "swapPreview")
+            callEndpoint @"clearState" (h $ UseKey w) (WithHistoryId "" $ ClearStateParams "swapPreview")
             delay 2
 
 
         iSwapTrace w slippage = do
             state <- WH.lookup "iSwapPreview" <$> observableState (h $ UseKey w)
             case state of
-                Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (IndirectSwapParams "" coinA coinB amountA amountB slippage)
+                Just (Right (ISwapPreview ((coinA, amountA),(coinB, amountB)))) -> callEndpoint @"iSwap" (h $ UseKey w) (WithHistoryId "" $ IndirectSwapParams coinA coinB amountA amountB slippage)
                 _ -> return ()
             delay 1
-            callEndpoint @"clearState" (h $ UseKey w) (ClearStateParams "" "iSwapPreview")
+            callEndpoint @"clearState" (h $ UseKey w) (WithHistoryId "" $ ClearStateParams "iSwapPreview")
             delay 5
 
     precondition s (StartA _)          = isNothing $ s ^. contractState . uniswap

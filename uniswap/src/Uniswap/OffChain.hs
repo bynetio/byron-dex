@@ -27,9 +27,6 @@ module Uniswap.OffChain
     CloseParams (..),
     RemoveParams (..),
     AddParams (..),
-    FundsParams (..),
-    PoolsParams (..),
-    StopParams (..),
     ClearStateParams (..),
     UniswapUserSchema,
     UserContractState (..),
@@ -47,9 +44,9 @@ module Uniswap.OffChain
     userEndpoints,
     uniswap,
     uniswapTokenName,
+    WithHistoryId (..),
   )
 where
-
 import           Control.Applicative          ((<|>))
 import           Control.Monad                hiding (fmap, mapM, mapM_)
 import           Data.List                    (scanl)
@@ -57,6 +54,8 @@ import qualified Data.Map                     as Map
 import           Data.Proxy                   (Proxy (..))
 import           Data.Text                    (Text, pack)
 import           Data.Void                    (Void)
+import qualified GHC.Classes
+import           GHC.TypeLits                 (symbolVal)
 import           Ledger                       hiding (fee, singleton)
 import           Ledger.Constraints           as Constraints
 import qualified Ledger.Typed.Scripts         as Scripts
@@ -82,27 +81,31 @@ instance Scripts.ValidatorTypes Uniswapping where
   type DatumType Uniswapping = UniswapDatum
 
 type UniswapOwnerSchema =
-    Endpoint "start" HistoryId
+    Endpoint "start" (WithHistoryId ())
 
 type UniswapOwnerSchema' =
-    Endpoint "start" (HistoryId,CurrencySymbol)
+    Endpoint "start" (WithHistoryId CurrencySymbol)
 
-
+data WithHistoryId a = WithHistoryId
+  {
+    historyId :: HistoryId,
+    content   :: a
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 -- | Schema for the endpoints for users of Uniswap.
 type UniswapUserSchema =
-    Endpoint "create" CreateParams
-    .\/ Endpoint "swap" SwapParams
-    .\/ Endpoint "swapPreview" SwapPreviewParams
-    .\/ Endpoint "iSwapPreview" ISwapPreviewParams
-    .\/ Endpoint "iSwap" IndirectSwapParams
-    .\/ Endpoint "close" CloseParams
-    .\/ Endpoint "remove" RemoveParams
-    .\/ Endpoint "add" AddParams
-    .\/ Endpoint "pools" PoolsParams
-    .\/ Endpoint "funds" FundsParams
-    .\/ Endpoint "stop" StopParams
-    .\/ Endpoint "clearState" ClearStateParams
+    Endpoint "create" (WithHistoryId CreateParams)
+    .\/ Endpoint "swap" (WithHistoryId SwapParams)
+    .\/ Endpoint "swapPreview" (WithHistoryId SwapPreviewParams)
+    .\/ Endpoint "iSwapPreview" (WithHistoryId ISwapPreviewParams)
+    .\/ Endpoint "iSwap" (WithHistoryId IndirectSwapParams)
+    .\/ Endpoint "close" (WithHistoryId CloseParams)
+    .\/ Endpoint "remove" (WithHistoryId RemoveParams)
+    .\/ Endpoint "add" (WithHistoryId AddParams)
+    .\/ Endpoint "pools" (WithHistoryId ())
+    .\/ Endpoint "funds" (WithHistoryId ())
+    .\/ Endpoint "stop" (WithHistoryId ())
+    .\/ Endpoint "clearState" (WithHistoryId ClearStateParams)
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
@@ -183,8 +186,7 @@ liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpT
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
-  { -- | Unique Identifier of Operation
-    cpOpId    :: HistoryId,
+  {
     -- | One 'Coin' of the liquidity pair.
     cpCoinA   :: Coin A,
     -- | The other 'Coin'.
@@ -201,8 +203,7 @@ data CreateParams = CreateParams
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-  { -- | Unique Identifier of Operation
-    spOpId     :: HistoryId,
+  {
     -- | One 'Coin' of the liquidity pair.
     spCoinA    :: Coin A,
     -- | The other 'Coin'.
@@ -219,8 +220,7 @@ data SwapParams = SwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data SwapPreviewParams = SwapPreviewParams
-  { -- | Unique Identifier of Operation
-    sppOpId   :: HistoryId,
+  {
     sppCoinA  :: Coin A,
     sppCoinB  :: Coin B,
     -- | Numerator and denominator of the swap fee
@@ -230,8 +230,7 @@ data SwapPreviewParams = SwapPreviewParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data IndirectSwapParams = IndirectSwapParams
-  { -- | Unique Identifier of Operation
-    ispOpId     :: HistoryId,
+  {
     -- | One 'Coin' of the liquidity pair.
     ispCoinA    :: Coin A,
     -- | The other 'Coin'.
@@ -244,8 +243,7 @@ data IndirectSwapParams = IndirectSwapParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data ISwapPreviewParams = ISwapPreviewParams
-  { -- | Unique Identifier of Operation
-    isppOpId   :: HistoryId,
+  {
     isppCoinA  :: Coin A,
     isppCoinB  :: Coin B,
     isppAmount :: Amount A
@@ -254,8 +252,7 @@ data ISwapPreviewParams = ISwapPreviewParams
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
-  { -- | Unique Identifier of Operation
-    clpOpId  :: HistoryId,
+  {
     -- | One 'Coin' of the liquidity pair.
     clpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -267,8 +264,7 @@ data CloseParams = CloseParams
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
-  { -- | Unique Identifier of Operation
-    rpOpId  :: HistoryId,
+  {
      -- | One 'Coin' of the liquidity pair.
     rpCoinA :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -282,8 +278,7 @@ data RemoveParams = RemoveParams
 
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
 data AddParams = AddParams
-  { -- | Unique Identifier of Operation
-    apOpId    :: HistoryId,
+  {
      -- | One 'Coin' of the liquidity pair.
     apCoinA   :: Coin A,
     -- | The other 'Coin' of the liquidity pair.
@@ -297,28 +292,9 @@ data AddParams = AddParams
   }
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
--- | Parameters for the @pools-@endpoint, which lookups available pools
-data PoolsParams = PoolsParams
-  { -- | Unique Identifier of Operation
-    plOpId :: HistoryId
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @funds-@endpoint, which lookups funds of the current wallet
-data FundsParams = FundsParams
-  { -- | Unique Identifier of Operation
-    fsOpId :: HistoryId
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @stop-@endpoint, which stops the uniswap instance
-data StopParams = StopParams
-  { -- | Unique Identifier of Operation
-    stOpId :: HistoryId
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
 -- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
-data ClearStateParams = ClearStateParams
-  { -- | Unique Identifier of Operation
-    clsOpId     :: HistoryId,
+newtype ClearStateParams = ClearStateParams
+  {
     -- | Identifier of Operation that should be removed from state
     clsRemoveId :: HistoryId
   } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
@@ -629,8 +605,8 @@ indirectSwap us IndirectSwapParams {..} = do
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. Uniswap -> PoolsParams -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
-pools us _ = do
+pools :: forall w s. Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools us = do
   utxos <- utxoAt (uniswapAddress us)
   go $ snd <$> Map.toList utxos
   where
@@ -658,8 +634,8 @@ pools us _ = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds :: FundsParams -> Contract w s Text Value
-funds _ = do
+funds ::Contract w s Text Value
+funds = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
   return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
@@ -735,7 +711,7 @@ ownerEndpoint = startHandler >> ownerEndpoint
   where
     startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >>= \guid -> (guid,) <$> start Nothing)
+      e <- runError (endpoint @"start" >>= \(WithHistoryId guid _) -> (guid,) <$> start Nothing)
       case e of
         Left err           -> tell $ WH.append "ERROR" $ Left err
         Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
@@ -745,7 +721,7 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
   where
     startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
     startHandler = do
-      e <- runError (endpoint @"start" >>= \(guid,currency) -> (guid,) <$> start (Just currency))
+      e <- runError (endpoint @"start" >>= \(WithHistoryId guid currency) -> (guid,) <$> start (Just currency))
       case e of
         Left err           -> tell $ WH.append "ERROR" $ Left err
         Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
@@ -763,17 +739,17 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
 userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
   stop
-    `select` ( ( f (Proxy @"create") cpOpId (const Created) create
-                   `select` f (Proxy @"swap") spOpId (const Swapped) swap
-                   `select` f (Proxy @"swapPreview") sppOpId SwapPreview swapPreview
-                   `select` f (Proxy @"iSwap") ispOpId (const ISwapped) indirectSwap
-                   `select` f (Proxy @"iSwapPreview") isppOpId ISwapPreview indirectSwapPreview
-                   `select` f (Proxy @"close") clpOpId (const Closed) close
-                   `select` f (Proxy @"remove") rpOpId (const Removed) remove
-                   `select` f (Proxy @"add") apOpId (const Added) add
-                   `select` f (Proxy @"pools") plOpId Pools pools
-                   `select` f (Proxy @"funds") fsOpId Funds (\_us historyId -> funds historyId)
-                   `select` f (Proxy @"clearState") clsOpId (const Cleared) (const clearState)
+    `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId{..} -> create us content)
+                   `select` f (Proxy @"swap") historyId (const Swapped) (\us WithHistoryId{..} -> swap us content)
+                   `select` f (Proxy @"swapPreview") historyId SwapPreview (\us WithHistoryId{..} -> swapPreview us content)
+                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId{..} -> indirectSwap us content)
+                   `select` f (Proxy @"iSwapPreview") historyId ISwapPreview (\us WithHistoryId{..} -> indirectSwapPreview us content)
+                   `select` f (Proxy @"close") historyId (const Closed) (\us WithHistoryId{..} -> close us content)
+                   `select` f (Proxy @"remove") historyId (const Removed) (\us WithHistoryId{..} -> remove us content)
+                   `select` f (Proxy @"add") historyId (const Added) (\us WithHistoryId{..} -> add us content)
+                   `select` f (Proxy @"pools") historyId Pools (\us _ -> pools us)
+                   `select` f (Proxy @"funds") historyId Funds (\_us _ -> funds)
+                   `select` f (Proxy @"clearState") historyId (const Cleared) (\us WithHistoryId{..} -> clearState content)
                )
                  >> userEndpoints us
              )
@@ -796,13 +772,14 @@ userEndpoints us =
         Left err -> do
           logInfo @Text ("Error during calling endpoint: " <> err)
           tell $ WH.append "ERROR" . Left $ err
-        Right (guid,a) ->
+        Right (guid,a) | symbolVal (Proxy @l) GHC.Classes./= "clearState" ->
           tell $ WH.append guid . Right . g $ a
+        _ -> return ()
 
     stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     stop = do
       e <- runError $ endpoint @"stop"
       tell $ case e of
-        Left err               -> WH.append "ERROR" $ Left err
-        Right (StopParams{..}) -> WH.append stOpId $ Right Stopped
+        Left err                    -> WH.append "ERROR" $ Left err
+        Right (WithHistoryId hId _) -> WH.append hId $ Right Stopped
 

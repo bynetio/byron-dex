@@ -1,4 +1,4 @@
-image: 'silquenarmo/dex-plutus-dev:1.4'
+image: 'silquenarmo/dex-plutus-dev:1.5'
 
 stages:
   - lint
