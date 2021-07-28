@@ -303,3 +303,31 @@ One can only also trigger a docker-compose configuration if the docker image is 
 ```
 docker-compose up
 ```
+
+## CI
+
+CI configuration can be found in [`.gitlab-ci.yml`](./.gitlab-ci.yaml) file.
+
+It uses `silquenarmo/dex-plutus-dev` image which is being built with [`Dockerfile`](./Dockerfile). To update it or rebuild manually:
+
+1. run `docker build -t silquenarmo/dex-plutus-dev:<version> .` in project root
+2. tag a latest version `docker tag silquenarmo/dex-plutus-dev:latest silquenarmo/dex-plutus-dev:<version>`
+3. _[optional]_ push an image to hub repository `docker push silquenarmo/dex-plutus-dev:<version>` and `docker push silquenarmo/dex-plutus-dev:latest`
+
+CI runs of external gitlab CI runner on AWS instance, and process is as follows:
+
+* create _r4.large_ instances (2vcpu, 16G ram)
+* there are max 2 instances for max two jobs at runtime
+* after processing job instances are waiting 1h
+* after 1h waiting the instance is being removed
+* if next job arises withing a 1h delay it's being processed by a free instance
+* the instance creation is about 5min long
+* disk capacity per instance is ~40G
+
+CI consists of three stages:
+
+* **lint** - using `hlint` to verify both projects
+* **build** - using `cabal build` to compile projects
+* **test** - using `cabal test` to run specs on projects
+
+All three stages are being runned in `on_success` mode when they are triggered from default (`master`) branch. On any other branches the pipeline will not be triggered UNLESS there is a merge request created on that branch. The `build` and `test` stages can only be triggered manually and only linting is performed automatically.
