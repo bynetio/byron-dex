@@ -29,49 +29,49 @@ stages:
   - test
 
 # uniswap-json-api
-lint uniswap-json-api:
+lint_uniswap-json-api:
   stage: lint
   extends: .automatic
   script: "nix-shell /build/default.nix --run 'hlint uniswap-json-api'"
 
-build uniswap-json-api:
+build_uniswap-json-api:
   stage: build
   extends:
     - .manual
     - .uniswap-json-api-cache
-  needs: ["lint uniswap-json-api"]
+  needs: ["lint_uniswap-json-api"]
   script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal build'"
   cache:
     key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
     paths:
       - /builds/plutus/dex/uniswap-json-api/dist-newstyle
 
-uniswap-json-api specs:
+uniswap-json-api_specs:
   stage: test
   extends:
     - .automatic
     - .uniswap-json-api-cache
-  needs: ["build uniswap-json-api"]
+  needs: ["build_uniswap-json-api"]
   script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal test'"
 
 # uniswap
-lint uniswap:
+lint_uniswap:
   stage: lint
   extends: .automatic
   script: "nix-shell /build/default.nix --run 'hlint uniswap'"
 
-build uniswap:
+build_uniswap:
   stage: build
   extends:
     - .manual
     - .uniswap-cache
-  needs: ["lint uniswap"]
+  needs: ["lint_uniswap"]
   script: "nix-shell /build/default.nix --run 'cd uniswap && cabal build'"
 
-uniswap specs:
+uniswap_specs:
   stage: test
   extends:
     - .automatic
     - .uniswap-cache
-  needs: ["build uniswap"]
+  needs: ["build_uniswap"]
   script: "nix-shell /build/default.nix --run 'cd uniswap && cabal test'"
