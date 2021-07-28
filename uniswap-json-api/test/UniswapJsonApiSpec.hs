@@ -18,7 +18,7 @@ import           UniswapJsonApi
 import           UniswapJsonApi.Logic
 import           UniswapJsonApi.Types
 
-config = Config 3001 "localhost" 8080
+config = MkAppContext (MkPabConfig "localhost" 8080) 3001
 
 spec :: Spec
 spec =
