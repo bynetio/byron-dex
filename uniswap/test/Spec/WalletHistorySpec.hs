@@ -24,9 +24,11 @@ satisfyMonoidLaws =
   , testProperty "(x <> y) <> z == x <> (y <> z)" associativity
   ]
 
+{-# ANN leftIdentity "HLint: ignore" #-}
 leftIdentity :: History Integer -> Bool
 leftIdentity x = mempty <> x == x
 
+{-# ANN rightIdentity "HLint: ignore" #-}
 rightIdentity :: History Integer -> Bool
 rightIdentity x = x <> mempty == x
 

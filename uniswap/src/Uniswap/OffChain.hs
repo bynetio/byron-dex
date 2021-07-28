@@ -293,7 +293,7 @@ data AddParams = AddParams
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 -- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
-data ClearStateParams = ClearStateParams
+newtype ClearStateParams = ClearStateParams
   {
     -- | Identifier of Operation that should be removed from state
     clsRemoveId :: HistoryId

@@ -1,8 +1,20 @@
 version: "3.8"
 services:
-  web: &base
-    image: "uniswap-json-api-image:latest"
+  web:
+    build:
+      context: .
+      dockerfile: ./uniswap-json-api/Dockerfile
+    command:
+      - "cabal run uniswap-json-api"
     env_file:
       - ./uniswap-json-api/.env
     ports:
       - "3000:3000"
+  node:
+    build:
+      context: .
+      dockerfile: ./uniswap/Dockerfile
+    command:
+      - "cabal run uniswap-pab"
+    ports:
+      - "8080:8080"

@@ -4,6 +4,10 @@ version:              0.1.0.0
 author:               Paweł Placzyński
 maintainer:           placzynski.pawel@gmail.com
 
+common shared-properties
+  default-language:   Haskell2010
+  ghc-options:        -Wall -optl-static -optl-pthread
+
 library
   hs-source-dirs:     src
   exposed-modules:    UniswapJsonApi
@@ -11,8 +15,9 @@ library
                     , UniswapJsonApi.Client
                     , UniswapJsonApi.Types
   build-depends:      base
-                    , bytestring
                     , aeson
+                    , bytestring
+                    , either
                     , http-client
                     , http-client-tls
                     , mtl
@@ -21,10 +26,9 @@ library
                     , servant-client
                     , servant-server
                     , text
-                    , warp
                     , uuid
-                    , either
-  default-language:   Haskell2010
+                    , warp
+  import:             shared-properties
 
 executable uniswap-json-api
   main-is:            Main.hs
@@ -32,7 +36,7 @@ executable uniswap-json-api
                     , mtl
                     , uniswap-json-api
   hs-source-dirs:     app
-  default-language:   Haskell2010
+  import:             shared-properties
 
 test-suite uniswap-json-api-spec
   type:               exitcode-stdio-1.0
@@ -49,5 +53,5 @@ test-suite uniswap-json-api-spec
                     , warp
                     , uniswap-json-api
   other-modules:      UniswapJsonApiSpec
-  default-language:   Haskell2010
   build-tool-depends: hspec-discover:hspec-discover == 2.*
+  import:             shared-properties

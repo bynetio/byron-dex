@@ -1,12 +1,11 @@
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
 module Main where
 
-import Control.Exception    (Exception, throwIO)
-import System.Environment   (lookupEnv, setEnv)
-import UniswapJsonApi       (runApp)
-import UniswapJsonApi.Types
+import           Control.Exception    (Exception, throwIO)
+import           System.Environment   (lookupEnv, setEnv)
+import           UniswapJsonApi       (runApp)
+import           UniswapJsonApi.Types
 
 data NoConfigFoundException = NoConfigFoundException deriving (Show, Exception)
 

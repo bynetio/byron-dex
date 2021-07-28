@@ -106,8 +106,8 @@ handleStarterContract ::
 handleStarterContract = Builtin.handleBuiltin getSchema getContract
   where
     getSchema = \case
-      UniswapOwnerContract -> Builtin.endpointsToSchemas @(Uniswap.UniswapOwnerSchema)
-      UniswapUserContract _ -> Builtin.endpointsToSchemas @(Uniswap.UniswapUserSchema)
+      UniswapOwnerContract -> Builtin.endpointsToSchemas @Uniswap.UniswapOwnerSchema
+      UniswapUserContract _ -> Builtin.endpointsToSchemas @Uniswap.UniswapUserSchema
       UniswapInit -> Builtin.endpointsToSchemas @Empty
     getContract = \case
       UniswapOwnerContract  -> SomeBuiltin Uniswap.ownerEndpoint

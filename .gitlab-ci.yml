@@ -1,0 +1,77 @@
+image: "silquenarmo/dex-plutus-dev:1.5"
+
+.automatic:
+  rules:
+    - if: $CI_MERGE_REQUEST_IID
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+.manual:
+  rules:
+    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+      when: manual
+      allow_failure: false
+
+.uniswap-json-api-cache:
+  cache:
+    key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
+    paths:
+      - /builds/plutus/dex/uniswap-json-api/dist-newstyle
+
+.uniswap-cache:
+  cache:
+    key: uniswap-cache-$CI_COMMIT_REF_SLUG
+    paths:
+      - /builds/plutus/dex/uniswap/dist-newstyle
+
+stages:
+  - lint
+  - build
+  - test
+
+# uniswap-json-api
+lint uniswap-json-api:
+  stage: lint
+  extends: .automatic
+  script: "nix-shell /build/default.nix --run 'hlint uniswap-json-api'"
+
+build uniswap-json-api:
+  stage: build
+  extends:
+    - .manual
+    - .uniswap-json-api-cache
+  needs: ["lint uniswap-json-api"]
+  script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal build'"
+  cache:
+    key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
+    paths:
+      - /builds/plutus/dex/uniswap-json-api/dist-newstyle
+
+uniswap-json-api specs:
+  stage: test
+  extends:
+    - .automatic
+    - .uniswap-json-api-cache
+  needs: ["build uniswap-json-api"]
+  script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal test'"
+
+# uniswap
+lint uniswap:
+  stage: lint
+  extends: .automatic
+  script: "nix-shell /build/default.nix --run 'hlint uniswap'"
+
+build uniswap:
+  stage: build
+  extends:
+    - .manual
+    - .uniswap-cache
+  needs: ["lint uniswap"]
+  script: "nix-shell /build/default.nix --run 'cd uniswap && cabal build'"
+
+uniswap specs:
+  stage: test
+  extends:
+    - .automatic
+    - .uniswap-cache
+  needs: ["build uniswap"]
+  script: "nix-shell /build/default.nix --run 'cd uniswap && cabal test'"
