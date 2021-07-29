@@ -182,7 +182,7 @@ getStatusByHistoryId uid hid =
         status <- fetchStatusRetry
         pure $ either Retry Ok . extractUniswapDef hid $ status
       extractDefRetry = do
-        def <- retryRequest 5 extractDef
+        def <- retryRequest 3 extractDef
         fromEither $ mapLeft (StatusNotFound hid) def
 
 
@@ -195,7 +195,7 @@ doEndpointRequest
   -> Text
   -> Eff effs ()
 doEndpointRequest uId hid a endpoint errMsg = do
-  callRes <- retryRequest 5 doSingle
+  callRes <- retryRequest 3 doSingle
   fromEither $ mapLeft (EndpointRequestFailed errMsg) callRes
     where
       doSingle = do

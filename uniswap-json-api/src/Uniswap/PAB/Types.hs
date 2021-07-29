@@ -12,6 +12,7 @@ import UniswapJsonApi.Types (HistoryId)
 
 type Fee = (Integer, Integer)
 
+-- | use:  https://gitlab.haskell.org/ghc/ghc/-/wikis/records/overloaded-record-fields/duplicate-record-fields
 data Coin = Coin
   { cCurrencySymbol :: Text
   , cTokenName      :: Text
