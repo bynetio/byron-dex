@@ -67,14 +67,12 @@ data UniswapDefinition = UniswapDefinition
 newtype UniswapContract = UniswapContract
   { unContractInstanceId :: Text
   }
-  deriving (Show, Generic)
-  deriving newtype (FromJSON, ToJSON)
+  deriving (Show, Generic, FromJSON, ToJSON)
 
 newtype UniswapWallet = UniswapWallet
   { getWallet :: Integer
   }
-  deriving (Show, Generic)
-  deriving newtype (FromJSON, ToJSON)
+  deriving (Show, Generic, FromJSON, ToJSON)
 
 
 data PabConfig = MkPabConfig

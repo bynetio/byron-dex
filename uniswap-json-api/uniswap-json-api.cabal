@@ -17,7 +17,6 @@ library
                     , Uniswap.PAB
                     , Uniswap.API
                     , Uniswap.App
-                    , Uniswap.LiquidityPool.Capabilities
                     , Uniswap.LiquidityPool.API
                     , Uniswap.LiquidityPool.Types
                     , Uniswap.Common.Utils
