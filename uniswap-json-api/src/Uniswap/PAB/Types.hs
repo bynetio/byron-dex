@@ -14,7 +14,7 @@ type Fee = (Integer, Integer)
 
 data Coin = Coin
   { cCurrencySymbol :: Text
-  , cTokenName :: Text
+  , cTokenName      :: Text
   }
   deriving (Show, Generic)
   deriving (ToJSON, FromJSON)
@@ -59,7 +59,7 @@ data SwapParams = SwapParams
   deriving (Show, Generic, ToJSON, FromJSON)
 
 data SwapPreviewParams = SwapPreviewParams
-  { sppCoinA   :: Coin
+  { sppCoinA  :: Coin
   , sppCoinB  :: Coin
   , sppFee    :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -128,6 +128,6 @@ data AddParams = AddParams
 -- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given OperationId
 data ClearStateParams = ClearStateParams
   { clsRemoveId :: HistoryId
-    -- ^ Identifier of Operation that should be removed from state
+    -- ^ Identifier of History that should be removed from state
   }
   deriving (Show, Generic, ToJSON, FromJSON)

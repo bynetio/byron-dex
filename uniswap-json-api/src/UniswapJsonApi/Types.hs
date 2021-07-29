@@ -9,7 +9,7 @@ module UniswapJsonApi.Types
 import Control.DeepSeq
 import Control.Monad.Except     (ExceptT, MonadError)
 import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import Data.Aeson
+import Data.Aeson               (FromJSON, ToJSON, Value)
 import Data.ByteString          (ByteString)
 import Data.List                (find)
 import Data.Text                (Text)
@@ -67,13 +67,14 @@ data UniswapDefinition = UniswapDefinition
 newtype UniswapContract = UniswapContract
   { unContractInstanceId :: Text
   }
-  deriving (Show, Generic, FromJSON, ToJSON)
+  deriving (Show, Generic)
+  deriving newtype (FromJSON, ToJSON)
 
 newtype UniswapWallet = UniswapWallet
   { getWallet :: Integer
   }
-  deriving (Show, Generic, FromJSON, ToJSON)
-
+  deriving (Show, Generic)
+  deriving newtype (FromJSON, ToJSON)
 
 
 data PabConfig = MkPabConfig

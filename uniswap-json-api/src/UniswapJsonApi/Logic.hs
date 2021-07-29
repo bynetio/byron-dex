@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module UniswapJsonApi.Logic where
+module UniswapJsonApi.Logic
+  where
 
 import Control.Monad           (join)
 import Control.Monad.Except    (MonadError, throwError)
@@ -32,7 +33,7 @@ processRequest c uId hid errorMessage endpoint = do
       let statusResult _ = pabStatus c uId
       statusResponse <- retrying limitedBackoff statusNotReady statusResult
       case extractStatus statusResponse of
-        Right r -> pure r
+        Right r  -> pure r
         Left err -> throwError err422{errBody = encode . pack $ show err}
     Left _ -> throwError err422{errBody = encode . pack $ errorMessage}
   where
@@ -45,7 +46,7 @@ processRequest c uId hid errorMessage endpoint = do
     history = observableState . cicCurrentState
 
     extractUniswapDef :: UniswapStatusResponse -> Either Text UniswapDefinition
-    extractUniswapDef = join . maybeToRight "Operation ID not found in history" . lookupHistory hid . history
+    extractUniswapDef = join . maybeToRight "History ID not found in history" . lookupHistory hid . history
 
     extractStatus :: Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition
     extractStatus e = extractUniswapDef =<< mapLeft (pack . show) e
