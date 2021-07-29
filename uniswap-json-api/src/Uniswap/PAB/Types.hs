@@ -1,41 +1,51 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DerivingVia    #-}
 module Uniswap.PAB.Types
   where
 
-import Data.Aeson           (FromJSON, ToJSON)
 import Data.Text            (Text)
+import Deriving.Aeson       (CustomJSON (CustomJSON), FromJSON, Generic, ToJSON)
 import GHC.Generics         (Generic)
-import UniswapJsonApi.Types (OperationId)
+import Uniswap.Common.Utils (PrefixedCamelCase)
+import UniswapJsonApi.Types (HistoryId)
 
-type Fee = Integer
+type Fee = (Integer, Integer)
+
+data Coin = Coin
+  { cCurrencySymbol :: Text
+  , cTokenName :: Text
+  }
+  deriving (Show, Generic)
+  deriving (ToJSON, FromJSON)
+    via PrefixedCamelCase "c" Coin
 
 data WithHistoryId a = WithHistoryId
-  { historyId :: OperationId
+  { historyId :: HistoryId
   , content   :: a
   } deriving (Show, Generic, ToJSON, FromJSON)
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
 data CreateParams = CreateParams
-  { cpCoinA     :: Text
-    -- ^ The other 'Coin'.
-    , cpCoinB   :: Text
-    -- ^ One 'Coin' of the liquidity pair.
-    , cpFee     :: Fee
-    -- ^ Numerator and denominator of the swap fee
-    , cpAmountA :: Integer
-    -- ^ Amount of liquidity for the first 'Coin'.
-    , cpAmountB :: Integer
-    -- ^ Amount of liquidity for the second 'Coin'.
+  { cpCoinA   :: Coin
+  -- ^ The other 'Coin'.
+  , cpCoinB   :: Coin
+  -- ^ One 'Coin' of the liquidity pair.
+  , cpFee     :: Fee
+  -- ^ Numerator and denominator of the swap fee
+  , cpAmountA :: Integer
+  -- ^ Amount of liquidity for the first 'Coin'.
+  , cpAmountB :: Integer
+  -- ^ Amount of liquidity for the second 'Coin'.
   }
   deriving (Show, Generic, ToJSON, FromJSON)
 
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
 data SwapParams = SwapParams
-  { spCoinA    :: Text
+  { spCoinA    :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , spCoinB    :: Text
+  , spCoinB    :: Coin
   -- ^ The other 'Coin'.
   , spFee      :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -49,18 +59,18 @@ data SwapParams = SwapParams
   deriving (Show, Generic, ToJSON, FromJSON)
 
 data SwapPreviewParams = SwapPreviewParams
-  { sppCoinA   :: Text
-  ,  sppCoinB  :: Text
-  ,  sppFee    :: Fee
+  { sppCoinA   :: Coin
+  , sppCoinB  :: Coin
+  , sppFee    :: Fee
   -- ^ Numerator and denominator of the swap fee
-  ,  sppAmount :: Integer
+  , sppAmount :: Integer
   }
   deriving (Show, Generic, ToJSON, FromJSON)
 
 data IndirectSwapParams = IndirectSwapParams
-  { ispCoinA    :: Text
+  { ispCoinA    :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , ispCoinB    :: Text
+  , ispCoinB    :: Coin
     -- ^ The other 'Coin'.
   , ispAmount   :: Integer
     -- ^ The amount of the first 'Coin' that should be swapped.
@@ -70,17 +80,17 @@ data IndirectSwapParams = IndirectSwapParams
   deriving (Show, Generic, ToJSON, FromJSON)
 
 data ISwapPreviewParams = ISwapPreviewParams
-  { isppCoinA  :: Text
-  , isppCoinB  :: Text
+  { isppCoinA  :: Coin
+  , isppCoinB  :: Coin
   , isppAmount :: Integer
   }
   deriving (Show, Generic, ToJSON, FromJSON)
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
 data CloseParams = CloseParams
-  { clpCoinA :: Text
+  { clpCoinA :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , clpCoinB :: Text
+  , clpCoinB :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , clpFee   :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -89,9 +99,9 @@ data CloseParams = CloseParams
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
 data RemoveParams = RemoveParams
-  { rpCoinA :: Text
+  { rpCoinA :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , rpCoinB :: Text
+  , rpCoinB :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , rpFee   :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -102,9 +112,9 @@ data RemoveParams = RemoveParams
 
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
 data AddParams = AddParams
-  { apCoinA   :: Text
+  { apCoinA   :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , apCoinB   :: Text
+  , apCoinB   :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , apFee     :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -117,7 +127,7 @@ data AddParams = AddParams
 
 -- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given OperationId
 data ClearStateParams = ClearStateParams
-  { clsRemoveId :: OperationId
+  { clsRemoveId :: HistoryId
     -- ^ Identifier of Operation that should be removed from state
   }
   deriving (Show, Generic, ToJSON, FromJSON)

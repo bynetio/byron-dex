@@ -12,8 +12,8 @@ import           UniswapJsonApi.Types
 type AppError = Error Err
 
 data Err
-  = StatusNotFound Instance OperationId
-  | CallEndpointFailed Instance OperationId ClientError
+  = StatusNotFound Instance HistoryId
+  | CallEndpointFailed Instance HistoryId ClientError
   | CallStatusFailed Instance ClientError
   | GetStatusFailed ClientError
   | GetFundsFailed ClientError

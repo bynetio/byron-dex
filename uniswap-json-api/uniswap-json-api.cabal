@@ -10,8 +10,7 @@ common shared-properties
 
 library
   hs-source-dirs:     src
-  exposed-modules:    UniswapJsonApi
-                    , UniswapJsonApi.Logic
+  exposed-modules:    UniswapJsonApi.Logic
                     , UniswapJsonApi.Client
                     , UniswapJsonApi.Types
                     , Uniswap.PAB.Types
@@ -23,9 +22,8 @@ library
                     , Uniswap.LiquidityPool.Types
                     , Uniswap.Common.Utils
                     , Uniswap.Common.ServantClient
-                    , Uniswap.Common.ServantServer
                     , Uniswap.Common.Logger
-                    , Uniswap.Common.NextOpID
+                    , Uniswap.Common.NextId
                     , Uniswap.Common.AppError
   build-depends:      base
                     , aeson
@@ -43,17 +41,14 @@ library
                     , servant-server
                     , text
                     , uuid
-<<<<<<< HEAD
                     , warp
-  import:             shared-properties
-=======
-                    , either
                     , freer-simple
                     , deepseq
                     , exceptions
+                    , either
+
+  import:             shared-properties
   default-extensions: ScopedTypeVariables FlexibleContexts GADTs PolyKinds TemplateHaskell TypeApplications DataKinds LambdaCase RankNTypes TypeOperators TypeFamilies
-  default-language:   Haskell2010
->>>>>>> f874b4f (Introduce Freer simple effect system)
 
 executable uniswap-json-api
   main-is:            Main.hs

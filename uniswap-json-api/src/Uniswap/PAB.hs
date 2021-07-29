@@ -22,7 +22,7 @@ import Servant.API                  (type (:<|>) ((:<|>)))
 import Servant.Client.Streaming     (ClientError, ClientM, client)
 import Uniswap.Common.AppError
 import Uniswap.Common.Logger
-import Uniswap.Common.NextOpID
+import Uniswap.Common.NextId
 import Uniswap.Common.ServantClient
 import Uniswap.Common.Utils
 import Uniswap.PAB.Types
@@ -46,7 +46,7 @@ makeEffect ''UniswapPab
 
 type UniswapPabEffs m =
   '[ ServantClient
-   , NextOpID
+   , NextId
    , Logger
    , AppError
    , Time
@@ -183,21 +183,21 @@ doReq
   -> Text
   -> Eff effs UniswapDefinition
 doReq uId a endpoint errMsg = do
-  opId <- next
-  let ahid  = WithHistoryId opId a
+  hid <- next
+  let ahid  = WithHistoryId hid a
       value = toJSON ahid
   logDebug $ toStrict . encodeToLazyText $ ahid
   callRes <- runClient' $ endpointAPI uId endpoint value
   fromEither $ mapLeft (EndpointRequestFailed errMsg) callRes
   response <- fetchStatus uId
-  fromEither $ mapLeft (EndpointRequestFailedRes errMsg) (extractUniswapDef opId response)
+  fromEither $ mapLeft (EndpointRequestFailedRes errMsg) (extractUniswapDef hid response)
 
 fetchStatus
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
   -> Eff effs UniswapStatusResponse
 fetchStatus uID = do
-  opId <- next
+  hid <- next
   logDebug [fmt|Fetching status for {uID}|]
   result <- runClient' . statusAPI $ uID
   logDebug [fmt|[Status for {uID} is {result:s}|]
@@ -209,11 +209,11 @@ fetchStatus uID = do
 history :: UniswapStatusResponse -> History (Either Text UniswapDefinition)
 history = observableState . cicCurrentState
 
-extractUniswapDef :: OperationId -> UniswapStatusResponse -> Either Text UniswapDefinition
-extractUniswapDef opId = join . maybeToRight "Operation ID not found in history" . lookupHistory opId . history
+extractUniswapDef :: HistoryId -> UniswapStatusResponse -> Either Text UniswapDefinition
+extractUniswapDef hid = join . maybeToRight "Operation ID not found in history" . lookupHistory hid . history
 
-extractStatus :: OperationId -> Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition
-extractStatus opId e = extractUniswapDef opId =<< mapLeft showText e
+extractStatus :: HistoryId -> Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition
+extractStatus hid e = extractUniswapDef hid =<< mapLeft showText e
 
 doRequest
   :: forall effs a m. (ToJSON a, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -221,11 +221,11 @@ doRequest
   -> a
   -> Eff effs UniswapDefinition
 doRequest uid a = do
-  opId <- next
-  res <- doEndpointRequest uid opId a
-  whenLeft res (throwError . CallEndpointFailed uid opId) -- FIXME: When pab endpoint request ends with error then throw error.
-  def <- retryRequest 5 $ getStatusByOpId uid opId
-  fromEither $ mapLeft (StatusNotFound opId) def
+  hid <- next
+  res <- doEndpointRequest uid hid a
+  whenLeft res (throwError . CallEndpointFailed uid hid) -- FIXME: When pab endpoint request ends with error then throw error.
+  def <- retryRequest 5 $ getStatusByHistoryId uid hid
+  fromEither $ mapLeft (StatusNotFound hid) def
 
 
 data ShouldRetry a b
@@ -259,14 +259,14 @@ retryRequest maxRetries action = retryInner 0
          pure $ Right resp
 
 
-getStatusByOpId
+getStatusByHistoryId
   :: forall effs m. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
-  -> OperationId
+  -> HistoryId
   -> Eff effs (ShouldRetry Text UniswapDefinition)
-getStatusByOpId uid opId = do
+getStatusByHistoryId uid hid = do
   status <- fetchStatusR uid
-  pure $ either Retry Ok . extractUniswapDef opId $ status
+  pure $ either Retry Ok . extractUniswapDef hid $ status
 
 fetchStatus'
   :: forall effs. (Members '[ServantClient] effs)
@@ -279,12 +279,12 @@ fetchStatus' uID = do
 doSingleEndpointRequest
   :: forall effs req. (ToJSON req, Member ServantClient effs)
   => Instance
-  -> OperationId
+  -> HistoryId
   -> req
   -> Eff effs (ShouldRetry ClientError ())
-doSingleEndpointRequest uId opId req = do
+doSingleEndpointRequest uId hid req = do
   let v = toJSON req
-  resp <- runClient' $ endpointAPI uId opId v
+  resp <- runClient' $ endpointAPI uId hid v
   pure $ either Fail Ok resp -- change Fail to Retry
 
 fetchStatusR
@@ -300,8 +300,8 @@ fetchStatusR uid = do
 doEndpointRequest
   :: forall effs m a. (ToJSON a, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
-  -> OperationId
+  -> HistoryId
   -> a
   -> Eff effs (Either ClientError ())
-doEndpointRequest uId opId req =
-  retryRequest 5 $ doSingleEndpointRequest uId opId req
+doEndpointRequest uId hid req =
+  retryRequest 5 $ doSingleEndpointRequest uId hid req

@@ -18,11 +18,18 @@
 {-# OPTIONS_GHC -fno-strictness #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
-module Uniswap.Types where
+module Uniswap.Types
+  where
 
+import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
+import qualified Data.Aeson          as JSON
+import qualified Data.Aeson.Extras   as JSON
 import           Data.String
+import qualified Data.Text.Encoding  as E
 import           Ledger
-import           Ledger.Value        (AssetClass (..), assetClass, assetClassValue, assetClassValueOf)
+import           Ledger.Value        (AssetClass (..), CurrencySymbol (unCurrencySymbol),
+                                      TokenName (unTokenName), assetClass, assetClassValue, assetClassValueOf,
+                                      currencySymbol, tokenName)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude
@@ -66,7 +73,24 @@ PlutusTx.makeLift ''Liquidity
 -- which one is which.
 newtype Coin a = Coin {unCoin :: AssetClass}
   deriving stock (Show, Generic)
-  deriving newtype (ToJSON, FromJSON, ToSchema, Eq, Prelude.Eq, Prelude.Ord)
+  deriving newtype (ToSchema, Eq, Prelude.Eq, Prelude.Ord)
+
+instance ToJSON (Coin a) where
+  toJSON coin =
+    object [
+      "currencySymbol" .= encodeCoin (unCurrencySymbol . fst),
+      "tokenName" .= encodeCoin (unTokenName . snd)
+    ]
+      where
+        encodeCoin f = JSON.String . JSON.encodeByteString . f . unAssetClass . unCoin $ coin
+
+instance FromJSON (Coin a) where
+  parseJSON = withObject "Coin" $ \v -> do
+    rawTokenName      <- v .: "tokenName"
+    rawCurrencySymbol <- v .: "currencySymbol"
+    let currencySymbol' = currencySymbol . E.encodeUtf8 $ rawCurrencySymbol
+        tokenName'      = tokenName . E.encodeUtf8 $ rawTokenName
+    return . Coin $ assetClass currencySymbol' tokenName'
 
 PlutusTx.makeIsDataIndexed ''Coin [('Coin, 0)]
 PlutusTx.makeLift ''Coin

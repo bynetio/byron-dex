@@ -3,17 +3,16 @@
 module Uniswap.LiquidityPool.Types
   where
 
-
 import Data.Char            (toLower)
 import Data.Text            (Text)
 import Deriving.Aeson       (CustomJSON (CustomJSON), FromJSON, Generic, ToJSON)
 import Uniswap.Common.Utils (PrefixedCamelCase)
-import Uniswap.PAB.Types    (Fee)
+import Uniswap.PAB.Types    (Coin, Fee)
 
 data CreatePoolForm = CreatePoolForm
-  { cpCoinA   :: Text
+  { cpCoinA   :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , cpCoinB   :: Text
+  , cpCoinB   :: Coin
   -- ^ The other 'Coin'.
   , cpFee     :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -27,9 +26,9 @@ data CreatePoolForm = CreatePoolForm
     via PrefixedCamelCase "cp" CreatePoolForm
 
 data CloseForm = CloseForm
-  { clpCoinA :: Text
+  { clpCoinA :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , clpCoinB :: Text
+  , clpCoinB :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , clpFee   :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -39,9 +38,9 @@ data CloseForm = CloseForm
     via PrefixedCamelCase "clp" CloseForm
 
 data SwapForm = SwapForm
-  { spCoinA    :: Text
+  { spCoinA    :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , spCoinB    :: Text
+  , spCoinB    :: Coin
   -- ^ The other 'Coin'.
   , spFee      :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -57,8 +56,8 @@ data SwapForm = SwapForm
     via PrefixedCamelCase "sp" SwapForm
 
 data SwapPreviewForm = SwapPreviewForm
-  { sppCoinA  :: Text
-  , sppCoinB  :: Text
+  { sppCoinA  :: Coin
+  , sppCoinB  :: Coin
   -- ^ Numerator and denominator of the swap fee
   , sppFee    :: Fee
   , sppAmount :: Integer
@@ -68,9 +67,9 @@ data SwapPreviewForm = SwapPreviewForm
     via PrefixedCamelCase "spp" SwapPreviewForm
 
 data IndirectSwapForm = IndirectSwapForm
-  { ispCoinA    :: Text
+  { ispCoinA    :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , ispCoinB    :: Text
+  , ispCoinB    :: Coin
   -- ^ The other 'Coin'.
   , ispAmount   :: Integer
   -- ^ The amount of the first 'Coin' that should be swapped.
@@ -82,8 +81,8 @@ data IndirectSwapForm = IndirectSwapForm
     via PrefixedCamelCase "isp" IndirectSwapForm
 
 data ISwapPreviewForm = ISwapPreviewForm
-  { isppCoinA  :: Text
-  , isppCoinB  :: Text
+  { isppCoinA  :: Coin
+  , isppCoinB  :: Coin
   , isppAmount :: Integer
   }
   deriving (Show, Generic)
@@ -91,9 +90,9 @@ data ISwapPreviewForm = ISwapPreviewForm
     via PrefixedCamelCase "ispp" ISwapPreviewForm
 
 data RemoveForm = RemoveForm
-  { rpCoinA :: Text
+  { rpCoinA :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , rpCoinB :: Text
+  , rpCoinB :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , rpFee   :: Fee
   -- ^ Numerator and denominator of the swap fee
@@ -105,9 +104,9 @@ data RemoveForm = RemoveForm
     via PrefixedCamelCase "rp" RemoveForm
 
 data AddForm = AddForm
-  { apCoinA   :: Text
+  { apCoinA   :: Coin
   -- ^ One 'Coin' of the liquidity pair.
-  , apCoinB   :: Text
+  , apCoinB   :: Coin
   -- ^ The other 'Coin' of the liquidity pair.
   , apFee     :: Fee
   -- ^ Numerator and denominator of the swap fee

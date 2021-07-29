@@ -20,13 +20,13 @@ import Servant                  (ServerError)
 
 type Instance = Text
 
-type OperationId = Text
+type HistoryId = Text
 
-data History a = History [(OperationId, a)] [OperationId]
+data History a = History [(HistoryId, a)] [HistoryId]
   deriving (Show, Generic, FromJSON, ToJSON)
 
-lookupHistory :: OperationId -> History a -> Maybe a
-lookupHistory opId (History hs _) = snd <$> find (\h' -> opId == fst h') (reverse hs)
+lookupHistory :: HistoryId -> History a -> Maybe a
+lookupHistory hid (History hs _) = snd <$> find (\h' -> hid == fst h') (reverse hs)
 
 data UniswapStatusResponse = UniswapStatusResponse
   { cicCurrentState :: UniswapCurrentState,

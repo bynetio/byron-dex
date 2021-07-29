@@ -1,7 +1,7 @@
-module Uniswap.Common.NextOpID
-  ( NextOpID
+module Uniswap.Common.NextId
+  ( NextId
   , next
-  , runNextOpID
+  , runNextId
   ) where
 
 import Control.Monad.Freer    as Eff (Eff, LastMember, interpret, type (~>))
@@ -9,16 +9,16 @@ import Control.Monad.Freer.TH as Eff (makeEffect)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.UUID              (toText)
 import Data.UUID.V4           as UUID (nextRandom)
-import UniswapJsonApi.Types   (OperationId)
+import UniswapJsonApi.Types   (HistoryId)
 
-data NextOpID a where
-  Next :: NextOpID OperationId
+data NextId a where
+  Next :: NextId HistoryId
 
-Eff.makeEffect ''NextOpID
+Eff.makeEffect ''NextId
 
-runNextOpID
+runNextId
   :: forall effs m. (MonadIO m, LastMember m effs)
-  => Eff (NextOpID ': effs)
+  => Eff (NextId ': effs)
   ~> Eff effs
-runNextOpID = Eff.interpret $ \case
+runNextId = Eff.interpret $ \case
   Next -> liftIO $ toText <$> UUID.nextRandom

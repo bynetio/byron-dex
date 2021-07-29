@@ -50,12 +50,12 @@ pabStop c = pabRequest c . stop
 
 -- uniswap endpoints
 
-uniswapCreate :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> m (Either ClientError ())
-uniswapCreate c i opId coinA coinB amountA amountB = pabEndpoint c i "create" v
+uniswapCreate :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> Int -> m (Either ClientError ())
+uniswapCreate c i hid coinA coinB amountA amountB = pabEndpoint c i "create" v
   where
     v =
       object
-        [ "historyId"    .= opId
+        [ "historyId"    .= hid
         , "content" .= object
           [ "cpCoinA"   .= coinA
           , "cpCoinB"   .= coinB
@@ -64,12 +64,12 @@ uniswapCreate c i opId coinA coinB amountA amountB = pabEndpoint c i "create" v
           ]
         ]
 
-uniswapSwap :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
-uniswapSwap c i opId coinA coinB amount result slippage = pabEndpoint c i "swap" v
+uniswapSwap :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
+uniswapSwap c i hid coinA coinB amount result slippage = pabEndpoint c i "swap" v
   where
     v =
       object
-        [ "historyId"     .= opId
+        [ "historyId"     .= hid
         , "content" .= object
           [ "spCoinA"    .= coinA
           , "spCoinB"    .= coinB
@@ -79,12 +79,12 @@ uniswapSwap c i opId coinA coinB amount result slippage = pabEndpoint c i "swap"
           ]
         ]
 
-uniswapSwapPreview :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
-uniswapSwapPreview c i opId coinA coinB amount = pabEndpoint c i "swapPreview" v
+uniswapSwapPreview :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> m (Either ClientError ())
+uniswapSwapPreview c i hid coinA coinB amount = pabEndpoint c i "swapPreview" v
   where
     v =
       object
-        [ "historyId"   .= opId
+        [ "historyId"   .= hid
         , "content" .= object
           [ "sppCoinA"  .= coinA
           , "sppCoinB"  .= coinB
@@ -92,12 +92,12 @@ uniswapSwapPreview c i opId coinA coinB amount = pabEndpoint c i "swapPreview" v
           ]
         ]
 
-uniswapIndirectSwap :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
-uniswapIndirectSwap c i opId coinA coinB amount result slippage = pabEndpoint c i "iSwap" v
+uniswapIndirectSwap :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> Int -> Int -> m (Either ClientError ())
+uniswapIndirectSwap c i hid coinA coinB amount result slippage = pabEndpoint c i "iSwap" v
   where
     v =
       object
-        [ "historyId"     .= opId
+        [ "historyId"     .= hid
         , "content" .= object
           [ "ispCoinA"    .= coinA
           , "ispCoinB"    .= coinB
@@ -107,12 +107,12 @@ uniswapIndirectSwap c i opId coinA coinB amount result slippage = pabEndpoint c 
           ]
         ]
 
-uniswapIndirectSwapPreview :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
-uniswapIndirectSwapPreview c i opId coinA coinB amount = pabEndpoint c i "iSwapPreview" v
+uniswapIndirectSwapPreview :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> m (Either ClientError ())
+uniswapIndirectSwapPreview c i hid coinA coinB amount = pabEndpoint c i "iSwapPreview" v
   where
     v =
       object
-        [ "historyId"   .= opId
+        [ "historyId"   .= hid
         , "content" .= object
           [ "sppCoinA"  .= coinA
           , "sppCoinB"  .= coinB
@@ -120,24 +120,24 @@ uniswapIndirectSwapPreview c i opId coinA coinB amount = pabEndpoint c i "iSwapP
           ]
         ]
 
-uniswapClose :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> m (Either ClientError ())
-uniswapClose c i opId coinA coinB = pabEndpoint c i "close" v
+uniswapClose :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> m (Either ClientError ())
+uniswapClose c i hid coinA coinB = pabEndpoint c i "close" v
   where
     v =
       object
-        [ "historyId"  .= opId
+        [ "historyId"  .= hid
         , "content" .= object
           [ "clpCoinA" .= coinA
           , "clpCoinB" .= coinB
           ]
         ]
 
-uniswapRemove :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> m (Either ClientError ())
-uniswapRemove c i opId coinA coinB amount = pabEndpoint c i "remove" v
+uniswapRemove :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> m (Either ClientError ())
+uniswapRemove c i hid coinA coinB amount = pabEndpoint c i "remove" v
   where
     v =
       object
-        [ "historyId"  .= opId
+        [ "historyId"  .= hid
         , "content" .= object
           [ "rpCoinA" .= coinA
           , "rpCoinB" .= coinB
@@ -145,12 +145,12 @@ uniswapRemove c i opId coinA coinB amount = pabEndpoint c i "remove" v
           ]
         ]
 
-uniswapAdd :: MonadIO m => PabConfig -> Instance -> OperationId -> Text -> Text -> Int -> Int -> m (Either ClientError ())
-uniswapAdd c i opId coinA coinB amountA amountB = pabEndpoint c i "add" v
+uniswapAdd :: MonadIO m => PabConfig -> Instance -> HistoryId -> Text -> Text -> Int -> Int -> m (Either ClientError ())
+uniswapAdd c i hid coinA coinB amountA amountB = pabEndpoint c i "add" v
   where
     v =
       object
-        [ "historyId"    .= opId
+        [ "historyId"    .= hid
         , "content" .= object
           [ "apCoinA"   .= coinA
           , "apCoinB"   .= coinB
@@ -159,18 +159,18 @@ uniswapAdd c i opId coinA coinB amountA amountB = pabEndpoint c i "add" v
           ]
         ]
 
-uniswapPools :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
-uniswapPools c i opId = pabEndpoint c i "pools" v
+uniswapPools :: MonadIO m => PabConfig -> Instance -> HistoryId -> m (Either ClientError ())
+uniswapPools c i hid = pabEndpoint c i "pools" v
   where
-    v = object [ "historyId" .= opId, "content" .= emptyArray ]
+    v = object [ "historyId" .= hid, "content" .= emptyArray ]
 
-uniswapFunds :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
-uniswapFunds c i opId = pabEndpoint c i "funds" v
+uniswapFunds :: MonadIO m => PabConfig -> Instance -> HistoryId -> m (Either ClientError ())
+uniswapFunds c i hid = pabEndpoint c i "funds" v
   where
-    v = object [ "historyId" .= opId, "content" .= emptyArray ]
+    v = object [ "historyId" .= hid, "content" .= emptyArray ]
 
-uniswapStop :: MonadIO m => PabConfig -> Instance -> OperationId -> m (Either ClientError ())
-uniswapStop c i opId = pabEndpoint c i "stop" v
+uniswapStop :: MonadIO m => PabConfig -> Instance -> HistoryId -> m (Either ClientError ())
+uniswapStop c i hid = pabEndpoint c i "stop" v
   where
-    v = object [ "historyId" .= opId, "content" .= emptyArray ]
+    v = object [ "historyId" .= hid, "content" .= emptyArray ]
 

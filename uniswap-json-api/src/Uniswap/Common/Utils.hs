@@ -1,3 +1,4 @@
+{-# LANGUAGE EmptyDataDecls #-}
 module Uniswap.Common.Utils
   where
 

@@ -15,7 +15,7 @@ import Servant.Client.Streaming     (ClientError)
 import Uniswap.API                  (API, api)
 import Uniswap.Common.AppError      (AppError, Err)
 import Uniswap.Common.Logger        (Logger, runColog)
-import Uniswap.Common.NextOpID      (NextOpID, runNextOpID)
+import Uniswap.Common.NextId        (NextId, runNextId)
 import Uniswap.Common.ServantClient (ServantClient, runServantClientUrl)
 import Uniswap.Common.Utils         (Time, runTime)
 import Uniswap.PAB                  (UniswapPab, runPab)
@@ -38,7 +38,7 @@ runApp ctx = do
 type AppEffs =
   '[ UniswapPab
    , ServantClient
-   , NextOpID
+   , NextId
    , Logger
    , AppError
    , Time
@@ -53,7 +53,7 @@ liftToHandler MkAppContext{..} effs = do
 
   where
     runEffects :: PabConfig -> Eff AppEffs a -> Handler (Either Err a)
-    runEffects pab = runM . runTime . runError . runColog . runNextOpID . runServantClientUrl (toPabUrl pab) . runPab
+    runEffects pab = runM . runTime . runError . runColog . runNextId . runServantClientUrl (toPabUrl pab) . runPab
 
     toPabUrl :: PabConfig -> String
     toPabUrl MkPabConfig{..} = pabUrl <> ":" <> show pabPort
