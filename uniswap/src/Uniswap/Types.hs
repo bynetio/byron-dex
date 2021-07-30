@@ -27,7 +27,7 @@ import qualified Data.Aeson.Extras   as JSON
 import           Data.String
 import qualified Data.Text.Encoding  as E
 import           Ledger
-import           Ledger.Value        (AssetClass (..), CurrencySymbol (unCurrencySymbol),
+import           Ledger.Value        (AssetClass (..), CurrencySymbol (CurrencySymbol, unCurrencySymbol),
                                       TokenName (unTokenName), assetClass, assetClassValue, assetClassValueOf,
                                       currencySymbol, tokenName)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
@@ -88,7 +88,8 @@ instance FromJSON (Coin a) where
   parseJSON = withObject "Coin" $ \v -> do
     rawTokenName      <- v .: "tokenName"
     rawCurrencySymbol <- v .: "currencySymbol"
-    let currencySymbol' = currencySymbol . E.encodeUtf8 $ rawCurrencySymbol
+    currencySymbolBytes <- JSON.decodeByteString rawCurrencySymbol
+    let currencySymbol' = CurrencySymbol currencySymbolBytes
         tokenName'      = tokenName . E.encodeUtf8 $ rawTokenName
     return . Coin $ assetClass currencySymbol' tokenName'
 

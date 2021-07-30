@@ -32,7 +32,7 @@ runColog =
         LogDebug msg -> withColog L.D msg
 
 
--- | FIXME: Change fmtMessage to fmtSimpleRichMessageDefault to add correct SourceLocation
+-- | FIXME: Change fmtMessage to fmtSimpleRichMessageDefault to add correct
 withColog :: MonadIO m => L.Severity -> Text -> m ()
 withColog s = L.usingLoggerT (L.cmap L.fmtMessage L.logTextStdout) . L.log s
 
