@@ -3,49 +3,58 @@
 module Uniswap.PAB
   where
 
-import Control.DeepSeq              (NFData (..))
-import Control.Monad                (join)
-import Control.Monad.Freer          (Eff, LastMember, Member, Members, interpret, interpretM, send, type (~>))
-import Control.Monad.Freer.Error    (catchError, handleError, runError, throwError)
-import Control.Monad.Freer.TH       (makeEffect)
-import Control.Monad.IO.Class       (MonadIO, liftIO)
-import Data.Aeson                   (ToJSON (toJSON), Value)
-import Data.Aeson.Text              (encodeToLazyText)
-import Data.Either.Combinators      (mapLeft, maybeToRight)
-import Data.Text                    (Text, pack)
-import Data.Text.Lazy               (toStrict)
-import PyF                          (fmt)
-import Servant                      (Capture, Get, JSON, Post, Proxy (..), Put, ReqBody, type (:<|>),
-                                     type (:>))
-import Servant.API                  (type (:<|>) ((:<|>)))
-import Servant.Client.Streaming     (ClientError, ClientM, client)
-import Uniswap.Common.AppError      (AppError,
-                                     Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound))
-import Uniswap.Common.Logger        (Logger, logDebug, logError)
-import Uniswap.Common.NextId        (NextId, next)
-import Uniswap.Common.ServantClient (ServantClient, runClient')
-import Uniswap.Common.Utils         (Time, fromEither, showText, sleep)
-import Uniswap.PAB.Types            (AddParams, CloseParams, CreateParams, ISwapPreviewParams,
-                                     IndirectSwapParams, RemoveParams, SwapParams, SwapPreviewParams,
-                                     WithHistoryId (WithHistoryId))
-import UniswapJsonApi.Types         (History, HistoryId, Instance, UniswapCurrentState (observableState),
-                                     UniswapDefinition,
-                                     UniswapStatusResponse (UniswapStatusResponse, cicCurrentState),
-                                     lookupHistory)
+import           Control.DeepSeq              (NFData (..))
+import           Control.Monad                (join)
+import           Control.Monad.Freer          (Eff, LastMember, Member, Members,
+                                               interpret, interpretM, send,
+                                               type (~>))
+import           Control.Monad.Freer.Error    (catchError, handleError,
+                                               runError, throwError)
+import           Control.Monad.Freer.TH       (makeEffect)
+import           Control.Monad.IO.Class       (MonadIO, liftIO)
+import           Data.Aeson                   (ToJSON (toJSON), Value)
+import           Data.Aeson.Text              (encodeToLazyText)
+import           Data.Either.Combinators      (mapLeft, maybeToRight)
+import           Data.Text                    (Text, pack)
+import           Data.Text.Lazy               (toStrict)
+import           PyF                          (fmt)
+import           Servant                      (Capture, Get, JSON, Post,
+                                               Proxy (..), Put, ReqBody,
+                                               type (:<|>), type (:>))
+import           Servant.API                  (type (:<|>) ((:<|>)))
+import           Servant.Client.Streaming     (ClientError, ClientM, client)
+import           Uniswap.Common.AppError      (AppError,
+                                               Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound))
+import           Uniswap.Common.Logger        (Logger, logDebug, logError)
+import           Uniswap.Common.NextId        (NextId, next)
+import           Uniswap.Common.ServantClient (ServantClient, runClient')
+import           Uniswap.Common.Utils         (Time, fromEither, showText,
+                                               sleep)
+import           Uniswap.PAB.Types            (AddParams, CloseParams,
+                                               CreateParams, ISwapPreviewParams,
+                                               IndirectSwapParams, RemoveParams,
+                                               SwapParams, SwapPreviewParams,
+                                               WithHistoryId (WithHistoryId))
+import           UniswapJsonApi.Types         (History (..), HistoryId,
+                                               Instance,
+                                               UniswapCurrentState (observableState),
+                                               UniswapMethodResult,
+                                               UniswapStatusResponse (UniswapStatusResponse, cicCurrentState),
+                                               lookupHistory)
 
 data UniswapPab r where
-  Pools               :: Instance -> UniswapPab UniswapDefinition
-  Funds               :: Instance -> UniswapPab UniswapDefinition
-  Stop                :: Instance -> UniswapPab UniswapDefinition
+  Pools               :: Instance -> UniswapPab UniswapMethodResult
+  Funds               :: Instance -> UniswapPab UniswapMethodResult
+  Stop                :: Instance -> UniswapPab UniswapMethodResult
   Status              :: Instance -> UniswapPab UniswapStatusResponse
-  Create              :: Instance -> CreateParams -> UniswapPab UniswapDefinition
-  Close               :: Instance -> CloseParams -> UniswapPab UniswapDefinition
-  Add                 :: Instance -> AddParams -> UniswapPab UniswapDefinition
-  Remove              :: Instance -> RemoveParams -> UniswapPab UniswapDefinition
-  Swap                :: Instance -> SwapParams -> UniswapPab UniswapDefinition
-  SwapPreview         :: Instance -> SwapPreviewParams -> UniswapPab UniswapDefinition
-  IndirectSwap        :: Instance -> IndirectSwapParams -> UniswapPab UniswapDefinition
-  IndirectSwapPreview :: Instance -> ISwapPreviewParams -> UniswapPab UniswapDefinition
+  Create              :: Instance -> CreateParams -> UniswapPab UniswapMethodResult
+  Close               :: Instance -> CloseParams -> UniswapPab UniswapMethodResult
+  Add                 :: Instance -> AddParams -> UniswapPab UniswapMethodResult
+  Remove              :: Instance -> RemoveParams -> UniswapPab UniswapMethodResult
+  Swap                :: Instance -> SwapParams -> UniswapPab UniswapMethodResult
+  SwapPreview         :: Instance -> SwapPreviewParams -> UniswapPab UniswapMethodResult
+  IndirectSwap        :: Instance -> IndirectSwapParams -> UniswapPab UniswapMethodResult
+  IndirectSwapPreview :: Instance -> ISwapPreviewParams -> UniswapPab UniswapMethodResult
 
 makeEffect ''UniswapPab
 
@@ -101,7 +110,7 @@ doRequest
   -> a
   -> Text
   -> Text
-  -> Eff effs UniswapDefinition
+  -> Eff effs UniswapMethodResult
 doRequest uid a endpoint errMsg = do
   hid <- next
   doEndpointRequest uid hid a endpoint errMsg
@@ -120,15 +129,15 @@ fetchStatus uID = do
     Left err -> throwError $ GetStatusFailed err
     Right r  -> pure r
 
-history :: UniswapStatusResponse -> History (Either Text UniswapDefinition)
+history :: UniswapStatusResponse -> History UniswapMethodResult
 history = observableState . cicCurrentState
 
 
-extractUniswapDef :: HistoryId -> UniswapStatusResponse -> Either Text UniswapDefinition
-extractUniswapDef hid = join . maybeToRight "History ID not found in history" . lookupHistory hid . history
+extractUniswapDef :: HistoryId -> UniswapStatusResponse -> Either Text UniswapMethodResult
+extractUniswapDef hid r = maybeToRight "History ID not found in history" $ lookupHistory hid $ history r
 
 
-extractStatus :: HistoryId -> Either ClientError UniswapStatusResponse -> Either Text UniswapDefinition
+extractStatus :: HistoryId -> Either ClientError UniswapStatusResponse -> Either Text UniswapMethodResult
 extractStatus hid e = extractUniswapDef hid =<< mapLeft showText e
 
 
@@ -137,7 +146,7 @@ data ShouldRetry a b
   | Ok b
 
 retryRequest
-  :: forall effs e a. (Members '[Logger, Time] effs, Show e)
+  :: forall effs e a. (Members '[Logger, Time] effs, Show e, Show a)
   => Integer
   -- ^ limit of retries
   -> Eff effs (ShouldRetry e a)
@@ -152,11 +161,11 @@ retryRequest maxRetries action = retryInner 0
          logDebug [fmt|Request failed. Giving up after {maxRetries} retries|]
          pure $ Left err
        Retry e -> do
-         sleep (50^numRetries)
+         sleep (100000 * 2^numRetries) -- metody typu add i create wymagają odczekania koło 10 sekund
          logError $ showText e
          logDebug [fmt|Request failed. So far we have retried {numRetries} times.|]
          retryInner (numRetries + 1)
-       Ok resp ->
+       Ok resp -> do
          pure $ Right resp
 
 
@@ -164,7 +173,7 @@ getStatusByHistoryId
   :: forall m effs a. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
   -> HistoryId
-  -> Eff effs UniswapDefinition
+  -> Eff effs UniswapMethodResult
 getStatusByHistoryId uid hid =
   extractDefRetry
     where
@@ -176,13 +185,13 @@ getStatusByHistoryId uid hid =
           Right r  -> Ok r
 
       fetchStatusRetry = do
-        res <- retryRequest 5 fetchStatus'
+        res <- retryRequest 4 fetchStatus'
         fromEither res
       extractDef = do
         status <- fetchStatusRetry
         pure $ either Retry Ok . extractUniswapDef hid $ status
       extractDefRetry = do
-        def <- retryRequest 3 extractDef
+        def <- retryRequest 20 extractDef
         fromEither $ mapLeft (StatusNotFound hid) def
 
 
@@ -195,7 +204,7 @@ doEndpointRequest
   -> Text
   -> Eff effs ()
 doEndpointRequest uId hid a endpoint errMsg = do
-  callRes <- retryRequest 3 doSingle
+  callRes <- retryRequest 4 doSingle
   fromEither $ mapLeft (EndpointRequestFailed errMsg) callRes
     where
       doSingle = do

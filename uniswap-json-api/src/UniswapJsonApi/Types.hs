@@ -1,22 +1,23 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module UniswapJsonApi.Types
   where
 
-import Control.DeepSeq
-import Control.Monad.Except     (ExceptT, MonadError)
-import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import Data.Aeson               (FromJSON, ToJSON, Value)
-import Data.ByteString          (ByteString)
-import Data.List                (find)
-import Data.Text                (Text)
-import Data.UUID                (UUID)
-import GHC.Generics
-import Network.Wai.Handler.Warp (HostPreference)
-import Servant                  (ServerError)
+import           Control.DeepSeq
+import           Control.Monad.Except     (ExceptT, MonadError)
+import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import           Data.Aeson               (FromJSON, ToJSON, Value)
+import           Data.ByteString          (ByteString)
+import           Data.List                (find)
+import           Data.Text                (Text)
+import           Data.UUID                (UUID)
+import           GHC.Generics
+import           Network.Wai.Handler.Warp (HostPreference)
+import           Servant                  (ServerError)
 
 type Instance = Text
 
@@ -45,7 +46,7 @@ data UniswapHook = UniswapHook
   deriving (Show, Generic, FromJSON, ToJSON)
 
 data UniswapCurrentState = UniswapCurrentState
-  { observableState :: History (Either Text UniswapDefinition),
+  { observableState :: History UniswapMethodResult,
     hooks           :: [UniswapHook],
     err             :: Maybe Text,
     logs            :: [UniswapLog],
@@ -58,8 +59,17 @@ data UniswapLog = UniswapLog
     _logLevel          :: Text
   } deriving (Show, Generic, FromJSON, ToJSON)
 
-data UniswapDefinition = UniswapDefinition
+
+data UniswapDefinition = UniswapDefiniotion
   { contents :: Value,
+    tag      :: Text
+
+  } deriving (Show, Generic, FromJSON, ToJSON)
+
+type UniswapMethodResult = Either Text UniswapSuccessMethodResult
+
+data UniswapSuccessMethodResult = UniswapSuccessMethodResult
+  { contents :: Maybe Value,
     tag      :: Text
   }
   deriving (Show, Generic, FromJSON, ToJSON)
