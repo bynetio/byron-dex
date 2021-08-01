@@ -111,7 +111,7 @@ type UniswapUserSchema =
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
-  = Pools [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+  = Pools [LiquidityPoolWithCoins]
   | Funds [AmountOfCoin A]
   | Created
   | Swapped
@@ -607,10 +607,11 @@ indirectSwap us IndirectSwapParams {..} = do
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools :: forall w s. Uniswap -> Contract w s Text [LiquidityPoolWithCoins]
 pools us = do
   utxos <- utxoAt (uniswapAddress us)
-  go $ snd <$> Map.toList utxos
+  pools <- go $ snd <$> Map.toList utxos
+  return $ map (\((coinA, amountA),(coinB,amountB),fee) -> LiquidityPoolWithCoins coinA coinB fee amountA amountB) pools
   where
     go :: [TxOutTx] -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
     go [] = return []

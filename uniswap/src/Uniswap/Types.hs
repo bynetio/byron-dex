@@ -163,6 +163,16 @@ PlutusTx.makeLift ''LiquidityPool
 liquidityPool :: (Coin A, Coin B) -> Fee -> LiquidityPool
 liquidityPool (Coin a, Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a b)) fee $ fromString $ show fee
 
+
+data LiquidityPoolWithCoins = LiquidityPoolWithCoins
+  { coinA   :: Coin A,
+    coinB   :: Coin B,
+    fee     :: Fee,
+    amountA :: Amount A,
+    amountB :: Amount B
+  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+
 -- | just swap in place the coins not touching types
 swapCoins :: (Coin A, Coin B) -> (Coin A, Coin B)
 swapCoins (ca, cb) = (Coin $ unCoin cb, Coin $ unCoin ca)
