@@ -59,10 +59,12 @@ import           GHC.TypeLits                 (symbolVal)
 import           Ledger                       hiding (fee, singleton)
 import           Ledger.Constraints           as Constraints
 import qualified Ledger.Typed.Scripts         as Scripts
+import           Ledger.Value                 (getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified Plutus.Contracts.Currency    as Currency
 import qualified PlutusTx
+import qualified PlutusTx.AssocMap            as AssocMap
 import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
 import           Prelude                      (Semigroup (..), String, div,
                                                show, undefined)
@@ -110,7 +112,7 @@ type UniswapUserSchema =
 -- | Type of the Uniswap user contract state.
 data UserContractState
   = Pools [((Coin A, Amount A), (Coin B, Amount B), Fee)]
-  | Funds Value
+  | Funds [AmountOfCoin A]
   | Created
   | Swapped
   | SwapPreview ((Coin A, Amount A), (Coin B, Amount B), Fee)
@@ -634,11 +636,12 @@ pools us = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds ::Contract w s Text Value
+funds ::Contract w s Text [AmountOfCoin A]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
-  return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  let value = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  return [AmountOfCoin (mkCoin cs tn) (Amount a) | (cs,tns) <- AssocMap.toList value, (tn,a) <- AssocMap.toList tns]
 
 clearState :: ClearStateParams -> Contract (History (Either Text UserContractState)) s Text ()
 clearState ClearStateParams{..} = do

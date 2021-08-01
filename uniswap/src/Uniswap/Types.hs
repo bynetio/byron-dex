@@ -99,6 +99,8 @@ instance FromJSON (Coin a) where
 PlutusTx.makeIsDataIndexed ''Coin [('Coin, 0)]
 PlutusTx.makeLift ''Coin
 
+
+
 -- | Likewise for 'Integer'; the corresponding amount we have of the
 -- particular 'Coin'.
 newtype Amount a = Amount {unAmount :: Integer}
@@ -109,6 +111,12 @@ newtype Amount a = Amount {unAmount :: Integer}
 
 PlutusTx.makeIsDataIndexed ''Amount [('Amount, 0)]
 PlutusTx.makeLift ''Amount
+
+data AmountOfCoin a = AmountOfCoin
+  { coin   :: Coin a
+  , amount :: Amount a
+  } deriving (Show,Generic,ToSchema,Eq, FromJSON, ToJSON)
+
 
 {-# INLINEABLE valueOf #-}
 valueOf :: Coin a -> Amount a -> Value
