@@ -7,7 +7,7 @@ import           Control.Monad.Freer       (type (~>))
 import           Control.Monad.Freer.Error (Error (..))
 import           Data.Text                 (Text)
 import           Servant.Client.Streaming  (ClientError)
-import           UniswapJsonApi.Types
+import           Uniswap.PAB.Types         (HistoryId, Instance)
 
 type AppError = Error Err
 
@@ -20,5 +20,6 @@ data Err
   | GetFundsFailedRes Text
   | EndpointRequestFailed Text ClientError
   | EndpointRequestFailedRes Text Text
+  | UnexpectedPABError Text
   deriving (Eq, Show)
 

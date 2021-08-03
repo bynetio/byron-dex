@@ -1,4 +1,7 @@
 module Uniswap.Data.Wallet where
 
 type Wallet
-  = { hash :: String }
+  = { instance :: String }
+
+type ConnectWalletFields
+  = { instance :: String }

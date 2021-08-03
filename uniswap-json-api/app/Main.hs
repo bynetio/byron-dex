@@ -4,13 +4,12 @@
 module Main
   where
 
-import Control.Exception    (Exception, throwIO)
-import System.Environment   (lookupEnv, setEnv)
+import Control.Exception  (Exception, throwIO)
+import System.Environment (lookupEnv, setEnv)
 import Uniswap.App
-import UniswapJsonApi.Types
+import Uniswap.Types
 
 data NoConfigFoundException = NoConfigFoundException deriving (Show, Exception)
-
 
 mkAppContext :: IO AppContext
 mkAppContext = do

@@ -1,5 +1,6 @@
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingVia   #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DerivingVia    #-}
 module Uniswap.LiquidityPool.Types
   where
 
@@ -118,4 +119,18 @@ data AddForm = AddForm
   deriving (Show, Generic)
   deriving (ToJSON, FromJSON)
     via PrefixedCamelCase "ap" AddForm
+
+
+data LiquidityPoolWithCoins = LiquidityPoolWithCoins
+  { coinA   :: Coin,
+    coinB   :: Coin,
+    fee     :: Fee,
+    amountA :: Integer,
+    amountB :: Integer
+  } deriving (Show, Generic, ToJSON, FromJSON)
+
+data AmountOfCoin = AmountOfCoin
+  { coin   :: Coin
+  , amount :: Integer
+  } deriving (Show, Generic, FromJSON, ToJSON)
 

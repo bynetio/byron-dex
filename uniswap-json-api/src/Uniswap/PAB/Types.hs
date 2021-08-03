@@ -1,18 +1,31 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
-{-# LANGUAGE DerivingVia    #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingVia           #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 module Uniswap.PAB.Types
   where
 
+import Control.DeepSeq      (NFData (rnf), rwhnf)
+import Data.Aeson           (Value)
+import Data.List            (find)
 import Data.Text            (Text)
 import Deriving.Aeson       (CustomJSON (CustomJSON), FromJSON, Generic, ToJSON)
 import GHC.Generics         (Generic)
 import Uniswap.Common.Utils (PrefixedCamelCase)
-import UniswapJsonApi.Types (HistoryId)
+
+
 
 type Fee = (Integer, Integer)
+type Instance = Text
+type HistoryId = Text
 
--- | use:  https://gitlab.haskell.org/ghc/ghc/-/wikis/records/overloaded-record-fields/duplicate-record-fields
+
+data History a = History [(HistoryId, a)] [HistoryId]
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+lookupHistory :: HistoryId -> History a -> Maybe a
+lookupHistory hid (History hs _) = snd <$> find (\h' -> hid == fst h') (reverse hs)
+
 data Coin = Coin
   { cCurrencySymbol :: Text
   , cTokenName      :: Text
@@ -132,3 +145,60 @@ data ClearStateParams = ClearStateParams
     -- ^ Identifier of History that should be removed from state
   }
   deriving (Show, Generic, ToJSON, FromJSON)
+
+data UniswapStatusResponse = UniswapStatusResponse
+  { cicCurrentState :: UniswapCurrentState,
+    cicContract     :: UniswapContract,
+    cicWallet       :: UniswapWallet,
+    cicDefintion    :: UniswapDefinition
+  }
+  deriving (Generic, Show, FromJSON, ToJSON)
+
+instance NFData UniswapStatusResponse where rnf = rwhnf
+data UniswapHook = UniswapHook
+  { rqID      :: Integer,
+    itID      :: Integer,
+    rqRequest :: Value
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+data UniswapCurrentState = UniswapCurrentState
+  { observableState :: History UniswapMethodResult,
+    hooks           :: [UniswapHook],
+    err             :: Maybe Text,
+    logs            :: [UniswapLog],
+    lastLogs        :: [UniswapLog]
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+data UniswapLog = UniswapLog
+  { _logMessageContent :: Text,
+    _logLevel          :: Text
+  } deriving (Show, Generic, FromJSON, ToJSON)
+
+
+data UniswapDefinition = UniswapDefiniotion
+  { contents :: Value,
+    tag      :: Text
+
+  } deriving (Show, Generic, FromJSON, ToJSON)
+
+-- | add ADT to handle all possible types in Result
+type UniswapMethodResult = Either Text UniswapSuccessMethodResult
+
+
+data UniswapSuccessMethodResult = UniswapSuccessMethodResult
+  { contents :: Maybe Value,
+    tag      :: Text
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+newtype UniswapContract = UniswapContract
+  { unContractInstanceId :: Text
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)
+
+newtype UniswapWallet = UniswapWallet
+  { getWallet :: Integer
+  }
+  deriving (Show, Generic, FromJSON, ToJSON)

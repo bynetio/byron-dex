@@ -16,6 +16,9 @@ derive instance eqTokenName :: Eq TokenName
 
 derive instance ordTokenName :: Ord TokenName
 
+instance showTokenName :: Show TokenName where
+  show (TokenName name) = name
+
 newtype CurrencySymbol
   = CurrencySymbol String
 
@@ -24,6 +27,9 @@ derive instance newtypeCurrencySymbol :: Newtype CurrencySymbol _
 derive instance eqCurrencySymbol :: Eq CurrencySymbol
 
 derive instance ordCurrencySymbol :: Ord CurrencySymbol
+
+instance showCurrencySymbol :: Show CurrencySymbol where
+  show (CurrencySymbol symbol) = symbol
 
 type Coin
   = { currencySymbol :: CurrencySymbol

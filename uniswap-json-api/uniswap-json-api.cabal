@@ -10,13 +10,11 @@ common shared-properties
 
 library
   hs-source-dirs:     src
-  exposed-modules:    UniswapJsonApi.Logic
-                    , UniswapJsonApi.Client
-                    , UniswapJsonApi.Types
-                    , Uniswap.PAB.Types
+  exposed-modules:    Uniswap.PAB.Types
                     , Uniswap.PAB
                     , Uniswap.API
                     , Uniswap.App
+                    , Uniswap.Types
                     , Uniswap.LiquidityPool.API
                     , Uniswap.LiquidityPool.Types
                     , Uniswap.Common.Utils
@@ -45,6 +43,8 @@ library
                     , deepseq
                     , exceptions
                     , either
+                    , wai
+                    , wai-cors
 
   import:             shared-properties
   default-extensions: ScopedTypeVariables FlexibleContexts GADTs PolyKinds TemplateHaskell TypeApplications DataKinds LambdaCase RankNTypes TypeOperators TypeFamilies

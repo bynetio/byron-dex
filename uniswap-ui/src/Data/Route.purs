@@ -8,7 +8,9 @@ import Routing.Duplex.Generic.Syntax ((/))
 
 data Route
   = Home
+  | ConnectWallet
   | Pools
+  | AddPool
 
 derive instance genericRoute :: Generic Route _
 
@@ -21,5 +23,7 @@ routeCodec =
   root
     $ sum
         { "Home": noArgs
+        , "ConnectWallet": "connect" / noArgs
         , "Pools": "pools" / noArgs
+        , "AddPool": "add" / noArgs
         }

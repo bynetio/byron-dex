@@ -3,58 +3,46 @@
 module Uniswap.PAB
   where
 
-import           Control.DeepSeq              (NFData (..))
-import           Control.Monad                (join)
-import           Control.Monad.Freer          (Eff, LastMember, Member, Members,
-                                               interpret, interpretM, send,
-                                               type (~>))
-import           Control.Monad.Freer.Error    (catchError, handleError,
-                                               runError, throwError)
-import           Control.Monad.Freer.TH       (makeEffect)
-import           Control.Monad.IO.Class       (MonadIO, liftIO)
-import           Data.Aeson                   (ToJSON (toJSON), Value)
-import           Data.Aeson.Text              (encodeToLazyText)
-import           Data.Either.Combinators      (mapLeft, maybeToRight)
-import           Data.Text                    (Text, pack)
-import           Data.Text.Lazy               (toStrict)
-import           PyF                          (fmt)
-import           Servant                      (Capture, Get, JSON, Post,
-                                               Proxy (..), Put, ReqBody,
-                                               type (:<|>), type (:>))
-import           Servant.API                  (type (:<|>) ((:<|>)))
-import           Servant.Client.Streaming     (ClientError, ClientM, client)
-import           Uniswap.Common.AppError      (AppError,
-                                               Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound))
-import           Uniswap.Common.Logger        (Logger, logDebug, logError)
-import           Uniswap.Common.NextId        (NextId, next)
-import           Uniswap.Common.ServantClient (ServantClient, runClient')
-import           Uniswap.Common.Utils         (Time, fromEither, showText,
-                                               sleep)
-import           Uniswap.PAB.Types            (AddParams, CloseParams,
-                                               CreateParams, ISwapPreviewParams,
-                                               IndirectSwapParams, RemoveParams,
-                                               SwapParams, SwapPreviewParams,
-                                               WithHistoryId (WithHistoryId))
-import           UniswapJsonApi.Types         (History (..), HistoryId,
-                                               Instance,
-                                               UniswapCurrentState (observableState),
-                                               UniswapMethodResult,
-                                               UniswapStatusResponse (UniswapStatusResponse, cicCurrentState),
-                                               lookupHistory)
+import Control.DeepSeq              (NFData (..))
+import Control.Monad                (join)
+import Control.Monad.Freer          (Eff, LastMember, Member, Members, interpret, interpretM, send, type (~>))
+import Control.Monad.Freer.Error    (catchError, handleError, runError, throwError)
+import Control.Monad.Freer.TH       (makeEffect)
+import Control.Monad.IO.Class       (MonadIO, liftIO)
+import Data.Aeson                   (ToJSON (toJSON), Value)
+import Data.Aeson.Text              (encodeToLazyText)
+import Data.Aeson.Types             (emptyObject)
+import Data.Either.Combinators      (mapLeft, maybeToRight)
+import Data.Text                    (Text, pack)
+import Data.Text.Lazy               (toStrict)
+import PyF                          (fmt)
+import Servant                      (Capture, Get, JSON, Post, Proxy (..), Put, ReqBody, type (:<|>),
+                                     type (:>))
+import Servant.API                  (type (:<|>) ((:<|>)))
+import Servant.Client.Streaming     (ClientError, ClientM, client)
+import Uniswap.Common.AppError      (AppError,
+                                     Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound, UnexpectedPABError))
+import Uniswap.Common.Logger        (Logger, logDebug, logError)
+import Uniswap.Common.NextId        (NextId, next)
+import Uniswap.Common.ServantClient (ServantClient, runClient')
+import Uniswap.Common.Utils         (Time, fromEither, showText, sleep)
+import Uniswap.LiquidityPool.Types
+import Uniswap.PAB.Types
+
 
 data UniswapPab r where
-  Pools               :: Instance -> UniswapPab UniswapMethodResult
-  Funds               :: Instance -> UniswapPab UniswapMethodResult
-  Stop                :: Instance -> UniswapPab UniswapMethodResult
+  Pools               :: Instance -> UniswapPab Value
+  Funds               :: Instance -> UniswapPab Value
+  Stop                :: Instance -> UniswapPab Value
   Status              :: Instance -> UniswapPab UniswapStatusResponse
-  Create              :: Instance -> CreateParams -> UniswapPab UniswapMethodResult
-  Close               :: Instance -> CloseParams -> UniswapPab UniswapMethodResult
-  Add                 :: Instance -> AddParams -> UniswapPab UniswapMethodResult
-  Remove              :: Instance -> RemoveParams -> UniswapPab UniswapMethodResult
-  Swap                :: Instance -> SwapParams -> UniswapPab UniswapMethodResult
-  SwapPreview         :: Instance -> SwapPreviewParams -> UniswapPab UniswapMethodResult
-  IndirectSwap        :: Instance -> IndirectSwapParams -> UniswapPab UniswapMethodResult
-  IndirectSwapPreview :: Instance -> ISwapPreviewParams -> UniswapPab UniswapMethodResult
+  Create              :: Instance -> CreateParams -> UniswapPab Value
+  Close               :: Instance -> CloseParams -> UniswapPab Value
+  Add                 :: Instance -> AddParams -> UniswapPab Value
+  Remove              :: Instance -> RemoveParams -> UniswapPab Value
+  Swap                :: Instance -> SwapParams -> UniswapPab Value
+  SwapPreview         :: Instance -> SwapPreviewParams -> UniswapPab Value
+  IndirectSwap        :: Instance -> IndirectSwapParams -> UniswapPab Value
+  IndirectSwapPreview :: Instance -> ISwapPreviewParams -> UniswapPab Value
 
 makeEffect ''UniswapPab
 
@@ -110,11 +98,15 @@ doRequest
   -> a
   -> Text
   -> Text
-  -> Eff effs UniswapMethodResult
+  -> Eff effs Value
 doRequest uid a endpoint errMsg = do
   hid <- next
   doEndpointRequest uid hid a endpoint errMsg
-  getStatusByHistoryId uid hid
+  status <- getStatusByHistoryId uid hid
+  case status of
+    Left err                                      -> throwError $ UnexpectedPABError err
+    Right (UniswapSuccessMethodResult (Just v) _) -> pure v
+    Right _                                       -> pure emptyObject
 
 
 fetchStatus

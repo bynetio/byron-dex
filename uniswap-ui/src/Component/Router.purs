@@ -1,12 +1,11 @@
 module Uniswap.Component.Router where
 
 import Prelude
-import Uniswap.Capability.Navigate (class Navigate, navigate)
-import Uniswap.Data.Route (Route(..), routeCodec)
-import Uniswap.Data.Wallet (Wallet)
-import Uniswap.Store as Store
-import Halogen as H
+import Data.Either (hush)
+import Data.Maybe (Maybe(..), fromMaybe)
+import Effect.Aff.Class (class MonadAff)
 import Halogen (liftEffect)
+import Halogen as H
 import Halogen.HTML as HH
 import Halogen.Store.Connect (Connected, connect)
 import Halogen.Store.Monad (class MonadStore)
@@ -14,10 +13,14 @@ import Halogen.Store.Select (selectEq)
 import Routing.Duplex as RD
 import Routing.Hash (getHash)
 import Type.Proxy (Proxy(..))
-import Data.Maybe (Maybe(..), fromMaybe)
-import Effect.Aff.Class (class MonadAff)
-import Data.Either (hush)
-import App.Button as Button
+import Uniswap.Capability.Navigate (class Navigate, navigate)
+import Uniswap.Capability.Pool (class ManagePool)
+import Uniswap.Data.Route (Route(..), routeCodec)
+import Uniswap.Data.Wallet (Wallet)
+import Uniswap.Page.ConnectWallet as CW
+import Uniswap.Page.LiquidityPools as LiquidityPools
+import Uniswap.Page.AddLiquidityPool as AddLiquidityPool
+import Uniswap.Store as Store
 
 type OpaqueSlot slot
   = forall query. H.Slot query Void slot
@@ -37,6 +40,8 @@ data Action
 type ChildSlots
   = ( home :: OpaqueSlot Unit
     , pools :: OpaqueSlot Unit
+    , connect :: OpaqueSlot Unit
+    , add :: OpaqueSlot Unit
     )
 
 component ::
@@ -44,6 +49,7 @@ component ::
   MonadAff m =>
   MonadStore Store.Action Store.Store m =>
   Navigate m =>
+  ManagePool m =>
   H.Component Query Unit Void m
 component =
   connect (selectEq _.currentWallet)
@@ -76,9 +82,20 @@ component =
         H.modify_ _ { route = Just dest }
       pure (Just a)
 
+  connected :: Maybe Wallet -> H.ComponentHTML Action ChildSlots m -> H.ComponentHTML Action ChildSlots m
+  connected mbWallet html = case mbWallet of
+    Nothing -> HH.slot (Proxy :: _ "connect") unit CW.component { redirect: false } absurd
+    Just _ -> html
+
   render :: State -> H.ComponentHTML Action ChildSlots m
-  render { route } = case route of
+  render { route, currentWallet } = case route of
     Just r -> case r of
-      Home -> HH.slot_ (Proxy :: _ "home") unit Button.component unit
-      Pools -> HH.slot_ (Proxy :: _ "pools") unit Button.component { redirect: true }
+      Home -> HH.slot_ (Proxy :: _ "home") unit CW.component { redirect: true }
+      Pools ->
+        connected currentWallet do
+          HH.slot_ (Proxy :: _ "pools") unit LiquidityPools.component unit
+      AddPool ->
+        connected currentWallet do
+          HH.slot_ (Proxy :: _ "add") unit AddLiquidityPool.component unit
+      ConnectWallet -> HH.slot_ (Proxy :: _ "connect") unit CW.component { redirect: true }
     Nothing -> HH.div_ [ HH.text "Page Not Found" ]

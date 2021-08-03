@@ -11,7 +11,7 @@ import Uniswap.Common.ServantClient (ServantClient)
 import Uniswap.Common.Utils         (Time)
 import Uniswap.LiquidityPool.API    (LiquidityPoolAPI, liquidityPoolAPI)
 import Uniswap.PAB                  (UniswapPab)
-import UniswapJsonApi.Types         (AppContext (..), AppM (..), UniswapDefinition, UniswapStatusResponse)
+import Uniswap.Types                (AppContext (..))
 
 
 type API =

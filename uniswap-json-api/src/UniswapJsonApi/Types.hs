@@ -7,17 +7,17 @@
 module UniswapJsonApi.Types
   where
 
-import           Control.DeepSeq
-import           Control.Monad.Except     (ExceptT, MonadError)
-import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import           Data.Aeson               (FromJSON, ToJSON, Value)
-import           Data.ByteString          (ByteString)
-import           Data.List                (find)
-import           Data.Text                (Text)
-import           Data.UUID                (UUID)
-import           GHC.Generics
-import           Network.Wai.Handler.Warp (HostPreference)
-import           Servant                  (ServerError)
+import Control.DeepSeq
+import Control.Monad.Except     (ExceptT, MonadError)
+import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import Data.Aeson               (FromJSON, ToJSON, Value)
+import Data.ByteString          (ByteString)
+import Data.List                (find)
+import Data.Text                (Text)
+import Data.UUID                (UUID)
+import GHC.Generics
+import Network.Wai.Handler.Warp (HostPreference)
+import Servant                  (ServerError)
 
 type Instance = Text
 
@@ -66,7 +66,9 @@ data UniswapDefinition = UniswapDefiniotion
 
   } deriving (Show, Generic, FromJSON, ToJSON)
 
+-- | add ADT to handle all possible types in Result
 type UniswapMethodResult = Either Text UniswapSuccessMethodResult
+
 
 data UniswapSuccessMethodResult = UniswapSuccessMethodResult
   { contents :: Maybe Value,
@@ -95,13 +97,4 @@ data AppContext = MkAppContext
   , port :: Int
   } deriving (Show)
 
-newtype (MonadIO m) => AppM m a = AppM
-  { unAppM :: ReaderT AppContext (ExceptT ServerError m) a
-  } deriving newtype ( Functor
-             , Applicative
-             , Monad
-             , MonadReader AppContext
-             , MonadError ServerError
-             , MonadIO
-             )
 

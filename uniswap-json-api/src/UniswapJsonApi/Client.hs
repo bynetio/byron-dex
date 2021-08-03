@@ -17,7 +17,7 @@ import           Network.HTTP.Client.TLS (tlsManagerSettings)
 import           Servant.API
 import           Servant.Client
 import           System.Environment
-import           UniswapJsonApi.Types
+import           Uniswap.Types
 
 type UniswapAPI =
   "api" :> "new" :> "contract" :> "instance" :> Capture "instance-id" Text :> "status" :> Get '[JSON] UniswapStatusResponse

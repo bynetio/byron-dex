@@ -20,19 +20,16 @@
 
 module Uniswap.Types
   where
-import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON),
-                                      object, withObject, (.:), (.=))
+import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
 import qualified Data.Aeson          as JSON
 import qualified Data.Aeson.Extras   as JSON
 import           Data.String
 import           Data.Text.Encoding  (decodeUtf8)
 import qualified Data.Text.Encoding  as E
 import           Ledger
-import           Ledger.Value        (AssetClass (..),
-                                      CurrencySymbol (CurrencySymbol, unCurrencySymbol),
-                                      TokenName (unTokenName), assetClass,
-                                      assetClassValue, assetClassValueOf,
-                                      currencySymbol, tokenName)
+import           Ledger.Value        (AssetClass (..), CurrencySymbol (CurrencySymbol, unCurrencySymbol),
+                                      TokenName (unTokenName), assetClass, assetClassValue, assetClassValueOf,
+                                      tokenName)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude

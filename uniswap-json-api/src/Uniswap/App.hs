@@ -1,4 +1,5 @@
-{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 module Uniswap.App
   ( runApp )
   where
@@ -9,8 +10,12 @@ import Control.Monad.Freer.Error    (runError)
 import Control.Monad.IO.Class       (liftIO)
 import Data.Aeson                   (encode)
 import Data.Text                    (Text)
+import Network.Wai                  (Middleware, Response)
 import Network.Wai.Handler.Warp     (run)
+import Network.Wai.Middleware.Cors
 import Servant
+import Servant                      (Application, Context, Handler (..), Proxy (..), hoistServerWithContext,
+                                     serveWithContext)
 import Servant.Client.Streaming     (ClientError)
 import Uniswap.API                  (API, api)
 import Uniswap.Common.AppError      (AppError, Err)
@@ -19,7 +24,7 @@ import Uniswap.Common.NextId        (NextId, runNextId)
 import Uniswap.Common.ServantClient (ServantClient, runServantClientUrl)
 import Uniswap.Common.Utils         (Time, runTime)
 import Uniswap.PAB                  (UniswapPab, runPab)
-import UniswapJsonApi.Types         (AppContext (..), PabConfig (..))
+import Uniswap.Types                (AppContext (..), PabConfig (..))
 
 runApp :: AppContext -> IO ()
 runApp ctx = do
@@ -33,7 +38,7 @@ runApp ctx = do
       app = serve (Proxy :: Proxy API) server
 
   -- serve application
-  run (port ctx) app
+  run (port ctx) (corsConfig app)
 
 type AppEffs =
   '[ UniswapPab
@@ -63,4 +68,23 @@ mapError :: Err -> Handler a
 mapError =
   throwError . \case
     err -> err400{errBody = encode . show $ err}-- FIXME: Map Errors to error codes/body
+
+corsPolicy :: CorsResourcePolicy
+corsPolicy =
+  CorsResourcePolicy {
+    corsOrigins = Nothing,
+    corsMethods = methods,
+    corsRequestHeaders = ["Content-Type"],
+    corsExposedHeaders = Nothing,
+    corsMaxAge = Nothing,
+    corsVaryOrigin = True,
+    corsRequireOrigin = False,
+    corsIgnoreFailures = False
+  }
+  where
+    methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+    cont = simpleContentTypes <> ["application/json"]
+
+corsConfig :: Middleware
+corsConfig = cors (const $ Just corsPolicy)
 
