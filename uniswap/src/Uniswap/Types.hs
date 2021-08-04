@@ -84,7 +84,7 @@ instance ToJSON (Coin a) where
   toJSON coin =
     object [
       "currencySymbol" .= encodeCoin (JSON.encodeByteString . unCurrencySymbol . fst),
-      "tokenName" .= fromJust (toJSON (snd $ unAssetClass $ unCoin $ coin) .: "unTokenName")
+      "tokenName" .= fromJust (toJSON (snd $ unAssetClass $ unCoin $ coin) ^? key "unTokenName")
     ]
       where
         encodeCoin f = JSON.String . f . unAssetClass . unCoin $ coin
