@@ -322,7 +322,6 @@ start mcs = do
       inst = uniswapInstance us
       tx = mustPayToTheScript (Factory []) $ unitValue c
   ledgerTx <- submitTxConstraints inst tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo @String $ printf "started Uniswap %s at address %s" (show us) (show $ uniswapAddress us)
   return us
@@ -357,7 +356,6 @@ create us CreateParams {..} = do
           <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Create lp)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "created liquidity pool: " ++ show lp
 
@@ -392,7 +390,6 @@ close us CloseParams {..} = do
           <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toData $ Pool lp liquidity)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "closed liquidity pool: " ++ show lp
 
@@ -429,7 +426,6 @@ remove us RemoveParams {..} = do
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "removed liquidity from pool: " ++ show lp
 
@@ -477,7 +473,6 @@ add us AddParams {..} = do
   logInfo $ show tx
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
@@ -523,7 +518,6 @@ swap us SwapParams {..} = do
           <> Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "swapped with: " ++ show lp
 
 indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
@@ -602,8 +596,7 @@ indirectSwap us IndirectSwapParams {..} = do
   --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
   --           Constraints.mustPayToTheScript (Pool lp liquidity) val
 
-  ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  void $ submitTxConstraintsWith lookups tx
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.

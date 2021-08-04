@@ -20,15 +20,21 @@
 
 module Uniswap.Types
   where
-import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON), object, withObject, (.:), (.=))
+import           Control.Lens        hiding ((.=))
+import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON),
+                                      object, withObject, (.:), (.=))
 import qualified Data.Aeson          as JSON
 import qualified Data.Aeson.Extras   as JSON
+import           Data.Aeson.Lens     (key)
+import           Data.Maybe          (fromJust)
 import           Data.String
 import           Data.Text.Encoding  (decodeUtf8)
 import qualified Data.Text.Encoding  as E
 import           Ledger
-import           Ledger.Value        (AssetClass (..), CurrencySymbol (CurrencySymbol, unCurrencySymbol),
-                                      TokenName (unTokenName), assetClass, assetClassValue, assetClassValueOf,
+import           Ledger.Value        (AssetClass (..),
+                                      CurrencySymbol (CurrencySymbol, unCurrencySymbol),
+                                      TokenName (unTokenName), assetClass,
+                                      assetClassValue, assetClassValueOf,
                                       tokenName)
 import           Playground.Contract (FromJSON, Generic, ToJSON, ToSchema)
 import qualified PlutusTx
@@ -36,7 +42,6 @@ import           PlutusTx.Prelude
 import           Prelude             (Show, show)
 import qualified Prelude
 import           Text.Printf         (PrintfArg)
-
 type Fee = (Integer, Integer)
 
 -- | Uniswap coin token
@@ -79,7 +84,7 @@ instance ToJSON (Coin a) where
   toJSON coin =
     object [
       "currencySymbol" .= encodeCoin (JSON.encodeByteString . unCurrencySymbol . fst),
-      "tokenName" .= encodeCoin (decodeUtf8 . unTokenName . snd)
+      "tokenName" .= fromJust (toJSON (snd $ unAssetClass $ unCoin $ coin) .: "unTokenName")
     ]
       where
         encodeCoin f = JSON.String . f . unAssetClass . unCoin $ coin
