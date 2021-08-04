@@ -1,6 +1,8 @@
 module Uniswap.Data.Coin where
 
 import Prelude
+import Affjax.RequestBody (RequestBody(..))
+import Data.Argonaut.Core (toString)
 import Data.Codec.Argonaut (JsonCodec)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut.Record as CAR
@@ -31,14 +33,29 @@ derive instance ordCurrencySymbol :: Ord CurrencySymbol
 instance showCurrencySymbol :: Show CurrencySymbol where
   show (CurrencySymbol symbol) = symbol
 
-type Coin
+type CoinRec
   = { currencySymbol :: CurrencySymbol
     , tokenName :: TokenName
     }
 
+newtype Coin
+  = Coin CoinRec
+
+derive instance newtypeCoin ∷ Newtype Coin _
+
+derive instance eqCoin :: Eq Coin
+
 codec :: JsonCodec Coin
 codec =
-  CAR.object "Coin"
-    { currencySymbol: wrapIso CurrencySymbol CA.string
-    , tokenName: wrapIso TokenName CA.string
-    }
+  wrapIso Coin
+    ( CAR.object "Coin"
+        { currencySymbol: wrapIso CurrencySymbol CA.string
+        , tokenName: wrapIso TokenName CA.string
+        }
+    )
+
+toTokenNameString :: Coin -> String
+toTokenNameString (Coin { tokenName }) = show tokenName
+
+toCurrencySymbolString :: Coin -> String
+toCurrencySymbolString (Coin { currencySymbol }) = show currencySymbol

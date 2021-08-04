@@ -11,6 +11,8 @@ data Route
   | ConnectWallet
   | Pools
   | AddPool
+  | Funds
+  | Swap
 
 derive instance genericRoute :: Generic Route _
 
@@ -26,4 +28,6 @@ routeCodec =
         , "ConnectWallet": "connect" / noArgs
         , "Pools": "pools" / noArgs
         , "AddPool": "add" / noArgs
+        , "Funds": "funds" / noArgs
+        , "Swap": "swap" / noArgs
         }

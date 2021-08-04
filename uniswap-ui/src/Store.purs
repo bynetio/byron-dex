@@ -1,6 +1,5 @@
 module Uniswap.Store where
 
-import Prelude
 import Data.Maybe (Maybe(..))
 import Uniswap.Api.Request (ApiURL)
 import Uniswap.Data.Wallet (Wallet)
