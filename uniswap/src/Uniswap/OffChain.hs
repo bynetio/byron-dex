@@ -59,13 +59,15 @@ import           GHC.TypeLits                 (symbolVal)
 import           Ledger                       hiding (fee, singleton)
 import           Ledger.Constraints           as Constraints
 import qualified Ledger.Typed.Scripts         as Scripts
+import           Ledger.Value                 (getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified Plutus.Contracts.Currency    as Currency
 import qualified PlutusTx
+import qualified PlutusTx.AssocMap            as AssocMap
 import           PlutusTx.Prelude             hiding (Semigroup (..), unless)
 import           Prelude                      (Semigroup (..), String, div,
-                                               show)
+                                               show, undefined)
 import           Text.Printf                  (printf)
 import           Uniswap.Common.WalletHistory (History, HistoryId)
 import qualified Uniswap.Common.WalletHistory as WH
@@ -109,8 +111,8 @@ type UniswapUserSchema =
 
 -- | Type of the Uniswap user contract state.
 data UserContractState
-  = Pools [((Coin A, Amount A), (Coin B, Amount B), Fee)]
-  | Funds Value
+  = Pools [LiquidityPoolWithCoins]
+  | Funds [AmountOfCoin A]
   | Created
   | Swapped
   | SwapPreview ((Coin A, Amount A), (Coin B, Amount B), Fee)
@@ -320,7 +322,6 @@ start mcs = do
       inst = uniswapInstance us
       tx = mustPayToTheScript (Factory []) $ unitValue c
   ledgerTx <- submitTxConstraints inst tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo @String $ printf "started Uniswap %s at address %s" (show us) (show $ uniswapAddress us)
   return us
@@ -355,7 +356,6 @@ create us CreateParams {..} = do
           <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Create lp)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "created liquidity pool: " ++ show lp
 
@@ -390,7 +390,6 @@ close us CloseParams {..} = do
           <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toData $ Pool lp liquidity)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "closed liquidity pool: " ++ show lp
 
@@ -427,7 +426,6 @@ remove us RemoveParams {..} = do
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "removed liquidity from pool: " ++ show lp
 
@@ -475,7 +473,6 @@ add us AddParams {..} = do
   logInfo $ show tx
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
@@ -521,7 +518,6 @@ swap us SwapParams {..} = do
           <> Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "swapped with: " ++ show lp
 
 indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
@@ -600,15 +596,15 @@ indirectSwap us IndirectSwapParams {..} = do
   --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
   --           Constraints.mustPayToTheScript (Pool lp liquidity) val
 
-  ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  void $ submitTxConstraintsWith lookups tx
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
-pools :: forall w s. Uniswap -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
+pools :: forall w s. Uniswap -> Contract w s Text [LiquidityPoolWithCoins]
 pools us = do
   utxos <- utxoAt (uniswapAddress us)
-  go $ snd <$> Map.toList utxos
+  pools <- go $ snd <$> Map.toList utxos
+  return $ map (\((coinA, amountA),(coinB,amountB),fee) -> LiquidityPoolWithCoins coinA coinB fee amountA amountB) pools
   where
     go :: [TxOutTx] -> Contract w s Text [((Coin A, Amount A), (Coin B, Amount B), Fee)]
     go [] = return []
@@ -634,11 +630,12 @@ pools us = do
         c = poolStateCoin us
 
 -- | Gets the caller's funds.
-funds ::Contract w s Text Value
+funds ::Contract w s Text [AmountOfCoin A]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
-  return $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  let value = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  return [AmountOfCoin (mkCoin cs tn) (Amount a) | (cs,tns) <- AssocMap.toList value, (tn,a) <- AssocMap.toList tns]
 
 clearState :: ClearStateParams -> Contract (History (Either Text UserContractState)) s Text ()
 clearState ClearStateParams{..} = do
@@ -763,17 +760,19 @@ userEndpoints us =
       (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
       Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
     f _ getGuid g c = do
-
-      e <- runError $ do
-        p <- endpoint @l
-        (getGuid p,) <$> c us p
+      p' <- runError @_ @_ @Text $ endpoint @l
+      let p = case p' of
+            Right x -> x
+            Left _  -> Prelude.undefined
+      e <- runError @_ @_ @Text $ do
+        c us p
 
       case e of
         Left err -> do
           logInfo @Text ("Error during calling endpoint: " <> err)
-          tell $ WH.append "ERROR" . Left $ err
-        Right (guid,a) | symbolVal (Proxy @l) GHC.Classes./= "clearState" ->
-          tell $ WH.append guid . Right . g $ a
+          tell $ WH.append (getGuid p) . Left $ err
+        Right a | symbolVal (Proxy @l) GHC.Classes./= "clearState" ->
+          tell $ WH.append (getGuid p) . Right . g $ a
         _ -> return ()
 
     stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()

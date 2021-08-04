@@ -1,30 +1,33 @@
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
+{-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleContexts           #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module UniswapJsonApi.Types where
+module UniswapJsonApi.Types
+  where
 
-import           Control.Monad.Except     (ExceptT, MonadError)
-import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import           Data.Aeson
-import           Data.ByteString          (ByteString)
-import           Data.List                (find)
-import           Data.Text                (Text)
-import           Data.UUID                (UUID)
-import           GHC.Generics
-import           Network.Wai.Handler.Warp (HostPreference)
-import           Servant                  (ServerError)
+import Control.DeepSeq
+import Control.Monad.Except     (ExceptT, MonadError)
+import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import Data.Aeson               (FromJSON, ToJSON, Value)
+import Data.ByteString          (ByteString)
+import Data.List                (find)
+import Data.Text                (Text)
+import Data.UUID                (UUID)
+import GHC.Generics
+import Network.Wai.Handler.Warp (HostPreference)
+import Servant                  (ServerError)
 
 type Instance = Text
 
-type OperationId = Text
+type HistoryId = Text
 
-data History a = History [(OperationId, a)] [OperationId]
+data History a = History [(HistoryId, a)] [HistoryId]
   deriving (Show, Generic, FromJSON, ToJSON)
 
-lookupHistory :: OperationId -> History a -> Maybe a
-lookupHistory opId (History hs _) = snd <$> find (\h' -> opId == fst h') (reverse hs)
+lookupHistory :: HistoryId -> History a -> Maybe a
+lookupHistory hid (History hs _) = snd <$> find (\h' -> hid == fst h') (reverse hs)
 
 data UniswapStatusResponse = UniswapStatusResponse
   { cicCurrentState :: UniswapCurrentState,
@@ -34,6 +37,7 @@ data UniswapStatusResponse = UniswapStatusResponse
   }
   deriving (Generic, Show, FromJSON, ToJSON)
 
+instance NFData UniswapStatusResponse where rnf = rwhnf
 data UniswapHook = UniswapHook
   { rqID      :: Integer,
     itID      :: Integer,
@@ -42,7 +46,7 @@ data UniswapHook = UniswapHook
   deriving (Show, Generic, FromJSON, ToJSON)
 
 data UniswapCurrentState = UniswapCurrentState
-  { observableState :: History (Either Text UniswapDefinition),
+  { observableState :: History UniswapMethodResult,
     hooks           :: [UniswapHook],
     err             :: Maybe Text,
     logs            :: [UniswapLog],
@@ -55,8 +59,19 @@ data UniswapLog = UniswapLog
     _logLevel          :: Text
   } deriving (Show, Generic, FromJSON, ToJSON)
 
-data UniswapDefinition = UniswapDefinition
+
+data UniswapDefinition = UniswapDefiniotion
   { contents :: Value,
+    tag      :: Text
+
+  } deriving (Show, Generic, FromJSON, ToJSON)
+
+-- | add ADT to handle all possible types in Result
+type UniswapMethodResult = Either Text UniswapSuccessMethodResult
+
+
+data UniswapSuccessMethodResult = UniswapSuccessMethodResult
+  { contents :: Maybe Value,
     tag      :: Text
   }
   deriving (Show, Generic, FromJSON, ToJSON)
@@ -72,7 +87,6 @@ newtype UniswapWallet = UniswapWallet
   deriving (Show, Generic, FromJSON, ToJSON)
 
 
-
 data PabConfig = MkPabConfig
   { pabUrl  :: String
   , pabPort :: Int
@@ -83,13 +97,4 @@ data AppContext = MkAppContext
   , port :: Int
   } deriving (Show)
 
-newtype (MonadIO m) => AppM m a = AppM
-  { unAppM :: ReaderT AppContext (ExceptT ServerError m) a
-  } deriving newtype ( Functor
-             , Applicative
-             , Monad
-             , MonadReader AppContext
-             , MonadError ServerError
-             , MonadIO
-             )
 

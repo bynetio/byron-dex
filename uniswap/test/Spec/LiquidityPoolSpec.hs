@@ -6,12 +6,12 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 module Spec.LiquidityPoolSpec where
 
-import           Data.String
-import           Ledger.Value
-import           Test.Tasty
-import           Test.Tasty.HUnit
-import           Test.Tasty.QuickCheck
-import           Uniswap.Types
+import Data.String
+import Ledger.Value
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
+import Uniswap.Types
 
 main :: IO ()
 main = defaultMain tests

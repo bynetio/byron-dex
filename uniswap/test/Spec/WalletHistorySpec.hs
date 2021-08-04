@@ -1,9 +1,10 @@
 module Spec.WalletHistorySpec (tests) where
 
-import           Data.Text                    (Text, pack)
-import           Test.Tasty
-import           Test.Tasty.QuickCheck
-import           Uniswap.Common.WalletHistory
+import Data.Text                    (Text, pack)
+import Test.Tasty
+import Test.Tasty.HUnit
+import Test.Tasty.QuickCheck
+import Uniswap.Common.WalletHistory
 
 nonEmptyText :: Gen Text
 nonEmptyText = pack <$> listOf1 arbitrary

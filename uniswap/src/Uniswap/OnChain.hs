@@ -21,10 +21,8 @@ import           Ledger.Constraints.TxConstraints as Constraints
 import           Ledger.Value                     (AssetClass (..), symbols)
 import qualified PlutusTx
 import           PlutusTx.Prelude
-import           Uniswap.Pool                     (calculateAdditionalLiquidity,
-                                                   calculateInitialLiquidity,
-                                                   calculateRemoval, checkSwap,
-                                                   lpTicker)
+import           Uniswap.Pool                     (calculateAdditionalLiquidity, calculateInitialLiquidity,
+                                                   calculateRemoval, checkSwap, lpTicker)
 import           Uniswap.Types
 
 {-# INLINEABLE findOwnInput' #-}

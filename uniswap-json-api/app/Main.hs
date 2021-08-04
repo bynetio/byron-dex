@@ -1,17 +1,21 @@
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
-module Main where
+{-# LANGUAGE TypeApplications  #-}
+module Main
+  where
 
-import           Control.Exception    (Exception, throwIO)
-import           System.Environment   (lookupEnv, setEnv)
-import           UniswapJsonApi       (runApp)
-import           UniswapJsonApi.Types
+import Control.Exception  (Exception, throwIO)
+import System.Environment (lookupEnv, setEnv)
+import Uniswap.App
+import Uniswap.Types
 
 data NoConfigFoundException = NoConfigFoundException deriving (Show, Exception)
 
-
 mkAppContext :: IO AppContext
 mkAppContext = do
+  setEnv "APP_PORT" "3000"
+  setEnv "APP_API_URL" "localhost"
+  setEnv "APP_API_PORT" "8080" --FIXME remove this
   port    <- lookupEnv "APP_PORT"
   pabUrl  <- lookupEnv "APP_API_URL"
   pabPort <- lookupEnv "APP_API_PORT"

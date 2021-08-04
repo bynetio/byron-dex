@@ -10,14 +10,25 @@ common shared-properties
 
 library
   hs-source-dirs:     src
-  exposed-modules:    UniswapJsonApi
-                    , UniswapJsonApi.Logic
-                    , UniswapJsonApi.Client
-                    , UniswapJsonApi.Types
+  exposed-modules:    Uniswap.PAB.Types
+                    , Uniswap.PAB
+                    , Uniswap.API
+                    , Uniswap.App
+                    , Uniswap.Types
+                    , Uniswap.LiquidityPool.API
+                    , Uniswap.LiquidityPool.Types
+                    , Uniswap.Common.Utils
+                    , Uniswap.Common.ServantClient
+                    , Uniswap.Common.Logger
+                    , Uniswap.Common.NextId
+                    , Uniswap.Common.AppError
   build-depends:      base
                     , aeson
                     , bytestring
                     , either
+                    , deriving-aeson
+                    , co-log
+                    , PyF
                     , http-client
                     , http-client-tls
                     , mtl
@@ -28,7 +39,15 @@ library
                     , text
                     , uuid
                     , warp
+                    , freer-simple
+                    , deepseq
+                    , exceptions
+                    , either
+                    , wai
+                    , wai-cors
+
   import:             shared-properties
+  default-extensions: ScopedTypeVariables FlexibleContexts GADTs PolyKinds TemplateHaskell TypeApplications DataKinds LambdaCase RankNTypes TypeOperators TypeFamilies
 
 executable uniswap-json-api
   main-is:            Main.hs

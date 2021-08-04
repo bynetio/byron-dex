@@ -11,11 +11,10 @@ module Uniswap.Pool
   )
 where
 
-import           Ledger.Value     (TokenName (..), unAssetClass,
-                                   unCurrencySymbol)
-import           PlutusTx.Prelude
-import           PlutusTx.Sqrt
-import           Uniswap.Types
+import Ledger.Value     (TokenName (..), unAssetClass, unCurrencySymbol)
+import PlutusTx.Prelude
+import PlutusTx.Sqrt
+import Uniswap.Types
 
 {-# INLINEABLE calculateInitialLiquidity #-}
 
