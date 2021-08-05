@@ -96,7 +96,7 @@ iswapTrace = do
         void $ waitNSlots 5
         maybePreview <- WH.lookup "guid2" <$> observableState h4
         case maybePreview of
-          Just (Right (ISwapPreview ((ca,a),(cb,b)))) ->
+          Just (Right (ISwapPreviewResult (ISwapPreviewResultData ca a cb b))) ->
             void $ callEndpoint @"iSwap" h4 (WithHistoryId "" $ IndirectSwapParams ca cb a b 0)
           _ ->
             return ()
@@ -135,7 +135,7 @@ slippageTrace = do
 
         maybePreview <- WH.lookup "guid4" <$> observableState h3
         case maybePreview of
-          Just (Right (ISwapPreview ((ca,a),(cb,b)))) ->
+          Just (Right (ISwapPreviewResult (ISwapPreviewResultData ca a cb b))) ->
             void $ callEndpoint @"iSwap" h3 (WithHistoryId "" $ IndirectSwapParams ca cb a b 5)
           _ ->
             return ()
@@ -194,14 +194,14 @@ mixedTrace = do
         callEndpoint @"swapPreview" h3 (WithHistoryId "guid7" $ SwapPreviewParams customCoin1 customCoin2 fee 500)
         maybePreview <- getContractState' "guid7" h3
         logInfo $ "swapPreview: " ++ show maybePreview
-        let Right (SwapPreview (_, (_, amount), _)) = maybePreview
+        let Right (SwapPreviewResult (SwapPreviewResultData _ _ _ amount _)) = maybePreview
         callEndpoint @"swap" h3 (WithHistoryId "" $ SwapParams customCoin1 customCoin2 fee 500 amount 1)
         void $ waitNSlots 10
         callEndpoint @"iSwapPreview" h3 (WithHistoryId "guid8" $ ISwapPreviewParams customCoin1 customCoin3 600)
         void $ waitNSlots 10
         maybeISwapPreview <- getContractState' "guid8" h3
         logInfo $ "iSwapPreview: " ++ show maybeISwapPreview
-        let Right (ISwapPreview (_, (_, amount'))) = maybeISwapPreview
+        let Right (ISwapPreviewResult (ISwapPreviewResultData _ _ _ amount')) = maybeISwapPreview
         callEndpoint @"iSwap" h3 (WithHistoryId "" $ IndirectSwapParams customCoin1 customCoin3 (Amount 600) amount' 1)
         void $ callEndpoint @"add" h4 (WithHistoryId "" $ AddParams customCoin2 customCoin1 fee 1000 1000)
         void $ waitNSlots 10

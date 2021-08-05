@@ -88,12 +88,6 @@ type UniswapOwnerSchema =
 type UniswapOwnerSchema' =
     Endpoint "start" (WithHistoryId CurrencySymbol)
 
-data WithHistoryId a = WithHistoryId
-  {
-    historyId :: HistoryId,
-    content   :: a
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
 -- | Schema for the endpoints for users of Uniswap.
 type UniswapUserSchema =
     Endpoint "create" (WithHistoryId CreateParams)
@@ -109,15 +103,16 @@ type UniswapUserSchema =
     .\/ Endpoint "stop" (WithHistoryId ())
     .\/ Endpoint "clearState" (WithHistoryId ClearStateParams)
 
+
 -- | Type of the Uniswap user contract state.
 data UserContractState
-  = Pools [LiquidityPoolWithCoins]
-  | Funds [AmountOfCoin A]
+  = AvailablePools [LiquidityPoolWithCoins]
+  | AvailableFunds [AmountOfCoin A]
   | Created
   | Swapped
-  | SwapPreview ((Coin A, Amount A), (Coin B, Amount B), Fee)
+  | SwapPreviewResult SwapPreviewResultData
   | ISwapped
-  | ISwapPreview ((Coin A, Amount A), (Coin B, Amount B))
+  | ISwapPreviewResult ISwapPreviewResultData
   | Added
   | Removed
   | Closed
@@ -185,122 +180,6 @@ liquidityCoin ::
   Fee ->
   Coin Liquidity
 liquidityCoin cs coinA coinB fee = mkCoin (liquidityCurrency $ uniswap cs) $ lpTicker $ liquidityPool (coinA, coinB) fee
-
--- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
-data CreateParams = CreateParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA   :: Coin A,
-    -- | The other 'Coin'.
-    coinB   :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee     :: Fee,
-    -- | Amount of liquidity for the first 'Coin'.
-    amountA :: Amount A,
-    -- | Amount of liquidity for the second 'Coin'.
-    amountB :: Amount B
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
--- One of the provided amounts must be positive, the other must be zero.
-data SwapParams = SwapParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA    :: Coin A,
-    -- | The other 'Coin'.
-    coinB    :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee      :: Fee,
-    -- | The amount the first 'Coin' that should be swapped.
-    amount   :: Amount A,
-    -- | The expected amount of swaped 'Coin B' (quoted amount)
-    result   :: Amount B,
-    -- | The expected % difference between quoted and executed prices.
-    slippage :: Integer
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
-data SwapPreviewParams = SwapPreviewParams
-  {
-    coinA  :: Coin A,
-    coinB  :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee    :: Fee,
-    amount :: Amount A
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
-data IndirectSwapParams = IndirectSwapParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA    :: Coin A,
-    -- | The other 'Coin'.
-    coinB    :: Coin B,
-    -- | The amount of the first 'Coin' that should be swapped.
-    amount   :: Amount A,
-    result   :: Amount B,
-    slippage :: Integer
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
-data ISwapPreviewParams = ISwapPreviewParams
-  {
-    coinA  :: Coin A,
-    coinB  :: Coin B,
-    amount :: Amount A
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @close@-endpoint, which closes a liquidity pool.
-data CloseParams = CloseParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee   :: Fee
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
-data RemoveParams = RemoveParams
-  {
-     -- | One 'Coin' of the liquidity pair.
-    coinA :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee   :: Fee,
-    -- | The amount of liquidity tokens to burn in exchange for liquidity from the pool.
-    diff  :: Amount Liquidity
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
-data AddParams = AddParams
-  {
-     -- | One 'Coin' of the liquidity pair.
-    coinA   :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB   :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee     :: Fee,
-    -- | The amount of coins of the first kind to add to the pool.
-    amountA :: Amount A,
-    -- | The amount of coins of the second kind to add to the pool.
-    amountB :: Amount B
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
--- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
-newtype ClearStateParams = ClearStateParams
-  {
-    -- | Identifier of Operation that should be removed from state
-    removeId :: HistoryId
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
 
 -- | Creates a Uniswap "factory". This factory will keep track of the existing liquidity pools and enforce that there will be at most one liquidity pool
 -- for any pair of tokens at any given time.
@@ -476,14 +355,14 @@ add us AddParams {..} = do
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
-swapPreview :: Uniswap -> SwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B), Fee)
+swapPreview :: Uniswap -> SwapPreviewParams -> Contract w s Text SwapPreviewResultData
 swapPreview us SwapPreviewParams {..} = do
   (_, (_, o, _, _)) <- findUniswfactoryAndPool us coinA coinB fee
   let outVal = txOutValue $ txOutTxOut o
   let oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
   let outB = Amount $ findSwap oldA oldB amount fee
-  return ((coinA, amount), (coinB, outB), fee)
+  return $ SwapPreviewResultData coinA amount coinB outB fee
 
 -- | Uses a liquidity pool two swap one sort of coins in the pool against the other.
 swap :: Uniswap -> SwapParams -> Contract w s Text ()
@@ -520,13 +399,13 @@ swap us SwapParams {..} = do
   ledgerTx <- submitTxConstraintsWith lookups tx
   logInfo $ "swapped with: " ++ show lp
 
-indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ((Coin A, Amount A), (Coin B, Amount B))
+indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ISwapPreviewResultData
 indirectSwapPreview us ISwapPreviewParams {..} = do
   abstractPools <- uniquePools us
   (_, outB) <- case findBestSwap abstractPools (unCoin coinA, unCoin coinB) (unAmount amount) of
     Nothing -> throwError "No path found"
     Just p  -> return p
-  return ((coinA, amount), (coinB, Amount outB))
+  return $ ISwapPreviewResultData coinA amount coinB (Amount outB)
 
 uniquePools :: Uniswap -> Contract w s Text (Map.Map (AssetClass, AssetClass, Fee) (Integer, Integer))
 uniquePools us = do
@@ -738,14 +617,14 @@ userEndpoints us =
   stop
     `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId{..} -> create us content)
                    `select` f (Proxy @"swap") historyId (const Swapped) (\us WithHistoryId{..} -> swap us content)
-                   `select` f (Proxy @"swapPreview") historyId SwapPreview (\us WithHistoryId{..} -> swapPreview us content)
+                   `select` f (Proxy @"swapPreview") historyId SwapPreviewResult (\us WithHistoryId{..} -> swapPreview us content)
                    `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId{..} -> indirectSwap us content)
-                   `select` f (Proxy @"iSwapPreview") historyId ISwapPreview (\us WithHistoryId{..} -> indirectSwapPreview us content)
+                   `select` f (Proxy @"iSwapPreview") historyId ISwapPreviewResult (\us WithHistoryId{..} -> indirectSwapPreview us content)
                    `select` f (Proxy @"close") historyId (const Closed) (\us WithHistoryId{..} -> close us content)
                    `select` f (Proxy @"remove") historyId (const Removed) (\us WithHistoryId{..} -> remove us content)
                    `select` f (Proxy @"add") historyId (const Added) (\us WithHistoryId{..} -> add us content)
-                   `select` f (Proxy @"pools") historyId Pools (\us _ -> pools us)
-                   `select` f (Proxy @"funds") historyId Funds (\_us _ -> funds)
+                   `select` f (Proxy @"pools") historyId AvailablePools (\us _ -> pools us)
+                   `select` f (Proxy @"funds") historyId AvailableFunds (\_us _ -> funds)
                    `select` f (Proxy @"clearState") historyId (const Cleared) (\us WithHistoryId{..} -> clearState content)
                )
                  >> userEndpoints us

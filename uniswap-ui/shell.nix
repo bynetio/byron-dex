@@ -26,5 +26,6 @@ pkgs.stdenv.mkDerivation {
     pursPkgs.spago
     pursPkgs.zephyr
     pkgs.nodejs-14_x
+    pkgs.haskellPackages.servant-purescript
   ];
 }
