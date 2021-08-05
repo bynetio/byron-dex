@@ -126,7 +126,6 @@ pools
   :: (LastMember Handler effs, Members LiquidityPoolEffs effs)
   => Text
   -> Eff effs Value
-pools uid =
-  PAB.pools uid
+pools = PAB.pools
 
 

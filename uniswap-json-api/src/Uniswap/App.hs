@@ -4,27 +4,26 @@ module Uniswap.App
   ( runApp )
   where
 
-import Control.Monad.Except         (ExceptT (..))
-import Control.Monad.Freer          (Eff, runM)
-import Control.Monad.Freer.Error    (runError)
-import Control.Monad.IO.Class       (liftIO)
-import Data.Aeson                   (encode)
-import Data.Text                    (Text)
-import Network.Wai                  (Middleware, Response)
-import Network.Wai.Handler.Warp     (run)
-import Network.Wai.Middleware.Cors
-import Servant
-import Servant                      (Application, Context, Handler (..), Proxy (..), hoistServerWithContext,
-                                     serveWithContext)
-import Servant.Client.Streaming     (ClientError)
-import Uniswap.API                  (API, api)
-import Uniswap.Common.AppError      (AppError, Err)
-import Uniswap.Common.Logger        (Logger, runColog)
-import Uniswap.Common.NextId        (NextId, runNextId)
-import Uniswap.Common.ServantClient (ServantClient, runServantClientUrl)
-import Uniswap.Common.Utils         (Time, runTime)
-import Uniswap.PAB                  (UniswapPab, runPab)
-import Uniswap.Types                (AppContext (..), PabConfig (..))
+import           Control.Monad.Except         (ExceptT (..))
+import           Control.Monad.Freer          (Eff, runM)
+import           Control.Monad.Freer.Error    (runError)
+import           Control.Monad.IO.Class       (liftIO)
+import           Data.Aeson                   (encode)
+import           Data.Text                    (Text)
+import           Network.Wai                  (Middleware, Response)
+import           Network.Wai.Handler.Warp     (run)
+import           Network.Wai.Middleware.Cors
+import           Servant
+import           Servant.Client.Streaming     (ClientError)
+import           Uniswap.API                  (API, api)
+import           Uniswap.Common.AppError      (AppError, Err)
+import           Uniswap.Common.Logger        (Logger, runColog)
+import           Uniswap.Common.NextId        (NextId, runNextId)
+import           Uniswap.Common.ServantClient (ServantClient,
+                                               runServantClientUrl)
+import           Uniswap.Common.Utils         (Time, runTime)
+import           Uniswap.PAB                  (UniswapPab, runPab)
+import           Uniswap.Types                (AppContext (..), PabConfig (..))
 
 runApp :: AppContext -> IO ()
 runApp ctx = do

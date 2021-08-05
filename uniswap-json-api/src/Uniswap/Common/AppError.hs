@@ -1,4 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Uniswap.Common.AppError
   where
 

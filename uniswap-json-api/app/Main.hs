@@ -1,13 +1,12 @@
 {-# LANGUAGE DeriveAnyClass    #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeApplications  #-}
 module Main
   where
 
-import Control.Exception  (Exception, throwIO)
-import System.Environment (lookupEnv, setEnv)
-import Uniswap.App
-import Uniswap.Types
+import           Control.Exception  (Exception, throwIO)
+import           System.Environment (lookupEnv, setEnv)
+import           Uniswap.App
+import           Uniswap.Types
 
 data NoConfigFoundException = NoConfigFoundException deriving (Show, Exception)
 
