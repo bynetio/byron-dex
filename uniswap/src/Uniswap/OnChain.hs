@@ -11,7 +11,7 @@
 
 module Uniswap.OnChain
   ( mkUniswapValidator,
-    validateLiquidityForging,
+    validateLiquidityMinting,
   )
 where
 
@@ -21,8 +21,10 @@ import           Ledger.Constraints.TxConstraints as Constraints
 import           Ledger.Value                     (AssetClass (..), symbols)
 import qualified PlutusTx
 import           PlutusTx.Prelude
-import           Uniswap.Pool                     (calculateAdditionalLiquidity, calculateInitialLiquidity,
-                                                   calculateRemoval, checkSwap, lpTicker)
+import           Uniswap.Pool                     (calculateAdditionalLiquidity,
+                                                   calculateInitialLiquidity,
+                                                   calculateRemoval, checkSwap,
+                                                   lpTicker)
 import           Uniswap.Types
 
 {-# INLINEABLE findOwnInput' #-}
@@ -261,7 +263,7 @@ validateAdd c lp liquidity ctx =
 {-# INLINEABLE findPoolDatum #-}
 findPoolDatum :: TxInfo -> DatumHash -> (LiquidityPool, Amount Liquidity)
 findPoolDatum info h = case findDatum h info of
-  Just (Datum d) -> case PlutusTx.fromData d of
+  Just (Datum d) -> case PlutusTx.fromBuiltinData d of
     Just (Pool lp a) -> (lp, a)
     _                -> traceError "error decoding data"
   _ -> traceError "pool input datum not found"
@@ -282,9 +284,9 @@ mkUniswapValidator _ c (Pool lp a) Remove ctx = validateRemove c lp a ctx
 mkUniswapValidator _ c (Pool lp a) Add ctx = validateAdd c lp a ctx
 mkUniswapValidator _ _ _ _ _ = False
 
-{-# INLINEABLE validateLiquidityForging #-}
-validateLiquidityForging :: Uniswap -> TokenName -> ScriptContext -> Bool
-validateLiquidityForging Uniswap {..} tn ctx =
+{-# INLINEABLE validateLiquidityMinting #-}
+validateLiquidityMinting :: Uniswap -> TokenName -> () -> ScriptContext -> Bool
+validateLiquidityMinting Uniswap {..} tn _ ctx =
   case [ i
          | i <- txInfoInputs $ scriptContextTxInfo ctx,
            let v = valueWithin i,

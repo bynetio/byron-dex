@@ -117,4 +117,5 @@ executable uniswap-pab
     text -any,
     plutus-use-cases -any,
     plutus-ledger-api -any,
-    bytestring
+    bytestring,
+    data-default

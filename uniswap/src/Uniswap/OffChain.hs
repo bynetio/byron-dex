@@ -73,7 +73,7 @@ import           Uniswap.Common.WalletHistory (History, HistoryId)
 import qualified Uniswap.Common.WalletHistory as WH
 import           Uniswap.IndirectSwaps
 import           Uniswap.OnChain              (mkUniswapValidator,
-                                               validateLiquidityForging)
+                                               validateLiquidityMinting)
 import           Uniswap.Pool
 import           Uniswap.Types
 data Uniswapping
@@ -148,10 +148,10 @@ uniswaddress = Ledger.scriptAddress . uniswapScript
 uniswap :: CurrencySymbol -> Uniswap
 uniswap cs = Uniswap $ mkCoin cs uniswapTokenName
 
-liquidityPolicy :: Uniswap -> MonetaryPolicy
+liquidityPolicy :: Uniswap -> MintingPolicy
 liquidityPolicy us =
-  mkMonetaryPolicyScript $
-    $$(PlutusTx.compile [||\u t -> Scripts.wrapMonetaryPolicy (validateLiquidityForging u t)||])
+  mkMintingPolicyScript $
+    $$(PlutusTx.compile [||\u t -> Scripts.wrapMintingPolicy (validateLiquidityMinting u t)||])
       `PlutusTx.applyCode` PlutusTx.liftCode us
       `PlutusTx.applyCode` PlutusTx.liftCode poolStateTokenName
 
@@ -194,7 +194,7 @@ start mcs = do
     Nothing ->
       fmap Currency.currencySymbol $
         mapError (pack . show @Currency.CurrencyError) $
-          Currency.forgeContract pkh [(uniswapTokenName, 1)]
+          Currency.mintContract pkh [(uniswapTokenName, 1)]
     Just jcs -> return jcs
   let c = mkCoin cs uniswapTokenName
       us = uniswap cs -- NFT token for a given uniswap instance
@@ -225,14 +225,14 @@ create us CreateParams {..} = do
       lookups =
         Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
-          <> Constraints.monetaryPolicy (liquidityPolicy us)
+          <> Constraints.mintingPolicy (liquidityPolicy us)
           <> Constraints.unspentOutputs (Map.singleton oref o)
 
       tx =
         Constraints.mustPayToTheScript usDat1 usVal
           <> Constraints.mustPayToTheScript usDat2 lpVal
-          <> Constraints.mustForgeValue (unitValue psC <> valueOf lC liquidity)
-          <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData $ Create lp)
+          <> Constraints.mustMintValue (unitValue psC <> valueOf lC liquidity)
+          <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Create lp)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
 
@@ -252,21 +252,21 @@ close us CloseParams {..} = do
       usVal = unitValue usC
       psVal = unitValue psC
       lVal = valueOf lC liquidity
-      redeemer = Redeemer $ PlutusTx.toData Close
+      redeemer = Redeemer $ PlutusTx.toBuiltinData Close
 
       lookups =
         Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
-          <> Constraints.monetaryPolicy (liquidityPolicy us)
+          <> Constraints.mintingPolicy (liquidityPolicy us)
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.unspentOutputs (Map.singleton oref1 o1 <> Map.singleton oref2 o2)
 
       tx =
         Constraints.mustPayToTheScript usDat usVal
-          <> Constraints.mustForgeValue (negate $ psVal <> lVal)
+          <> Constraints.mustMintValue (negate $ psVal <> lVal)
           <> Constraints.mustSpendScriptOutput oref1 redeemer
           <> Constraints.mustSpendScriptOutput oref2 redeemer
-          <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toData $ Pool lp liquidity)
+          <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData $ Pool lp liquidity)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
 
@@ -290,18 +290,18 @@ remove us RemoveParams {..} = do
       inB = amountOf inVal coinB
       (outA, outB) = calculateRemoval inA inB liquidity diff
       val = psVal <> valueOf coinA outA <> valueOf coinB outB
-      redeemer = Redeemer $ PlutusTx.toData Remove
+      redeemer = Redeemer $ PlutusTx.toBuiltinData Remove
 
       lookups =
         Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
-          <> Constraints.monetaryPolicy (liquidityPolicy us)
+          <> Constraints.mintingPolicy (liquidityPolicy us)
           <> Constraints.unspentOutputs (Map.singleton oref o)
           <> Constraints.ownPubKeyHash pkh
 
       tx =
         Constraints.mustPayToTheScript dat val
-          <> Constraints.mustForgeValue (negate lVal)
+          <> Constraints.mustMintValue (negate lVal)
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   ledgerTx <- submitTxConstraintsWith lookups tx
@@ -333,18 +333,18 @@ add us AddParams {..} = do
       psVal = unitValue psC
       lVal = valueOf lC delL
       val = psVal <> valueOf coinA newA <> valueOf coinB newB
-      redeemer = Redeemer $ PlutusTx.toData Add
+      redeemer = Redeemer $ PlutusTx.toBuiltinData Add
 
       lookups =
         Constraints.typedValidatorLookups usInst
           <> Constraints.otherScript usScript
-          <> Constraints.monetaryPolicy (liquidityPolicy us)
+          <> Constraints.mintingPolicy (liquidityPolicy us)
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.unspentOutputs (Map.singleton oref o)
 
       tx =
         Constraints.mustPayToTheScript dat val
-          <> Constraints.mustForgeValue lVal
+          <> Constraints.mustMintValue lVal
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   logInfo @String $ printf "val = %s, inVal = %s" (show val) (show inVal)
@@ -393,7 +393,7 @@ swap us SwapParams {..} = do
           <> Constraints.ownPubKeyHash pkh
 
       tx =
-        Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap)
+        Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap)
           <> Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   ledgerTx <- submitTxConstraintsWith lookups tx
@@ -467,12 +467,12 @@ indirectSwap us IndirectSwapParams {..} = do
                     (newA, newB) = (oldA + unAmount amount, oldB - findSwap (Amount oldA) (Amount oldB) amount fee)
 
                     val = valueOf (Coin a) (Amount newA) <> valueOf (Coin b) (Amount newB) <> unitValue (poolStateCoin us)
-                 in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap)
+                 in Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap)
                       <> Constraints.mustPayToTheScript (Pool pool liquidity) val
             )
             moneyToPay
 
-  --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toData Swap) <>
+  --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap) <>
   --           Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   void $ submitTxConstraintsWith lookups tx
@@ -525,7 +525,7 @@ getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
   Nothing -> throwError "datumHash not found"
   Just h -> case Map.lookup h $ txData $ txOutTxTx o of
     Nothing -> throwError "datum not found"
-    Just (Datum e) -> case PlutusTx.fromData e of
+    Just (Datum e) -> case PlutusTx.fromBuiltinData e of
       Nothing -> throwError "datum has wrong type"
       Just d  -> return d
 
@@ -582,25 +582,27 @@ findUniswfactoryAndPool us coinA coinB fee = do
         )
     _ -> throwError "liquidity pool not found"
 
-ownerEndpoint :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
-ownerEndpoint = startHandler >> ownerEndpoint
+ownerEndpoint :: Promise (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
+ownerEndpoint = startHandler <> ownerEndpoint
   where
-    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
-    startHandler = do
-      e <- runError (endpoint @"start" >>= \(WithHistoryId guid _) -> (guid,) <$> start Nothing)
-      case e of
-        Left err           -> tell $ WH.append "ERROR" $ Left err
-        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
+    startHandler :: Promise (History (Either Text Uniswap)) UniswapOwnerSchema Void ()
+    startHandler = handleEndpoint @"start" @_ @_ @_ @Text (\case
+      (Right(WithHistoryId guid _)) -> do
+          e <- runError (start Nothing)
+          case e of
+            Left err       -> tell $ WH.append guid $ Left err
+            Right uniswap' -> tell $ WH.append guid $ Right uniswap')
 
-ownerEndpoint' :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
-ownerEndpoint' = startHandler >> ownerEndpoint'
+ownerEndpoint' :: Promise (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+ownerEndpoint' = startHandler <> ownerEndpoint'
   where
-    startHandler :: Contract (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
-    startHandler = do
-      e <- runError (endpoint @"start" >>= \(WithHistoryId guid currency) -> (guid,) <$> start (Just currency))
-      case e of
-        Left err           -> tell $ WH.append "ERROR" $ Left err
-        Right (a,uniswap') -> tell $ WH.append a $ Right uniswap'
+    startHandler :: Promise (History (Either Text Uniswap)) UniswapOwnerSchema' Void ()
+    startHandler = handleEndpoint @"start" @_ @_ @_ @Text (\case
+      (Right(WithHistoryId guid currency)) -> do
+          e <- runError (start (Just currency))
+          case e of
+            Left err       -> tell $ WH.append guid $ Left err
+            Right uniswap' -> tell $ WH.append guid $ Right uniswap')
 
 -- | Provides the following endpoints for users of a Uniswap instance:
 --
@@ -612,7 +614,7 @@ ownerEndpoint' = startHandler >> ownerEndpoint'
 --      [@pools@]: Finds all liquidity pools and their liquidity belonging to the Uniswap instance. This merely inspects the blockchain and does not issue any transactions.
 --      [@funds@]: Gets the caller's funds. This merely inspects the blockchain and does not issue any transactions.
 --      [@stop@]: Stops the contract.
-userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
+userEndpoints :: Uniswap -> Promise (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
   stop
     `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId{..} -> create us content)
@@ -627,7 +629,7 @@ userEndpoints us =
                    `select` f (Proxy @"funds") historyId AvailableFunds (\_us _ -> funds)
                    `select` f (Proxy @"clearState") historyId (const Cleared) (\us WithHistoryId{..} -> clearState content)
                )
-                 >> userEndpoints us
+                 <> userEndpoints us
              )
   where
     f ::
@@ -637,26 +639,21 @@ userEndpoints us =
       (p -> Text) ->
       (a -> UserContractState) ->
       (Uniswap -> p -> Contract (History (Either Text UserContractState)) UniswapUserSchema Text a) ->
-      Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
-    f _ getGuid g c = do
-      p' <- runError @_ @_ @Text $ endpoint @l
-      let p = case p' of
-            Right x -> x
-            Left _  -> Prelude.undefined
-      e <- runError @_ @_ @Text $ do
-        c us p
+      Promise (History (Either Text UserContractState)) UniswapUserSchema Void ()
+    f _ getGuid g c = handleEndpoint @l $ \p -> do
+      let guid = either (const "ERROR") getGuid p
+      e <- either (pure . Left) (runError @_ @_ @Text . c us) p
 
       case e of
         Left err -> do
           logInfo @Text ("Error during calling endpoint: " <> err)
-          tell $ WH.append (getGuid p) . Left $ err
+          tell $ WH.append guid . Left $ err
         Right a | symbolVal (Proxy @l) GHC.Classes./= "clearState" ->
-          tell $ WH.append (getGuid p) . Right . g $ a
+          tell $ WH.append guid . Right . g $ a
         _ -> return ()
 
-    stop :: Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
-    stop = do
-      e <- runError $ endpoint @"stop"
+    stop :: Promise (History (Either Text UserContractState)) UniswapUserSchema Void ()
+    stop = handleEndpoint @"stop" $ \e -> do
       tell $ case e of
         Left err                    -> WH.append "ERROR" $ Left err
         Right (WithHistoryId hId _) -> WH.append hId $ Right Stopped

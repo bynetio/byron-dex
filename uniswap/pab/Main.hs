@@ -8,18 +8,22 @@
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE TypeOperators      #-}
 {-# LANGUAGE ViewPatterns       #-}
 module Main (main) where
 
 import           Control.Monad                       (forM, void)
-import           Control.Monad.Freer                 (Eff, Member, interpret, type (~>))
+import           Control.Monad.Freer                 (Eff, Member, interpret,
+                                                      type (~>))
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON (..), Options (..), Result (..), ToJSON (..),
-                                                      defaultOptions, fromJSON, genericParseJSON,
+import           Data.Aeson                          (FromJSON (..),
+                                                      Options (..), Result (..),
+                                                      ToJSON (..),
+                                                      defaultOptions, fromJSON,
+                                                      genericParseJSON,
                                                       genericToJSON)
+import           Data.Default
 import qualified Data.Map                            as Map
 import qualified Data.Monoid                         as Monoid
 import qualified Data.Semigroup                      as Semigroup
@@ -27,13 +31,16 @@ import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import           GHC.Generics                        (Generic)
 import           Ledger.Ada                          (adaSymbol, adaToken)
-import           Plutus.Contract                     (ContractError, Empty)
+import           Plutus.Contract                     (ContractError, Empty,
+                                                      awaitPromise)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
-import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..), type (.\\))
+import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
+                                                      type (.\\))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
-import           Plutus.PAB.Simulator                (SimulatorEffectHandlers, logString)
+import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
+                                                      logString)
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
@@ -91,24 +98,17 @@ data UniswapContracts
 instance Pretty UniswapContracts where
   pretty = viaShow
 
-handleStarterContract ::
-  ( Member (Error PABError) effs,
-    Member (LogMsg (PABMultiAgentMsg (Builtin UniswapContracts))) effs
-  ) =>
-  ContractEffect (Builtin UniswapContracts)
-    ~> Eff effs
-handleStarterContract = Builtin.handleBuiltin getSchema getContract
-  where
+instance Builtin.HasDefinitions UniswapContracts where
+    getDefinitions = [UniswapInit, UniswapOwnerContract]
     getSchema = \case
       UniswapOwnerContract -> Builtin.endpointsToSchemas @Uniswap.UniswapOwnerSchema
       UniswapUserContract _ -> Builtin.endpointsToSchemas @Uniswap.UniswapUserSchema
       UniswapInit -> Builtin.endpointsToSchemas @Empty
     getContract = \case
-      UniswapOwnerContract  -> SomeBuiltin Uniswap.ownerEndpoint
-      UniswapUserContract u -> SomeBuiltin (Uniswap.userEndpoints u)
+      UniswapOwnerContract  -> SomeBuiltin (awaitPromise Uniswap.ownerEndpoint)
+      UniswapUserContract u -> SomeBuiltin (awaitPromise (Uniswap.userEndpoints u))
       UniswapInit           -> SomeBuiltin Uniswap.setupTokens
 
 handlers :: SimulatorEffectHandlers (Builtin UniswapContracts)
 handlers =
-  Simulator.mkSimulatorHandlers @(Builtin UniswapContracts) [] $ -- [UniswapOwnerContract, UniswapUserContract]
-    interpret handleStarterContract
+  Simulator.mkSimulatorHandlers def $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @UniswapContracts))

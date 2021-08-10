@@ -27,6 +27,7 @@ import           Data.Text                          (Text)
 import           Data.Void
 import           Ledger.Ada                         as Ada
 import           Ledger.Value                       hiding (valueOf)
+import           Plutus.Contract                    (awaitPromise)
 import           Plutus.Contract.Test
 import           Plutus.Contract.Test.ContractModel
 import           Plutus.Trace.Emulator
@@ -413,8 +414,8 @@ deriving instance Show (ContractInstanceKey UModel w s e)
 
 instanceSpec :: [ContractInstanceSpec UModel]
 instanceSpec =
-    ContractInstanceSpec (StartKey (Wallet 1)) (Wallet 1) ownerEndpoint' :
-    [ContractInstanceSpec (UseKey w) w $ userEndpoints sampleUniswap | w <- wallets]
+    ContractInstanceSpec (StartKey (Wallet 1)) (Wallet 1) (awaitPromise ownerEndpoint') :
+    [ContractInstanceSpec (UseKey w) w $ awaitPromise $ userEndpoints sampleUniswap | w <- wallets]
 
 delay :: Int -> EmulatorTrace ()
 delay = void . waitNSlots . fromIntegral

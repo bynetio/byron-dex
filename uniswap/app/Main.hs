@@ -50,7 +50,7 @@ main :: IO ()
 main = return ()
 
 runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' def emulatorCfg
+runTrace = runEmulatorTraceIO' def emulatorCfg def
   where
     emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1 .. 4]])
       where
