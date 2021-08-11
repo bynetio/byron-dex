@@ -4,39 +4,15 @@
 
 After cloning the repository, `cd` into the project and do the following:
 
-##### Fetch plutus submodule
+##### Local Hoogle documentation
 
-In order to have a plutus documentation running under local instance of hoogle we need to fetch the proper version of plutus and build the documentation.
+In order to run local hoogle with all project dependencies run:
 
-To get the plutus prject initialize and update submodules:
-
-```
-git submodule update --init
+```bash
+nix-shell shell-hoogle.nix --run "hoogle server --local"
 ```
 
-##### Build plutus packages
-
-To build plutus project type:
-
-```
-nix-shell --run ./bin/build-plutus
-```
-
-##### Generate hoogle documentation database
-
-Once the plutus project is build we can generate plutus `*.hoo` file with command:
-
-```
-nix-shell --run ./bin/build-hoogle
-```
-
-##### Start [plutus hoogle](http://localhost:8080/)
-
-Start a local instance of plutus hoogle. If the `*.hoo` file from previous step is missing the instance will end up immediately.
-
-```
-nix-shell --run ./bin/start-hoogle
-```
+This will open a local Hoogle server at `http://127.0.0.1:8080`
 
 ##### Generate ctags
 
@@ -50,9 +26,10 @@ find vendor/plutus/ -name "*.*hs" \
 ### vscode integration
 
 Plugins
-* [vscode-haskell](https://github.com/haskell/vscode-haskell)
-* [nix-env-selector](https://github.com/arrterian/nix-env-selector)
-* [ctagsx](https://github.com/jtanx/ctagsx)
+
+- [vscode-haskell](https://github.com/haskell/vscode-haskell)
+- [nix-env-selector](https://github.com/arrterian/nix-env-selector)
+- [ctagsx](https://github.com/jtanx/ctagsx)
 
 ### vim integration
 
@@ -63,31 +40,31 @@ To find some examples of how to setup vim to work with `coc` see [this `.vimrc`]
 
 There are 2 main projects in this repository:
 
-* ```uniswap``` - this project contains all contract logic, defines all contract endpoints and provides a PAB executable.
-* ```uniswap-json-api``` - this project provides a Proxy API which simplifies HTTP communication with PAB.
+- `uniswap` - this project contains all contract logic, defines all contract endpoints and provides a PAB executable.
+- `uniswap-json-api` - this project provides a Proxy API which simplifies HTTP communication with PAB.
 
 ## `uniswap`
 
 ### Contract Endpoints
 
-All contract endpoints are defined in ```uniswap/src/Uniswap/OffChain.hs```.
+All contract endpoints are defined in `uniswap/src/Uniswap/OffChain.hs`.
 
-- ```start``` -- creates a new script instance.
-- ```create``` -- creates a new *LiquidityPool*. *LiquidityPool* is identified by pair of tokens and fee rate.
-- ```add``` -- adds liquidity to a existing *LiquidityPool*.
-- ```remove``` -- removes liquidity from a *LiquidityPool*.
-- ```close``` -- removes all liquidity from a *LiquidityPool* and deletes it. This endpoint can only be used when all liquidity in this pool belongs to the person who wants to close it.
-- ```swap``` -- swaps one token for another by using specific *LiquidityPool*.
-- ```pools``` -- provides information about existing *LiquidityPools*.
-- ```funds``` -- provides information about funds belonging to the user.
+- `start` -- creates a new script instance.
+- `create` -- creates a new _LiquidityPool_. _LiquidityPool_ is identified by pair of tokens and fee rate.
+- `add` -- adds liquidity to a existing _LiquidityPool_.
+- `remove` -- removes liquidity from a _LiquidityPool_.
+- `close` -- removes all liquidity from a _LiquidityPool_ and deletes it. This endpoint can only be used when all liquidity in this pool belongs to the person who wants to close it.
+- `swap` -- swaps one token for another by using specific _LiquidityPool_.
+- `pools` -- provides information about existing _LiquidityPools_.
+- `funds` -- provides information about funds belonging to the user.
 
-- ```swapPreview``` -- checks how much of desired token user would get if he tried to perform swap.
-- ```iSwapPreview``` -- checks how much of desired token user would get if he tried to perform indirect swap.
-- ```iSwap``` -- swaps one token for another by using chain of *LiquidityPools*. Automatically finds the best *swap path* and performs all intermediate swaps in one transaction.
+- `swapPreview` -- checks how much of desired token user would get if he tried to perform swap.
+- `iSwapPreview` -- checks how much of desired token user would get if he tried to perform indirect swap.
+- `iSwap` -- swaps one token for another by using chain of _LiquidityPools_. Automatically finds the best _swap path_ and performs all intermediate swaps in one transaction.
 
 ### Slippage
 
-State of *LiquidityPools* can change at any time -- even during execution of Off-chain methods. This could be a problem, because user couldn't be sure of how much will he get by performing swap. To solve this problem we allow user to specify expected amount of desired coin and slippage tolerance. Transaction will be submitted only if amount of token returned to user isn't lower than expected value (with slippage tolerance taken to account).
+State of _LiquidityPools_ can change at any time -- even during execution of Off-chain methods. This could be a problem, because user couldn't be sure of how much will he get by performing swap. To solve this problem we allow user to specify expected amount of desired coin and slippage tolerance. Transaction will be submitted only if amount of token returned to user isn't lower than expected value (with slippage tolerance taken to account).
 
 ### Custom fees
 
@@ -97,24 +74,25 @@ Fee rate is defined as pair of nominator and denominator. For example the 0.3% f
 
 ### Indirect Swaps
 
-Indirect swaps comes handy when we want to swap between two tokens and there is not a single *LiquidityPool* with these two tokens. Indirect swap will check if by performing multiple swaps on diferent *LiquidityPools* user can get their desired token. All these swaps are performed simultaneously in single transaction.
+Indirect swaps comes handy when we want to swap between two tokens and there is not a single _LiquidityPool_ with these two tokens. Indirect swap will check if by performing multiple swaps on diferent _LiquidityPools_ user can get their desired token. All these swaps are performed simultaneously in single transaction.
 
-Currently swap path can include each *LiquidityPool* at most once. Lets say that there are currently 5 *LiquidityPools*:
-* Pool 1 (*A* 100, *B* 100), fee rate (3,1000)
-* Pool 2 (*B* 200, *C* 300), fee rate (3,1000)
-* Pool 3 (*D* 2, *E* 1_000_000), fee rate (3,1000)
-* Pool 4 (*D* 1_000_000, *E* 2), fee rate (2,1000)
-* Pool 5 (*B* 100, *D* 100), fee rate (3,1000)
-If someone wants to swap some amount of token *A* for token *C* then indirect swap will just perform 2 swaps (on Pool 1 and Pool 2). In this case someone could take advantage of Pool 3 and Pool 4 having drastically different exchange rates between tokens *D* and *E*. If the swap path would look like this:
+Currently swap path can include each _LiquidityPool_ at most once. Lets say that there are currently 5 _LiquidityPools_:
 
-1. Swap *A* for *B* in Pool 1
-2. Swap *B* for *D* in Pool 5
-3. Swap *D* for *E* in Pool 3
-4. Swap *E* for *D* in Pool 4
-5. Swap *D* for *B* in Pool 5
-6. Swap *B* for *C* in Pool 2
+- Pool 1 (_A_ 100, _B_ 100), fee rate (3,1000)
+- Pool 2 (_B_ 200, _C_ 300), fee rate (3,1000)
+- Pool 3 (_D_ 2, _E_ 1_000_000), fee rate (3,1000)
+- Pool 4 (_D_ 1*000_000, \_E* 2), fee rate (2,1000)
+- Pool 5 (_B_ 100, _D_ 100), fee rate (3,1000)
+  If someone wants to swap some amount of token _A_ for token _C_ then indirect swap will just perform 2 swaps (on Pool 1 and Pool 2). In this case someone could take advantage of Pool 3 and Pool 4 having drastically different exchange rates between tokens _D_ and _E_. If the swap path would look like this:
 
-then someone could get much more of token *C* than if swapping with just Pool 1 and Pool 2. This would require swapping on Pool 5 twice which is currently not supported.
+1. Swap _A_ for _B_ in Pool 1
+2. Swap _B_ for _D_ in Pool 5
+3. Swap _D_ for _E_ in Pool 3
+4. Swap _E_ for _D_ in Pool 4
+5. Swap _D_ for _B_ in Pool 5
+6. Swap _B_ for _C_ in Pool 2
+
+then someone could get much more of token _C_ than if swapping with just Pool 1 and Pool 2. This would require swapping on Pool 5 twice which is currently not supported.
 
 ## `uniswap-json-api`
 
@@ -130,149 +108,151 @@ In order to reach the information we need to ensure we have a success on the end
 
 #### `POST /:id/create`
 
-Creates a new *LiquidityPool*. *LiquidityPool* is identified by pair of tokens and fee rate.
+Creates a new _LiquidityPool_. _LiquidityPool_ is identified by pair of tokens and fee rate.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
-| `amount_a` | query   | `Int`     | An amount of first token in a pair.
-| `amount_a` | query   | `Int`     | An amount of second token in a pair.
+| name       | type    | data type | description                          |
+| ---------- | ------- | --------- | ------------------------------------ |
+| `id`       | capture | `Text`    | An instance ID of a wallet.          |
+| `coin_a`   | query   | `Text`    | A name of first token in a pair.     |
+| `coin_b`   | query   | `Text`    | A name of second token in a pair.    |
+| `amount_a` | query   | `Int`     | An amount of first token in a pair.  |
+| `amount_a` | query   | `Int`     | An amount of second token in a pair. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/swap`
 
-Swaps one token for another by using specific *LiquidityPool*.
+Swaps one token for another by using specific _LiquidityPool_.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
-| `amount_a` | query   | `Int`     | An amount of first token in a pair.
-| `amount_a` | query   | `Int`     | An amount of second token in a pair.
-| `slippage` | query   | `Int`     | A slippage for `swap` operation.
+| name       | type    | data type | description                          |
+| ---------- | ------- | --------- | ------------------------------------ |
+| `id`       | capture | `Text`    | An instance ID of a wallet.          |
+| `coin_a`   | query   | `Text`    | A name of first token in a pair.     |
+| `coin_b`   | query   | `Text`    | A name of second token in a pair.    |
+| `amount_a` | query   | `Int`     | An amount of first token in a pair.  |
+| `amount_a` | query   | `Int`     | An amount of second token in a pair. |
+| `slippage` | query   | `Int`     | A slippage for `swap` operation.     |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/indirect_swap`
 
-Swaps one token for another by using chain of *LiquidityPools*. Automatically finds the best *swap path* and performs all intermediate swaps in one transaction.
+Swaps one token for another by using chain of _LiquidityPools_. Automatically finds the best _swap path_ and performs all intermediate swaps in one transaction.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
-| `amount_a` | query   | `Int`     | An amount of first token in a pair.
-| `amount_a` | query   | `Int`     | An amount of second token in a pair.
-| `slippage` | query   | `Int`     | A slippage for `swap` operation.
+| name       | type    | data type | description                          |
+| ---------- | ------- | --------- | ------------------------------------ |
+| `id`       | capture | `Text`    | An instance ID of a wallet.          |
+| `coin_a`   | query   | `Text`    | A name of first token in a pair.     |
+| `coin_b`   | query   | `Text`    | A name of second token in a pair.    |
+| `amount_a` | query   | `Int`     | An amount of first token in a pair.  |
+| `amount_a` | query   | `Int`     | An amount of second token in a pair. |
+| `slippage` | query   | `Int`     | A slippage for `swap` operation.     |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/add`
 
-Adds liquidity to a existing *LiquidityPool*.
+Adds liquidity to a existing _LiquidityPool_.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
-| `amount_a` | query   | `Int`     | An amount of first token in a pair.
-| `amount_a` | query   | `Int`     | An amount of second token in a pair.
+| name       | type    | data type | description                          |
+| ---------- | ------- | --------- | ------------------------------------ |
+| `id`       | capture | `Text`    | An instance ID of a wallet.          |
+| `coin_a`   | query   | `Text`    | A name of first token in a pair.     |
+| `coin_b`   | query   | `Text`    | A name of second token in a pair.    |
+| `amount_a` | query   | `Int`     | An amount of first token in a pair.  |
+| `amount_a` | query   | `Int`     | An amount of second token in a pair. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/remove`
 
-Removes liquidity from a *LiquidityPool*.
+Removes liquidity from a _LiquidityPool_.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
-| `amount`   | query   | `Int`     | An amount of liquidity tokens.
+| name     | type    | data type | description                       |
+| -------- | ------- | --------- | --------------------------------- |
+| `id`     | capture | `Text`    | An instance ID of a wallet.       |
+| `coin_a` | query   | `Text`    | A name of first token in a pair.  |
+| `coin_b` | query   | `Text`    | A name of second token in a pair. |
+| `amount` | query   | `Int`     | An amount of liquidity tokens.    |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/swap_preview`
+
 " :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
 
 #### `POST /:id/indirect_swap_preview`
+
 " :> QueryParam "coin_a" Text :> QueryParam "coin_b" Text :> QueryParam "amount" Int :> Post '[JSON] ()
 
 #### `POST /:id/close`
 
-Removes all liquidity from a *LiquidityPool* and deletes it. This endpoint can only be used when all liquidity in this pool belongs to the person who wants to close it.
+Removes all liquidity from a _LiquidityPool_ and deletes it. This endpoint can only be used when all liquidity in this pool belongs to the person who wants to close it.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
-| `coin_a`   | query   | `Text`    | A name of first token in a pair.
-| `coin_b`   | query   | `Text`    | A name of second token in a pair.
+| name     | type    | data type | description                       |
+| -------- | ------- | --------- | --------------------------------- |
+| `id`     | capture | `Text`    | An instance ID of a wallet.       |
+| `coin_a` | query   | `Text`    | A name of first token in a pair.  |
+| `coin_b` | query   | `Text`    | A name of second token in a pair. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `GET /:id/pools`
 
-Provides information about existing *LiquidityPools*.
+Provides information about existing _LiquidityPools_.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
+| name | type    | data type | description                 |
+| ---- | ------- | --------- | --------------------------- |
+| `id` | capture | `Text`    | An instance ID of a wallet. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/funds`
 
 Provides information about funds belonging to the user.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
+| name | type    | data type | description                 |
+| ---- | ------- | --------- | --------------------------- |
+| `id` | capture | `Text`    | An instance ID of a wallet. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 #### `POST /:id/status`
 
 Provides a status of recent operation on wallet.
 
-| name       | type    | data type | description
-|------------|---------|-----------|-------------
-| `id`       | capture | `Text`    | An instance ID of a wallet.
+| name | type    | data type | description                 |
+| ---- | ------- | --------- | --------------------------- |
+| `id` | capture | `Text`    | An instance ID of a wallet. |
 
-* Returns `200` status code when operation has been triggered properly for a wallet.
-* Returns `422` status code if there were a problem with HTTP connection.
-* Returns `400` status code when any od the params are invalid.
-* Returns status of the operation in body.
+- Returns `200` status code when operation has been triggered properly for a wallet.
+- Returns `422` status code if there were a problem with HTTP connection.
+- Returns `400` status code when any od the params are invalid.
+- Returns status of the operation in body.
 
 ## Deployment on docker
 
@@ -306,28 +286,56 @@ docker-compose up
 
 ## CI
 
-CI configuration can be found in [`.gitlab-ci.yml`](./.gitlab-ci.yaml) file.
+This project use GitLab as CI. Check the configuration [file](./.gitlab-ci.yaml) for more information.
+GitLab use custom docker image (`silquenarmo/dex-plutus-dev`) which cointains neccesary dependencies.
+The image is build using [devcontainer](./nix/devcontainer/uniswap-devcontainer.nix).
+To update it or rebuild manually:
 
-It uses `silquenarmo/dex-plutus-dev` image which is being built with [`Dockerfile`](./Dockerfile). To update it or rebuild manually:
-
-1. run `docker build -t silquenarmo/dex-plutus-dev:<version> .` in project root
-2. tag a latest version `docker tag silquenarmo/dex-plutus-dev:latest silquenarmo/dex-plutus-dev:<version>`
+1. `docker load < $(nix-build default.nix -A devcontainer)`.
+2. tag result image `docker tag uniswap-devcontainer silquenarmo/dex-plutus-dev:<version>`
 3. _[optional]_ push an image to hub repository `docker push silquenarmo/dex-plutus-dev:<version>` and `docker push silquenarmo/dex-plutus-dev:latest`
+
+NOTE: You can build docker image only on linux.
 
 CI runs of external gitlab CI runner on AWS instance, and process is as follows:
 
-* create _r4.large_ instances (2vcpu, 16G ram)
-* there are max 2 instances for max two jobs at runtime
-* after processing job instances are waiting 1h
-* after 1h waiting the instance is being removed
-* if next job arises withing a 1h delay it's being processed by a free instance
-* the instance creation is about 5min long
-* disk capacity per instance is ~40G
+- create _r4.large_ instances (2vcpu, 16G ram)
+- there are max 2 instances for max two jobs at runtime
+- after processing job instances are waiting 1h
+- after 1h waiting the instance is being removed
+- if next job arises withing a 1h delay it's being processed by a free instance
+- the instance creation is about 5min long
+- disk capacity per instance is ~40G
 
 CI consists of three stages:
 
-* **lint** - using `hlint` to verify both projects
-* **build** - using `cabal build` to compile projects
-* **test** - using `cabal test` to run specs on projects
+- **lint** - using `hlint` to verify both projects
+- **build** - using `cabal build` to compile projects
+- **test** - using `cabal test` to run specs on projects
 
 All three stages are being runned in `on_success` mode when they are triggered from default (`master`) branch. On any other branches the pipeline will not be triggered UNLESS there is a merge request created on that branch. The `build` and `test` stages can only be triggered manually and only linting is performed automatically.
+
+## Remote development
+
+The docker image used by CI can be use to remote development with VSCode.
+
+Usage:
+
+1. Create `.devcontainer/devcontainer.json` in your project as below
+2. Install the Remote Development extension pack in VSCode
+3. Open the folder "in the container"
+
+```json
+{
+  "name": "Uniswap Project",
+  "image": "silquenarmo/dex-plutus-dev:latest",
+
+  // Use 'settings' to set *default* container specific settings.json values on container create.
+  // You can edit these settings after create using File > Preferences > Settings > Remote.
+  "settings": {
+    "terminal.integrated.shell.linux": "/bin/bash"
+  },
+
+  "extensions": ["haskell.haskell"]
+}
+```

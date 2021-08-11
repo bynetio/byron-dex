@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-
-pushd vendor/plutus
-  cabal build all
-popd
