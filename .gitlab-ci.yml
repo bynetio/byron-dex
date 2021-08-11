@@ -1,4 +1,4 @@
-image: "silquenarmo/dex-plutus-dev:1.5"
+image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
 .automatic:
   rules:
@@ -7,72 +7,116 @@ image: "silquenarmo/dex-plutus-dev:1.5"
 
 .manual:
   rules:
-    - if: '$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH'
+    - if: "$CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH"
       when: manual
       allow_failure: false
     - when: on_success
+
+.uniswap-cache:
+  cache:
+    key: uniswap-cachee-$CI_COMMIT_REF_SLUG
+    paths:
+      - /builds/plutus/dex/dist-newstyle
 
 .uniswap-json-api-cache:
   cache:
     key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
     paths:
-      - /builds/plutus/dex/uniswap-json-api/dist-newstyle
+      - /builds/plutus/dex/dist-newstyle
 
-.uniswap-cache:
+.cabal-cache:
   cache:
-    key: uniswap-cache-$CI_COMMIT_REF_SLUG
+    key: cache-dot-cabal-w
     paths:
-      - /builds/plutus/dex/uniswap/dist-newstyle
+      - /builds/plutus/.cabal
+      - /builds/plutus/dex/.cabal
+      - /builds/plutus/dex/dist-newstyle
+
+.copy-cabal-cache:
+  before_script:
+    - cp -rf /builds/plutus/.cabal /home/uniswap/
+    - cp -rf /builds/plutus/dist-newstyle /builds/plutus/dex/
 
 stages:
   - lint
+  - prebuild
   - build
   - test
 
-# uniswap-json-api
+prebuild:
+  stage: prebuild
+  extends:
+    - .automatic
+    - .cabal-cache
+  script:
+    - |
+      if [[ ! -d  /builds/plutus/dex/.cabal ]]; then
+       cabal update
+       cabal configure --index-state=2021-07-07T00:00:00Z
+       #  The GitLab CI can only archive files from directories relative to your build directory.
+       cp -R /home/uniswap/.cabal /builds/plutus/dex/
+      fi
+    - cp -R  /builds/plutus/dex/.cabal /builds/plutus/
+    - cp -Rf /builds/plutus/dex/dist-newstyle /builds/plutus/
+  allow_failure:
+    exit_codes: 10
+
+# uniswap-uswap-json-api
 lint_uniswap-json-api:
   stage: lint
   extends: .automatic
-  script: "nix-shell /build/default.nix --run 'hlint uniswap-json-api'"
+  script: "hlint uniswap-json-api"
 
 build_uniswap-json-api:
   stage: build
   extends:
-    - .manual
+    - .automatic
+    - .copy-cabal-cache
     - .uniswap-json-api-cache
-  needs: ["lint_uniswap-json-api"]
-  script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal build'"
-  cache:
-    key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
-    paths:
-      - /builds/plutus/dex/uniswap-json-api/dist-newstyle
+  needs:
+    - prebuild
+    - lint_uniswap-json-api
+  script:
+    - cabal build uniswap-json-api
 
 uniswap-json-api_specs:
   stage: test
   extends:
     - .automatic
-    - .uniswap-json-api-cache
-  needs: ["build_uniswap-json-api"]
-  script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal test'"
+    - .copy-cabal-cache
+    - .uniswap-cache
+  needs:
+    - prebuild
+    - build_uniswap-json-api
+  script:
+    - cabal run uniswap-json-api-specs
 
 # uniswap
 lint_uniswap:
   stage: lint
   extends: .automatic
-  script: "nix-shell /build/default.nix --run 'hlint uniswap'"
+  script: "hlint uniswap"
 
 build_uniswap:
   stage: build
   extends:
-    - .manual
+    - .automatic
+    - .copy-cabal-cache
     - .uniswap-cache
-  needs: ["lint_uniswap"]
-  script: "nix-shell /build/default.nix --run 'cd uniswap && cabal build'"
+  needs:
+    - prebuild
+    - lint_uniswap
+  script:
+    - cabal build uniswap-pab
 
 uniswap_specs:
   stage: test
   extends:
     - .automatic
+    - .copy-cabal-cache
     - .uniswap-cache
-  needs: ["build_uniswap"]
-  script: "nix-shell /build/default.nix --run 'cd uniswap && cabal test'"
+  needs:
+    - prebuild
+    - build_uniswap
+  script:
+    - cabal run uniswap-tests

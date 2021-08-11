@@ -3,3 +3,6 @@ tmp
 */dist-newstyle/
 tags
 uniswap/.hpc
+.DS_Store
+.psc-ide-port
+

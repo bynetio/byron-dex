@@ -1,6 +1,0 @@
-[submodule "vendor/plutus"]
-	path = vendor/plutus
-	url = git@github.com:input-output-hk/plutus.git
-[submodule "vendor/lessons"]
-	path = vendor/lessons
-	url = git@github.com:input-output-hk/plutus-pioneer-program.git

@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-[ -f tmp/doc/plutus.hoo ] && hoogle server --local --database=tmp/doc/plutus.hoo
