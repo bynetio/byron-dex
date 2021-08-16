@@ -50,7 +50,7 @@ build_uniswap-json-api:
 uniswap-json-api_specs:
   stage: test
   extends:
-    - .automatic
+    - .manual
     - .uniswap-json-api-cache
   needs: ["build_uniswap-json-api"]
   script: "nix-shell /build/default.nix --run 'cd uniswap-json-api && cabal test'"
@@ -72,7 +72,7 @@ build_uniswap:
 uniswap_specs:
   stage: test
   extends:
-    - .automatic
+    - .manual
     - .uniswap-cache
   needs: ["build_uniswap"]
   script: "nix-shell /build/default.nix --run 'cd uniswap && cabal test'"
