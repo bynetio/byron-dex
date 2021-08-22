@@ -26,16 +26,18 @@ image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
 .cabal-cache:
   cache:
-    key: cache-dot-cabal-w
+    key: cache-dot-cabal
     paths:
-      - /builds/plutus/.cabal
-      - /builds/plutus/dex/.cabal
-      - /builds/plutus/dex/dist-newstyle
+      - /builds/plutus/dex/prebuild-cache/
 
 .copy-cabal-cache:
+  variables:
+    GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/
   before_script:
-    - cp -rf /builds/plutus/.cabal /home/uniswap/
-    - cp -rf /builds/plutus/dist-newstyle /builds/plutus/dex/
+    - ls -la /builds/plutus/dex/prebuild-cache/
+    - ls -la /builds/plutus/dex/prebuild-cache/.cabal
+    - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
+    - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
 
 stages:
   - lint
@@ -50,14 +52,17 @@ prebuild:
     - .cabal-cache
   script:
     - |
-      if [[ ! -d  /builds/plutus/dex/.cabal ]]; then
-       cabal update
-       cabal configure --index-state=2021-07-07T00:00:00Z
-       #  The GitLab CI can only archive files from directories relative to your build directory.
-       cp -R /home/uniswap/.cabal /builds/plutus/dex/
+      if [[ ! -d /builds/plutus/dex/prebuild-cache/.cabal ]]; then
+        cabal update
+        cabal configure --index-state=2021-07-07T00:00:00Z
+        #  The GitLab CI can only archive files from directories relative to your build directory.
+        cp -Rf /home/uniswap/.cabal /builds/plutus/dex/prebuild-cache/
+        cp -Rf /builds/plutus/dex/dist-newstyle /builds/plutus/dex/prebuild-cache/
+
+        ls -la /builds/plutus/dex/prebuild-cache/.cabal
+      else
+       echo "Using cache..."
       fi
-    - cp -R  /builds/plutus/dex/.cabal /builds/plutus/
-    - cp -Rf /builds/plutus/dex/dist-newstyle /builds/plutus/
   allow_failure:
     exit_codes: 10
 
@@ -72,7 +77,7 @@ build_uniswap-json-api:
   extends:
     - .automatic
     - .copy-cabal-cache
-    - .uniswap-json-api-cache
+    # - .uniswap-json-api-cache
   needs:
     - prebuild
     - lint_uniswap-json-api
@@ -84,7 +89,7 @@ uniswap-json-api_specs:
   extends:
     - .automatic
     - .copy-cabal-cache
-    - .uniswap-cache
+    # - .uniswap-cache
   needs:
     - prebuild
     - build_uniswap-json-api
@@ -102,11 +107,12 @@ build_uniswap:
   extends:
     - .automatic
     - .copy-cabal-cache
-    - .uniswap-cache
+    # - .uniswap-cache
   needs:
     - prebuild
     - lint_uniswap
   script:
+    - ls -la /builds/plutus/dex/prebuild-cache/
     - cabal build uniswap-pab
 
 uniswap_specs:
@@ -114,7 +120,7 @@ uniswap_specs:
   extends:
     - .automatic
     - .copy-cabal-cache
-    - .uniswap-cache
+    # - .uniswap-cache
   needs:
     - prebuild
     - build_uniswap
