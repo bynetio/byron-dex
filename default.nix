@@ -109,27 +109,6 @@ let
     haskellPackages.hasktags
     haskellPackages.implicit-hie
     haskellPackages.hpc
-    ((vim_configurable.override { python = python3; }).customize {
-      name = "vim";
-      vimrcConfig.customRC = "source $HOME/.vimrc";
-      vimrcConfig.packages.myVimPackage = with pkgs.vimPlugins; {
-        start = [
-          coc-fzf
-          coc-nvim
-          coc-snippets
-          coc-solargraph
-          fzf-vim
-          fzfWrapper
-          haskell-vim
-          nerdtree
-          syntastic
-          ultisnips
-          vim-airline
-          vim-airline-themes
-          vim-fugitive
-        ];
-      };
-    })
   ]);
 
 in
