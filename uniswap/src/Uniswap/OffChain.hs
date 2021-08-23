@@ -239,7 +239,7 @@ create us CreateParams {..} = do
           <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Create lp)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "created liquidity pool: " ++ show lp
 
 -- | Closes a liquidity pool by burning all remaining liquidity tokens in exchange for all liquidity remaining in the pool.
@@ -273,7 +273,7 @@ close us CloseParams {..} = do
           <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData $ Pool lp liquidity)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "closed liquidity pool: " ++ show lp
 
 -- | Removes some liquidity from a liquidity pool in exchange for liquidity tokens.
@@ -309,7 +309,7 @@ remove us RemoveParams {..} = do
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  --void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "removed liquidity from pool: " ++ show lp
 
@@ -357,7 +357,7 @@ add us AddParams {..} = do
   logInfo $ show tx
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  --void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
@@ -403,7 +403,7 @@ swap us SwapParams {..} = do
           <> Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-  void $ awaitTxConfirmed $ txId ledgerTx
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "swapped with: " ++ show lp
 
 indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ISwapPreviewResultData
@@ -485,7 +485,8 @@ indirectSwap2 us IndirectSwapParams {..} = runM $ translate (\case
                  <> Constraints.ownPubKeyHash pkh
 
         ledgerTx <- submitTxConstraintsWith lookups constraints
-        void $ awaitTxConfirmed $ txId ledgerTx
+        --void $ awaitTxConfirmed $ txId ledgerTx
+        return ()
     IndirectSwapLog message -> logInfo @Text message
   ) (iswap @(Map.Map TxOutRef TxOutTx, TxConstraints UniswapAction UniswapDatum) IndirectSwapParams {..})
 
