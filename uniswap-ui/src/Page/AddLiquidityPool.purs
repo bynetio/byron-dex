@@ -1,26 +1,30 @@
 module Uniswap.Page.AddLiquidityPool where
 
 import Prelude
-import Data.Const (Const)
 import Data.Maybe (Maybe(..))
-import Data.Newtype (class Newtype, unwrap)
+import Data.Newtype (class Newtype)
 import Effect.Aff.Class (class MonadAff)
 import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
 import Halogen.HTML.Properties as HP
-import Halogen.Store.Connect (Connected, connect)
+import Halogen.Store.Connect (connect)
 import Halogen.Store.Monad (class MonadStore)
 import Halogen.Store.Select (selectEq)
+import Network.RemoteData (RemoteData(..), fromMaybe)
+import Select as Select
 import Type.Proxy (Proxy(..))
+import Uniswap.Capability.Funds (class ManageFunds, getFunds)
 import Uniswap.Capability.Navigate (class Navigate, navigate)
 import Uniswap.Capability.Pool (class ManagePool, createLiquidityPool)
+import Uniswap.Component.Dropdown as DD
 import Uniswap.Component.HTML.Header (header)
 import Uniswap.Component.HTML.Utils (css, whenElem)
 import Uniswap.Data.Amount (Amount)
-import Uniswap.Data.Coin (CurrencySymbol, TokenName)
+import Uniswap.Data.Coin (Coin)
 import Uniswap.Data.Fee (Fee)
+import Uniswap.Data.Funds (Fund)
 import Uniswap.Data.LiquidityPool (LiquidityPool)
 import Uniswap.Data.Route (Route(..))
 import Uniswap.Data.Wallet (Wallet)
@@ -30,20 +34,22 @@ import Uniswap.Store as Store
 import Web.Event.Event as Event
 
 data Action
-  = HandleCreateForm LiquidityPoolFields
+  = Initialize
+  | HandleCreateForm LiquidityPoolFields
+  | LoadFunds
 
 type State
-  = { currentWallet :: Maybe Wallet }
+  = { currentWallet :: Maybe Wallet
+    , funds :: RemoteData String (Array Fund)
+    }
 
 type ChildSlots
-  = ( formless :: F.Slot AddPoolForm FormQuery () LiquidityPoolFields Unit )
+  = ( formless :: F.Slot AddPoolForm FormQuery ChildSlotsForm LiquidityPoolFields Unit )
 
 type LiquidityPoolFields
-  = { tokenNameA :: TokenName
-    , currencySymbolA :: CurrencySymbol
+  = { coinA :: Coin
     , amountA :: Amount
-    , tokenNameB :: TokenName
-    , currencySymbolB :: CurrencySymbol
+    , coinB :: Coin
     , amountB :: Amount
     , fee :: Fee
     }
@@ -54,26 +60,39 @@ component ::
   MonadStore Store.Action Store.Store m =>
   Navigate m =>
   ManagePool m =>
+  ManageFunds m =>
   H.Component q Unit o m
 component =
   connect (selectEq _.currentWallet)
     $ H.mkComponent
         { initialState:
             \{ context: currentWallet } ->
-              { currentWallet }
+              { currentWallet
+              , funds: NotAsked
+              }
         , render
-        , eval: H.mkEval $ H.defaultEval { handleAction = handleAction }
+        , eval:
+            H.mkEval
+              $ H.defaultEval
+                  { handleAction = handleAction
+                  , initialize = Just Initialize
+                  }
         }
   where
   handleAction :: Action -> H.HalogenM State Action ChildSlots o m Unit
   handleAction = case _ of
-    HandleCreateForm { tokenNameA, currencySymbolA, amountA, tokenNameB, currencySymbolB, amountB, fee } -> do
+    Initialize -> void $ H.fork $ handleAction $ LoadFunds
+    LoadFunds -> do
+      H.modify_ _ { funds = Loading }
+      funds <- getFunds
+      H.modify_ _ { funds = fromMaybe funds }
+    HandleCreateForm { coinA, amountA, coinB, amountB, fee } -> do
       let
         lp :: LiquidityPool
         lp =
-          { coinA: { tokenName: tokenNameA, currencySymbol: currencySymbolA }
+          { coinA: coinA
           , amountA: amountA
-          , coinB: { tokenName: tokenNameB, currencySymbol: currencySymbolB }
+          , coinB: coinB
           , amountB: amountB
           , fee: fee
           }
@@ -83,12 +102,12 @@ component =
             navigate Pools
 
   render :: State -> H.ComponentHTML Action ChildSlots m
-  render { currentWallet } =
+  render { currentWallet, funds } =
     container
       [ HH.h1
-          [ css "text-xs-center" ]
+          [ css "label" ]
           [ HH.text "Create a Pool" ]
-      , HH.slot F._formless unit formComponent unit HandleCreateForm
+      , renderForm funds
       ]
     where
     container html =
@@ -97,24 +116,31 @@ component =
         , HH.div
             [ css "" ]
             [ HH.div
-                [ css "container page" ]
+                [ css "container" ]
                 [ HH.div
-                    [ css "row" ]
+                    [ css "box columns is-centered" ]
                     [ HH.div
-                        [ css "col-md-6 offset-md-3 col-xs12" ]
+                        [ css "column" ]
                         html
                     ]
                 ]
             ]
         ]
 
+    renderForm = case _ of
+      NotAsked -> HH.text "Wallet funds not loaded"
+      Loading -> HH.text "Loading wallet funds..."
+      Failure err -> HH.text ("Error during loading wallets funds: " <> err)
+      Success walletFunds -> do
+        let
+          form = formComponent walletFunds
+        HH.slot F._formless unit form unit HandleCreateForm
+
 newtype AddPoolForm (r :: Row Type -> Type) f
   = AddPoolForm
   ( r
-      ( tokenNameA :: f V.FormError String TokenName
-      , currencySymbolA :: f V.FormError String CurrencySymbol
-      , tokenNameB :: f V.FormError String TokenName
-      , currencySymbolB :: f V.FormError String CurrencySymbol
+      ( coinA :: f V.FormError (Maybe Coin) Coin
+      , coinB :: f V.FormError (Maybe Coin) Coin
       , amountA :: f V.FormError String Amount
       , amountB :: f V.FormError String Amount
       , fee :: f V.FormError String Fee
@@ -125,20 +151,33 @@ derive instance newtypeAddPoolFields :: Newtype (AddPoolForm r f) _
 
 data FormAction
   = Submit Event.Event
+  | HandleCoin DDSlot (DD.Message Coin)
 
 data FormQuery a
   = SetFormError Boolean a
 
 derive instance functorFormQuery :: Functor FormQuery
 
+type ChildSlotsForm
+  = ( dropdown :: DD.Slot Coin DDSlot )
+
+data DDSlot
+  = CoinA
+  | CoinB
+
+derive instance eqDDSlot :: Eq DDSlot
+
+derive instance ordDDSlot :: Ord DDSlot
+
 formComponent ::
-  forall i slots m.
+  forall i m.
   MonadAff m =>
-  F.Component AddPoolForm FormQuery slots i LiquidityPoolFields m
-formComponent =
+  (Array Fund) ->
+  F.Component AddPoolForm FormQuery ChildSlotsForm i LiquidityPoolFields m
+formComponent funds =
   F.component formInput
     $ F.defaultSpec
-        { render = renderCreateLP
+        { render = renderCreateLP funds
         , handleEvent = handleEvent
         , handleQuery = handleQuery
         , handleAction = handleAction
@@ -148,11 +187,9 @@ formComponent =
   formInput _ =
     { validators:
         AddPoolForm
-          { tokenNameA: V.required >>> V.tokenNameFormat
-          , currencySymbolA: V.required >>> V.currencySymbolFormat
+          { coinA: V.exists
           , amountA: V.required >>> V.amountFormat
-          , tokenNameB: V.required >>> V.tokenNameFormat
-          , currencySymbolB: V.required >>> V.currencySymbolFormat
+          , coinB: V.exists
           , amountB: V.required >>> V.amountFormat
           , fee: V.required >>> V.feeFormat
           }
@@ -166,6 +203,13 @@ formComponent =
     Submit event -> do
       H.liftEffect $ Event.preventDefault event
       eval F.submit
+    HandleCoin slot message -> case slot of
+      CoinA -> case message of
+        DD.Selected coin -> eval $ F.setValidate proxies.coinA (Just coin)
+        DD.Cleared -> eval $ F.setValidate proxies.coinA Nothing
+      CoinB -> case message of
+        DD.Selected coin -> eval $ F.setValidate proxies.coinB (Just coin)
+        DD.Cleared -> eval $ F.setValidate proxies.coinB Nothing
     where
     eval act = F.handleAction handleAction handleEvent act
 
@@ -177,7 +221,22 @@ formComponent =
 
   proxies = F.mkSProxies (Proxy :: _ AddPoolForm)
 
-  renderCreateLP { form, formError } =
+  renderCoin funds help slot label =
+    Field.field
+      { label: label
+      , help: help
+      }
+      [ HH.slot DD._dropdown slot (Select.component DD.input DD.spec) coinsInput handler
+      ]
+    where
+    handler = F.injAction <<< (HandleCoin slot)
+
+    coinsInput =
+      { placeholder: "Choose " <> label
+      , items: map (\f -> f.coin) funds
+      }
+
+  renderCreateLP funds { form, formError } =
     HH.form
       [ HE.onSubmit \ev -> F.injAction $ Submit ev ]
       [ whenElem formError \_ ->
@@ -185,33 +244,34 @@ formComponent =
             [ css "error-messages" ]
             [ HH.text "all fields are required" ]
       , HH.fieldset_
-          [ Field.input proxies.tokenNameA form
-              [ HP.placeholder "Token Name A"
-              , HP.type_ HP.InputText
+          [ renderCoin funds (F.getResult proxies.coinA form # V.resultToHelp "") CoinA "Coin A"
+          , Field.input'
+              { label: "Amount A"
+              , help: F.getResult proxies.amountA form # V.resultToHelp ""
+              , placeholder: "Amount of Lovelace"
+              , inputType: HP.InputText
+              }
+              [ HP.value $ F.getInput proxies.amountA form
+              , HE.onValueInput (F.setValidate proxies.amountA)
               ]
-          , Field.input proxies.currencySymbolA form
-              [ HP.placeholder "Currency Symbol A"
-              , HP.type_ HP.InputText
+          , renderCoin funds (F.getResult proxies.coinA form # V.resultToHelp "") CoinB "Coin B"
+          , Field.input'
+              { label: "Amount B"
+              , help: F.getResult proxies.amountA form # V.resultToHelp ""
+              , placeholder: "Amount of Lovelace"
+              , inputType: HP.InputText
+              }
+              [ HP.value $ F.getInput proxies.amountB form
+              , HE.onValueInput (F.setValidate proxies.amountB)
               ]
-          , Field.input proxies.amountA form
-              [ HP.placeholder "Amount A"
-              , HP.type_ HP.InputNumber
-              ]
-          , Field.input proxies.tokenNameB form
-              [ HP.placeholder "Token Name B"
-              , HP.type_ HP.InputText
-              ]
-          , Field.input proxies.currencySymbolB form
-              [ HP.placeholder "Currency Symbol B"
-              , HP.type_ HP.InputText
-              ]
-          , Field.input proxies.amountB form
-              [ HP.placeholder "Amount B"
-              , HP.type_ HP.InputNumber
-              ]
-          , Field.input proxies.fee form
-              [ HP.placeholder "Fee"
-              , HP.type_ HP.InputText
+          , Field.input'
+              { label: "Fee"
+              , help: F.getResult proxies.amountA form # V.resultToHelp ""
+              , placeholder: "Fee"
+              , inputType: HP.InputText
+              }
+              [ HP.value $ F.getInput proxies.fee form
+              , HE.onValueInput (F.setValidate proxies.fee)
               ]
           , Field.submit "Create!"
           ]
