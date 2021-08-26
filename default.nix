@@ -3,6 +3,7 @@ let
 
   inherit (packages) pkgs uniswap easy-purescript-nix;
   project = uniswap.haskell.project;
+
   inherit (uniswap) haskell stylish-haskell devcontainer;
 
 in

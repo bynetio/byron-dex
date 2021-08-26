@@ -18,8 +18,10 @@ pkgs.callPackage (import ./devcontainer.nix) {
   tag = "latest";
   nonRootUser = "uniswap";
   extraContents = [
+    pkgs.haskellPackages.ieee
+    pkgs.haskellPackages.filemanip
     shell.ghc
-    uniswap.haskell-language-server
+    uniswap.hlint
     uniswap.cabal-install
     pkgs.binutils
   ];
@@ -33,5 +35,6 @@ pkgs.callPackage (import ./devcontainer.nix) {
     # We just clobbered this, put it back
     echo 'export PATH=$PATH:/usr/bin:/bin' >> etc/profile.d/env.sh
     echo 'export NIX_BUILD_TOP=$(mktemp -d)' >> etc/profile.d/env.sh
+    mkdir -p /home/uniswap/.cabal/packages
   '';
 }
