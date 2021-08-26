@@ -8,33 +8,33 @@ import Uniswap.Component.HTML.Utils (css, safeHref, whenElem)
 import Uniswap.Data.Route (Route(..))
 import Uniswap.Data.Wallet (Wallet)
 
-header :: forall i p r. (Maybe Wallet) -> Route -> HH.HTML i p
+header :: forall i p. (Maybe Wallet) -> Route -> HH.HTML i p
 header currentWallet route =
   HH.nav
-    [ css "navbar navbar-default navbar-fixed-top" ]
+    [ css "navbar is-fixed-top is-info" ]
     [ HH.div
-        [ css "container" ]
+        [ css "navbar-brand" ]
         [ HH.a
-            [ css "navbar-brand"
+            [ css "navbar-item"
             , safeHref Home
             ]
-            [ HH.text "uniswap" ]
-        , HH.ul
-            [ css "nav navbar-nav pull-xs-right" ]
-            [ navItem Pools
-                [ HH.text "Pools" ]
-            , whenElem (isNothing currentWallet) \_ ->
-                navItem (ConnectWallet)
-                  [ HH.text "Connect Wallet" ]
-            ]
+            [ HH.text "Uniswap" ]
+        , whenElem (isJust currentWallet) \_ ->
+            navItem Pools [ HH.text " Pools" ]
+        , whenElem (isJust currentWallet) \_ ->
+            navItem Funds [ HH.text " Funds" ]
+        , whenElem (isJust currentWallet) \_ ->
+            navItem Swap [ HH.text " Swap" ]
+        , whenElem (isNothing currentWallet) \_ ->
+            navItem ConnectWallet [ HH.text "Connect Wallet" ]
         ]
     ]
   where
   navItem r html =
-    HH.li
-      [ css "nav-item" ]
+    HH.a
+      [ css "navbar-item" ]
       [ HH.a
-          [ css $ "nav-link" <> guard (route == r) " active"
+          [ css $ "navbar-link" <> guard (route == r) " is-active"
           , safeHref r
           ]
           html

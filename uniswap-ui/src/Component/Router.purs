@@ -13,13 +13,17 @@ import Halogen.Store.Select (selectEq)
 import Routing.Duplex as RD
 import Routing.Hash (getHash)
 import Type.Proxy (Proxy(..))
+import Uniswap.Capability.Funds (class ManageFunds)
 import Uniswap.Capability.Navigate (class Navigate, navigate)
 import Uniswap.Capability.Pool (class ManagePool)
+import Uniswap.Capability.Timer (class Timer)
 import Uniswap.Data.Route (Route(..), routeCodec)
 import Uniswap.Data.Wallet (Wallet)
-import Uniswap.Page.ConnectWallet as CW
-import Uniswap.Page.LiquidityPools as LiquidityPools
 import Uniswap.Page.AddLiquidityPool as AddLiquidityPool
+import Uniswap.Page.ConnectWallet as CW
+import Uniswap.Page.Funds as Funds
+import Uniswap.Page.LiquidityPools as LiquidityPools
+import Uniswap.Page.Swap as Swap
 import Uniswap.Store as Store
 
 type OpaqueSlot slot
@@ -42,6 +46,8 @@ type ChildSlots
     , pools :: OpaqueSlot Unit
     , connect :: OpaqueSlot Unit
     , add :: OpaqueSlot Unit
+    , funds :: OpaqueSlot Unit
+    , swap :: OpaqueSlot Unit
     )
 
 component ::
@@ -50,6 +56,8 @@ component ::
   MonadStore Store.Action Store.Store m =>
   Navigate m =>
   ManagePool m =>
+  ManageFunds m =>
+  Timer m =>
   H.Component Query Unit Void m
 component =
   connect (selectEq _.currentWallet)
@@ -90,7 +98,9 @@ component =
   render :: State -> H.ComponentHTML Action ChildSlots m
   render { route, currentWallet } = case route of
     Just r -> case r of
-      Home -> HH.slot_ (Proxy :: _ "home") unit CW.component { redirect: true }
+      Home ->
+        connected currentWallet do
+          HH.slot_ (Proxy :: _ "funds") unit Funds.component unit
       Pools ->
         connected currentWallet do
           HH.slot_ (Proxy :: _ "pools") unit LiquidityPools.component unit
@@ -98,4 +108,10 @@ component =
         connected currentWallet do
           HH.slot_ (Proxy :: _ "add") unit AddLiquidityPool.component unit
       ConnectWallet -> HH.slot_ (Proxy :: _ "connect") unit CW.component { redirect: true }
+      Funds ->
+        connected currentWallet do
+          HH.slot_ (Proxy :: _ "funds") unit Funds.component unit
+      Swap ->
+        connected currentWallet do
+          HH.slot_ (Proxy :: _ "swap") unit Swap.component unit
     Nothing -> HH.div_ [ HH.text "Page Not Found" ]

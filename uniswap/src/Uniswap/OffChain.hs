@@ -1,9 +1,11 @@
+{-# LANGUAGE AllowAmbiguousTypes        #-}
 {-# LANGUAGE DataKinds                  #-}
 {-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE DuplicateRecordFields      #-}
 {-# LANGUAGE FlexibleContexts           #-}
+{-# LANGUAGE GADTs                      #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
@@ -76,6 +78,8 @@ import           Uniswap.OnChain              (mkUniswapValidator,
                                                validateLiquidityMinting)
 import           Uniswap.Pool
 import           Uniswap.Types
+
+import           Control.Monad.Freer
 data Uniswapping
 
 instance Scripts.ValidatorTypes Uniswapping where
@@ -201,7 +205,7 @@ start mcs = do
       inst = uniswapInstance us
       tx = mustPayToTheScript (Factory []) $ unitValue c
   ledgerTx <- submitTxConstraints inst tx
-
+  void $ awaitTxConfirmed $ txId ledgerTx
   logInfo @String $ printf "started Uniswap %s at address %s" (show us) (show $ uniswaddress us)
   return us
 
@@ -210,7 +214,7 @@ create :: Uniswap -> CreateParams -> Contract w s Text ()
 create us CreateParams {..} = do
   when (unCoin coinA == unCoin coinB) $ throwError "coins must be different"
   when (amountA <= 0 || amountB <= 0) $ throwError "amounts must be positive"
-  (oref, o, lps) <- findUniswfactory us
+  (oref, o, lps) <- findUniswapFactory us
   let liquidity = calculateInitialLiquidity amountA amountB
       lp = liquidityPool (coinA, coinB) fee
   let usInst = uniswapInstance us
@@ -235,13 +239,13 @@ create us CreateParams {..} = do
           <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData $ Create lp)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "created liquidity pool: " ++ show lp
 
 -- | Closes a liquidity pool by burning all remaining liquidity tokens in exchange for all liquidity remaining in the pool.
 close :: Uniswap -> CloseParams -> Contract w s Text ()
 close us CloseParams {..} = do
-  ((oref1, o1, lps), (oref2, o2, lp, liquidity)) <- findUniswfactoryAndPool us coinA coinB fee
+  ((oref1, o1, lps), (oref2, o2, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
   pkh <- pubKeyHash <$> ownPubKey
   let usInst = uniswapInstance us
       usScript = uniswapScript us
@@ -269,13 +273,13 @@ close us CloseParams {..} = do
           <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData $ Pool lp liquidity)
 
   ledgerTx <- submitTxConstraintsWith lookups tx
-
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "closed liquidity pool: " ++ show lp
 
 -- | Removes some liquidity from a liquidity pool in exchange for liquidity tokens.
 remove :: Uniswap -> RemoveParams -> Contract w s Text ()
 remove us RemoveParams {..} = do
-  (_, (oref, o, lp, liquidity)) <- findUniswfactoryAndPool us coinA coinB fee
+  (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
   pkh <- pubKeyHash <$> ownPubKey
   when (diff < 1 || diff >= liquidity) $ throwError "removed liquidity must be positive and less than total liquidity"
   let usInst = uniswapInstance us
@@ -305,6 +309,7 @@ remove us RemoveParams {..} = do
           <> Constraints.mustSpendScriptOutput oref redeemer
 
   ledgerTx <- submitTxConstraintsWith lookups tx
+  --void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "removed liquidity from pool: " ++ show lp
 
@@ -312,7 +317,7 @@ remove us RemoveParams {..} = do
 add :: Uniswap -> AddParams -> Contract w s Text ()
 add us AddParams {..} = do
   pkh <- pubKeyHash <$> ownPubKey
-  (_, (oref, o, lp, liquidity)) <- findUniswfactoryAndPool us coinA coinB fee
+  (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
   logInfo @String $ printf "old liquidity = %d" $ unAmount liquidity
   when (amountA < 0 || amountB < 0) $ throwError "amounts must not be negative"
   let outVal = txOutValue $ txOutTxOut o
@@ -352,12 +357,13 @@ add us AddParams {..} = do
   logInfo $ show tx
 
   ledgerTx <- submitTxConstraintsWith lookups tx
+  --void $ awaitTxConfirmed $ txId ledgerTx
 
   logInfo $ "added liquidity to pool: " ++ show lp
 
 swapPreview :: Uniswap -> SwapPreviewParams -> Contract w s Text SwapPreviewResultData
 swapPreview us SwapPreviewParams {..} = do
-  (_, (_, o, _, _)) <- findUniswfactoryAndPool us coinA coinB fee
+  (_, (_, o, _, _)) <- findUniswapFactoryAndPool us coinA coinB fee
   let outVal = txOutValue $ txOutTxOut o
   let oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
@@ -368,7 +374,7 @@ swapPreview us SwapPreviewParams {..} = do
 swap :: Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams {..} = do
   unless (amount > 0) $ throwError "amount must be positive"
-  (_, (oref, o, lp, liquidity)) <- findUniswfactoryAndPool us coinA coinB fee
+  (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
   let outVal = txOutValue $ txOutTxOut o
   let oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
@@ -397,6 +403,7 @@ swap us SwapParams {..} = do
           <> Constraints.mustPayToTheScript (Pool lp liquidity) val
 
   ledgerTx <- submitTxConstraintsWith lookups tx
+  --void $ awaitTxConfirmed $ txId ledgerTx
   logInfo $ "swapped with: " ++ show lp
 
 indirectSwapPreview :: Uniswap -> ISwapPreviewParams -> Contract w s Text ISwapPreviewResultData
@@ -407,9 +414,32 @@ indirectSwapPreview us ISwapPreviewParams {..} = do
     Just p  -> return p
   return $ ISwapPreviewResultData coinA amount coinB (Amount outB)
 
+
+uniquePoolsWithCoins :: Uniswap -> Contract w s Text [LiquidityPoolWithCoins]
+uniquePoolsWithCoins us = do
+  (_, _, allPools) <- findUniswapFactory us
+  relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x, lp)) allPools
+  let uniquePools' =
+        map (\((a,b,f),(amountA,amountB)) -> LiquidityPoolWithCoins (Coin a) (Coin b) f (Amount amountA) (Amount amountB))
+          $ distinctPools
+          $ map
+              ( \((_, pO, _), LiquidityPool {..}) ->
+                  let pOutVal = txOutValue $ txOutTxOut pO
+                      amountA = unAmount $ amountOf pOutVal lpCoinA
+                      amountB = unAmount $ amountOf pOutVal lpCoinB
+                   in ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (amountA, amountB))
+              )
+              relevantPools
+  return uniquePools'
+  where
+    distinctPools :: [((AssetClass, AssetClass, Fee), (Integer, Integer))] -> [((AssetClass, AssetClass, Fee), (Integer, Integer))]
+    distinctPools = nubBy eqPool
+      where
+        eqPool ((a1, a2, f1), _) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
+
 uniquePools :: Uniswap -> Contract w s Text (Map.Map (AssetClass, AssetClass, Fee) (Integer, Integer))
 uniquePools us = do
-  (_, _, allPools) <- findUniswfactory us
+  (_, _, allPools) <- findUniswapFactory us
   relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x, lp)) allPools
   let uniquePools' =
         Map.fromList $
@@ -429,10 +459,42 @@ uniquePools us = do
       where
         eqPool ((a1, a2, f1), _) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
 
+
+indirectSwap2 :: forall w s. Uniswap -> IndirectSwapParams -> Contract w s Text ()
+indirectSwap2 us IndirectSwapParams {..} = runM $ translate (\case
+    IndirectSwapFail message -> throwError message
+    IndirectSwapPools -> uniquePoolsWithCoins us
+    IndirectSwapStep (unspentOutputs, constraints) (LiquidityPoolWithCoins {..}, (inAmount, outAmount))-> do
+      (oref, o, liquidity) <- findUniswapPool us $ liquidityPool (coinA, coinB) fee
+      let (newA, newB) = (amountA + inAmount, amountB - outAmount)
+      let val = valueOf coinA newA <> valueOf coinB newB <> unitValue (poolStateCoin us)
+      return (Map.insert oref o unspentOutputs, constraints
+            <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap)
+            <> Constraints.mustPayToTheScript (Pool (liquidityPool (coinA, coinB) fee ) liquidity) val )
+    IndirectSwapInitStepState -> return (Map.empty, mempty)
+    IndirectSwapCommit (unspentOutputs, constraints) ->
+      do
+        pkh <- pubKeyHash <$> ownPubKey
+        let
+          inst = uniswapInstance us
+
+
+          lookups = Constraints.typedValidatorLookups inst
+                 <> Constraints.otherScript (Scripts.validatorScript inst)
+                 <> Constraints.unspentOutputs unspentOutputs
+                 <> Constraints.ownPubKeyHash pkh
+
+        ledgerTx <- submitTxConstraintsWith lookups constraints
+        --void $ awaitTxConfirmed $ txId ledgerTx
+        return ()
+    IndirectSwapLog message -> logInfo @Text message
+  ) (iswap @(Map.Map TxOutRef TxOutTx, TxConstraints UniswapAction UniswapDatum) IndirectSwapParams {..})
+
+
 indirectSwap :: Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams {..} = do
   unless (amount > 0) $ throwError "amount must be positive"
-  (_, _, allPools) <- findUniswfactory us
+  (_, _, allPools) <- findUniswapFactory us
   relevantPools <- mapM (\lp -> findUniswapPool us lp >>= \x -> pure (x, lp)) allPools
   abstractPools <- uniquePools us
   let orefs = Map.fromList $ map (\((pRef, pO, _), LiquidityPool {..}) -> ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (pRef, pO))) relevantPools
@@ -475,7 +537,10 @@ indirectSwap us IndirectSwapParams {..} = do
   --   mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap) <>
   --           Constraints.mustPayToTheScript (Pool lp liquidity) val
 
-  void $ submitTxConstraintsWith lookups tx
+  ledgerTx <- submitTxConstraintsWith lookups tx
+  void $ awaitTxConfirmed $ txId ledgerTx
+
+
 
 -- | Finds all liquidity pools and their liquidity belonging to the Uniswap instance.
 -- This merely inspects the blockchain and does not issue any transactions.
@@ -545,8 +610,8 @@ findUniswapInstance us c f = do
           logInfo @String $ printf "found Uniswap instance with datum: %s" (show d)
           return (oref, o, a)
 
-findUniswfactory :: Uniswap -> Contract w s Text (TxOutRef, TxOutTx, [LiquidityPool])
-findUniswfactory us@Uniswap {..} = findUniswapInstance us usCoin $ \case
+findUniswapFactory :: Uniswap -> Contract w s Text (TxOutRef, TxOutTx, [LiquidityPool])
+findUniswapFactory us@Uniswap {..} = findUniswapInstance us usCoin $ \case
   Factory lps -> Just lps
   Pool _ _    -> Nothing
 
@@ -556,7 +621,7 @@ findUniswapPool us lp = findUniswapInstance us (poolStateCoin us) $ \case
     | lp == lp' -> Just l
   _ -> Nothing
 
-findUniswfactoryAndPool ::
+findUniswapFactoryAndPool ::
   Uniswap ->
   Coin A ->
   Coin B ->
@@ -568,8 +633,8 @@ findUniswfactoryAndPool ::
     ( (TxOutRef, TxOutTx, [LiquidityPool]),
       (TxOutRef, TxOutTx, LiquidityPool, Amount Liquidity)
     )
-findUniswfactoryAndPool us coinA coinB fee = do
-  (oref1, o1, lps) <- findUniswfactory us
+findUniswapFactoryAndPool us coinA coinB fee = do
+  (oref1, o1, lps) <- findUniswapFactory us
   case [ lp'
          | lp' <- lps,
            lp' == liquidityPool (coinA, coinB) fee
@@ -620,7 +685,7 @@ userEndpoints us =
     `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId{..} -> create us content)
                    `select` f (Proxy @"swap") historyId (const Swapped) (\us WithHistoryId{..} -> swap us content)
                    `select` f (Proxy @"swapPreview") historyId SwapPreviewResult (\us WithHistoryId{..} -> swapPreview us content)
-                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId{..} -> indirectSwap us content)
+                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId{..} -> indirectSwap2 us content)
                    `select` f (Proxy @"iSwapPreview") historyId ISwapPreviewResult (\us WithHistoryId{..} -> indirectSwapPreview us content)
                    `select` f (Proxy @"close") historyId (const Closed) (\us WithHistoryId{..} -> close us content)
                    `select` f (Proxy @"remove") historyId (const Removed) (\us WithHistoryId{..} -> remove us content)

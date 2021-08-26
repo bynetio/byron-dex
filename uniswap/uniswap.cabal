@@ -33,6 +33,7 @@ library
                      , ghc-prim
                      , lens
                      , lens-aeson
+                     , freer-simple
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
@@ -91,6 +92,9 @@ test-suite uniswap-tests
                      , plutus-ledger-api
                      , plutus-use-cases
                      , bytestring
+                     , freer-simple
+                     , prettyprinter
+                     , foldl
                      , uniswap-common
   if !(impl(ghcjs) || os(ghcjs))
     build-depends: plutus-tx-plugin -any

@@ -15,8 +15,8 @@ import           Test.Hspec.Wai
 import           Test.Hspec.Wai.Matcher
 
 import           Uniswap.Types
-import           UniswapJsonApi
-import           UniswapJsonApi.Logic
+--import           UniswapJsonApi
+--import           UniswapJsonApi.Logic
 
 config = MkAppContext (MkPabConfig "localhost" 8080) 3001
 

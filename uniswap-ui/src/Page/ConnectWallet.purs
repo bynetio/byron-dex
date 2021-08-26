@@ -1,7 +1,6 @@
 module Uniswap.Page.ConnectWallet where
 
 import Prelude
-import Uniswap.Data.Wallet (ConnectWalletFields)
 import Data.Maybe (Maybe(..))
 import Data.Newtype (class Newtype)
 import Effect.Aff.Class (class MonadAff)
@@ -16,6 +15,7 @@ import Uniswap.Capability.Navigate (class Navigate, navigate)
 import Uniswap.Component.HTML.Header (header)
 import Uniswap.Component.HTML.Utils (css, whenElem)
 import Uniswap.Data.Route (Route(..))
+import Uniswap.Data.Wallet (ConnectWalletFields)
 import Uniswap.Form.Field as Field
 import Uniswap.Form.Validation as V
 import Uniswap.Store as Store
@@ -58,21 +58,21 @@ component =
   render _ =
     container
       [ HH.h1
-          [ css "text-xs-center" ]
+          [ css "title" ]
           [ HH.text "Connect a Wallet" ]
       , HH.slot F._formless unit formComponent unit HandleConnectFrom
       ]
     where
     container html =
       HH.div
-        [ css "auth-page" ]
+        [ css "" ]
         [ header Nothing ConnectWallet
         , HH.div
-            [ css "container page" ]
+            [ css "container" ]
             [ HH.div
-                [ css "row" ]
+                [ css "box columns is-centered" ]
                 [ HH.div
-                    [ css "col-md-6 offset-md-3 col-xs12" ]
+                    [ css "column  is-one-third" ]
                     html
                 ]
             ]
@@ -95,9 +95,9 @@ data FormAction
   = Submit Event.Event
 
 formComponent ::
-  forall i slots m.
+  forall i slot m.
   MonadAff m =>
-  F.Component ConnectWalletForm FormQuery slots i ConnectWalletFields m
+  F.Component ConnectWalletForm FormQuery slot i ConnectWalletFields m
 formComponent =
   F.component formInput
     $ F.defaultSpec
@@ -138,12 +138,17 @@ formComponent =
       [ HE.onSubmit \ev -> F.injAction $ Submit ev ]
       [ whenElem connectError \_ ->
           HH.div
-            [ css "error-messages" ]
+            [ css "help is-danger" ]
             [ HH.text "Instance ID is invalid" ]
       , HH.fieldset_
-          [ Field.input proxies.instance form
-              [ HP.placeholder "Instance ID"
-              , HP.type_ HP.InputText
+          [ Field.input'
+              { label: "Instance ID"
+              , help: F.getResult proxies.instance form # V.resultToHelp ""
+              , placeholder: "Instance ID"
+              , inputType: HP.InputText
+              }
+              [ HP.value $ F.getInput proxies.instance form
+              , HE.onValueInput (F.setValidate proxies.instance)
               ]
           , Field.submit "Connect"
           ]

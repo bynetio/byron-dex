@@ -1,14 +1,17 @@
 module Uniswap.Form.Validation where
 
 import Prelude
+import Data.BigInt (fromString)
+import Data.Decimal (Decimal)
+import Data.Decimal as Decimal
 import Data.Either (Either(..), note)
-import Data.Int (fromString)
-import Data.Maybe (Maybe(..), isJust)
+import Data.Lens (preview)
+import Data.Maybe (Maybe(..), maybe)
+import Data.Show (show)
 import Data.String as String
-import Data.String.Pattern (Pattern(..))
 import Formless as F
 import Uniswap.Data.Amount (Amount(..))
-import Uniswap.Data.Coin (CurrencySymbol(..), TokenName(..))
+import Uniswap.Data.Coin (Coin(..), CurrencySymbol(..), TokenName(..))
 import Uniswap.Data.Fee (Fee)
 
 data FormError
@@ -19,6 +22,15 @@ data FormError
   | InvalidCurrencySymbol
   | InvalidAmount
   | InvalidFee
+
+instance toTextFieldError :: ToText FormError where
+  toText Required = "This field is required."
+  toText TooShort = "Not enough characters entered"
+  toText TooLong = "Too many characters entered"
+  toText InvalidTokenName = "Invalid Token Name"
+  toText InvalidCurrencySymbol = "Invalid Currency Symbol"
+  toText InvalidAmount = "Invalid Amount Format"
+  toText InvalidFee = "Invalid Fee format"
 
 errorToString :: FormError -> String
 errorToString = case _ of
@@ -33,6 +45,9 @@ errorToString = case _ of
 required :: forall form m a. Eq a => Monoid a => Monad m => F.Validation form m FormError a a
 required = F.hoistFnE_ $ cond (_ /= mempty) Required
 
+exists :: forall form m a. Monad m => F.Validation form m FormError (Maybe a) a
+exists = F.hoistFnE_ $ maybe (Left Required) Right
+
 minLength :: forall form m. Monad m => Int -> F.Validation form m FormError String String
 minLength n = F.hoistFnE_ $ cond (\str -> String.length str > n) TooShort
 
@@ -46,13 +61,20 @@ currencySymbolFormat :: forall form m. Monad m => F.Validation form m FormError 
 currencySymbolFormat = F.hoistFnE_ $ map CurrencySymbol <<< cond (\str -> String.length str > 0) InvalidCurrencySymbol
 
 amountFormat :: forall form m. Monad m => F.Validation form m FormError String Amount
-amountFormat = F.hoistFnE_ $ map Amount <<< condMap (_ /= mempty) (\str -> note InvalidAmount (fromString str)) InvalidAmount
+amountFormat = F.hoistFnE_ $ condMap (_ /= mempty) (\str -> note InvalidAmount (Amount <$> fromString str)) InvalidAmount
 
+-- | We should represent Fee as an arbitrary precision number instead of fractional
 feeFormat :: forall form m. Monad m => F.Validation form m FormError String Fee
-feeFormat = F.hoistFnE_ $ map (\str -> toFee $ String.split (Pattern ".") str) <<< cond (\i -> isJust (String.indexOf (Pattern ".") i)) InvalidFee
+feeFormat = F.hoistFnE_ $ condMap positiveDec (\str -> note InvalidFee (toFee <$> Decimal.fromString str)) InvalidFee
   where
-  toFee :: Array String -> Fee
-  toFee _ = { numerator: 2, denominator: 200 }
+  positiveDec :: String -> Boolean
+  positiveDec str = case Decimal.fromString str of
+    Just i
+      | (i >= Decimal.fromInt 0) && Decimal.isFinite i -> true
+    _ -> false
+
+  toFee :: Decimal -> Fee
+  toFee _ = { numerator: 20, denominator: 500 }
 
 cond :: forall a. (a -> Boolean) -> FormError -> a -> Either FormError a
 cond f err a = if f a then pure a else Left err
@@ -71,3 +93,24 @@ toOptional v =
   F.Validation \form val -> case val == mempty of
     true -> pure (pure Nothing)
     _ -> (map <<< map) Just (F.runValidation v form val)
+
+class ToText item where
+  toText :: item -> String
+
+instance toTextString :: ToText String where
+  toText = identity
+
+instance toTextCoin :: ToText Coin where
+  toText (Coin { tokenName }) = show tokenName
+
+instance toTextTokenName :: ToText TokenName where
+  toText = show
+
+formErrorToString :: forall e o. ToText e => F.FormFieldResult e o -> Maybe String
+formErrorToString = map toText <<< preview F._Error
+
+resultToHelp :: forall t e. ToText e => String -> F.FormFieldResult e t -> Either String String
+resultToHelp str = case _ of
+  F.NotValidated -> Right str
+  F.Validating -> Right "validating..."
+  other -> maybe (Right str) Left $ formErrorToString other
