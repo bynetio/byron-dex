@@ -21,4 +21,3 @@ data Err
   | EndpointRequestFailedRes Text Text
   | UnexpectedPABError Text
   deriving (Eq, Show)
-

@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DerivingVia           #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+
 module Uniswap.PAB.Types
   where
 
@@ -14,12 +15,9 @@ import           Deriving.Aeson       (CustomJSON (CustomJSON), FromJSON,
 import           GHC.Generics         (Generic)
 import           Uniswap.Common.Utils (PrefixedCamelCase)
 
-
-
 type Fee = (Integer, Integer)
 type Instance = Text
 type HistoryId = Text
-
 
 data History a = History [(HistoryId, a)] [HistoryId]
   deriving (Show, Generic, FromJSON, ToJSON)
@@ -176,7 +174,6 @@ data UniswapLog = UniswapLog
     _logLevel          :: Text
   } deriving (Show, Generic, FromJSON, ToJSON)
 
-
 data UniswapDefinition = UniswapDefiniotion
   { contents :: Value,
     tag      :: Text
@@ -185,7 +182,6 @@ data UniswapDefinition = UniswapDefiniotion
 
 -- | add ADT to handle all possible types in Result
 type UniswapMethodResult = Either Text UniswapSuccessMethodResult
-
 
 data UniswapSuccessMethodResult = UniswapSuccessMethodResult
   { contents :: Maybe Value,

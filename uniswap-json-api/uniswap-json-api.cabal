@@ -57,20 +57,24 @@ executable uniswap-json-api
   hs-source-dirs:     app
   import:             shared-properties
 
-test-suite uniswap-json-api-spec
+test-suite uniswap-json-api-specs
   type:               exitcode-stdio-1.0
   main-is:            Spec.hs
   hs-source-dirs:     test
   build-depends:      base
+                    , aeson
+                    , freer-simple
                     , hspec
                     , hspec-wai
                     , http-client
                     , http-client-tls
+                    , http-types
                     , servant
                     , servant-client
                     , servant-server
-                    , warp
                     , uniswap-json-api
+                    , unordered-containers
+                    , warp
   other-modules:      UniswapJsonApiSpec
   build-tool-depends: hspec-discover:hspec-discover == 2.*
   import:             shared-properties

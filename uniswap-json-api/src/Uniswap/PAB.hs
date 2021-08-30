@@ -1,34 +1,39 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
+
 module Uniswap.PAB
   where
 
-import Control.DeepSeq              (NFData (..))
-import Control.Monad                (join)
-import Control.Monad.Freer          (Eff, LastMember, Member, Members, interpret, interpretM, send, type (~>))
-import Control.Monad.Freer.Error    (catchError, handleError, runError, throwError)
-import Control.Monad.Freer.TH       (makeEffect)
-import Control.Monad.IO.Class       (MonadIO, liftIO)
-import Data.Aeson                   (ToJSON (toJSON), Value)
-import Data.Aeson.Text              (encodeToLazyText)
-import Data.Aeson.Types             (emptyObject)
-import Data.Either.Combinators      (mapLeft, maybeToRight)
-import Data.Text                    (Text, pack)
-import Data.Text.Lazy               (toStrict)
-import PyF                          (fmt)
-import Servant                      (Capture, Get, JSON, Post, Proxy (..), Put, ReqBody, type (:<|>),
-                                     type (:>))
-import Servant.API                  (type (:<|>) ((:<|>)))
-import Servant.Client.Streaming     (ClientError, ClientM, client)
-import Uniswap.Common.AppError      (AppError,
-                                     Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound, UnexpectedPABError))
-import Uniswap.Common.Logger        (Logger, logDebug, logError)
-import Uniswap.Common.NextId        (NextId, next)
-import Uniswap.Common.ServantClient (ServantClient, runClient')
-import Uniswap.Common.Utils         (Time, fromEither, showText, sleep)
-import Uniswap.LiquidityPool.Types
-import Uniswap.PAB.Types
-
+import           Control.DeepSeq              (NFData (..))
+import           Control.Monad                (join)
+import           Control.Monad.Freer          (Eff, LastMember, Member, Members,
+                                               interpret, interpretM, send,
+                                               type (~>))
+import           Control.Monad.Freer.Error    (catchError, handleError,
+                                               runError, throwError)
+import           Control.Monad.Freer.TH       (makeEffect)
+import           Control.Monad.IO.Class       (MonadIO, liftIO)
+import           Data.Aeson                   (ToJSON (toJSON), Value)
+import           Data.Aeson.Text              (encodeToLazyText)
+import           Data.Aeson.Types             (emptyObject)
+import           Data.Either.Combinators      (mapLeft, maybeToRight)
+import           Data.Text                    (Text, pack)
+import           Data.Text.Lazy               (toStrict)
+import           PyF                          (fmt)
+import           Servant                      (Capture, Get, JSON, Post,
+                                               Proxy (..), Put, ReqBody,
+                                               type (:<|>), type (:>))
+import           Servant.API                  (type (:<|>) ((:<|>)))
+import           Servant.Client.Streaming     (ClientError, ClientM, client)
+import           Uniswap.Common.AppError      (AppError,
+                                               Err (CallStatusFailed, EndpointRequestFailed, GetStatusFailed, StatusNotFound, UnexpectedPABError))
+import           Uniswap.Common.Logger        (Logger, logDebug, logError)
+import           Uniswap.Common.NextId        (NextId, next)
+import           Uniswap.Common.ServantClient (ServantClient, runClient')
+import           Uniswap.Common.Utils         (Time, fromEither, showText,
+                                               sleep)
+import           Uniswap.LiquidityPool.Types
+import           Uniswap.PAB.Types
 
 data UniswapPab r where
   Pools               :: Instance -> UniswapPab Value
@@ -70,7 +75,6 @@ endpointAPI :: Text -> Text -> Value -> ClientM ()
 stopAPI :: Text -> ClientM ()
 (statusAPI :<|> endpointAPI :<|> stopAPI) = uniswap
 
-
 -- | Interpret the 'UniswapPab' effect.
 runPab
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
@@ -108,7 +112,6 @@ doRequest uid a endpoint errMsg = do
     Right (UniswapSuccessMethodResult (Just v) _) -> pure v
     Right _                                       -> pure emptyObject
 
-
 fetchStatus
   :: forall m effs. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
@@ -124,14 +127,11 @@ fetchStatus uID = do
 history :: UniswapStatusResponse -> History UniswapMethodResult
 history = observableState . cicCurrentState
 
-
 extractUniswapDef :: HistoryId -> UniswapStatusResponse -> Either Text UniswapMethodResult
 extractUniswapDef hid r = maybeToRight "History ID not found in history" $ lookupHistory hid $ history r
 
-
 extractStatus :: HistoryId -> Either ClientError UniswapStatusResponse -> Either Text UniswapMethodResult
 extractStatus hid e = extractUniswapDef hid =<< mapLeft showText e
-
 
 data ShouldRetry a b
   = Retry a
@@ -160,7 +160,6 @@ retryRequest maxRetries action = retryInner 0
        Ok resp -> do
          pure $ Right resp
 
-
 getStatusByHistoryId
   :: forall m effs a. (MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
@@ -186,7 +185,6 @@ getStatusByHistoryId uid hid =
         def <- retryRequest 20 extractDef
         fromEither $ mapLeft (StatusNotFound hid) def
 
-
 doEndpointRequest
   :: forall m effs a. (ToJSON a, MonadIO m, LastMember m effs, Members (UniswapPabEffs m) effs)
   => Instance
@@ -205,4 +203,3 @@ doEndpointRequest uId hid a endpoint errMsg = do
         logDebug $ toStrict . encodeToLazyText $ ahid
         res <- runClient' $ endpointAPI uId endpoint value
         pure $ either Retry Ok res
-

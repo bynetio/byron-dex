@@ -7,7 +7,8 @@ module Uniswap.Common.Logger
   ) where
 
 import qualified Colog                  as L
-import           Control.Monad.Freer    (Eff, LastMember, Member, interpretM, type (~>))
+import           Control.Monad.Freer    (Eff, LastMember, Member, interpretM,
+                                         type (~>))
 import qualified Control.Monad.Freer.TH as EffTH
 import           Control.Monad.IO.Class (MonadIO)
 import           Data.Text              (Text)
@@ -31,8 +32,6 @@ runColog =
         LogError msg -> withColog L.E msg
         LogDebug msg -> withColog L.D msg
 
-
 -- | FIXME: Change fmtMessage to fmtSimpleRichMessageDefault to add correct
 withColog :: MonadIO m => L.Severity -> Text -> m ()
 withColog s = L.usingLoggerT (L.cmap L.fmtMessage L.logTextStdout) . L.log s
-

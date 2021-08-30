@@ -1,23 +1,23 @@
-{-# LANGUAGE DeriveAnyClass             #-}
-{-# LANGUAGE DeriveGeneric              #-}
-{-# LANGUAGE DerivingStrategies         #-}
-{-# LANGUAGE DuplicateRecordFields      #-}
-{-# LANGUAGE FlexibleContexts           #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DerivingStrategies    #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
+
 module UniswapJsonApi.Types
   where
 
-import Control.DeepSeq
-import Control.Monad.Except     (ExceptT, MonadError)
-import Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
-import Data.Aeson               (FromJSON, ToJSON, Value)
-import Data.ByteString          (ByteString)
-import Data.List                (find)
-import Data.Text                (Text)
-import Data.UUID                (UUID)
-import GHC.Generics
-import Network.Wai.Handler.Warp (HostPreference)
-import Servant                  (ServerError)
+import           Control.DeepSeq
+import           Control.Monad.Except     (ExceptT, MonadError)
+import           Control.Monad.Reader     (MonadIO, MonadReader, ReaderT)
+import           Data.Aeson               (FromJSON, ToJSON, Value)
+import           Data.ByteString          (ByteString)
+import           Data.List                (find)
+import           Data.Text                (Text)
+import           Data.UUID                (UUID)
+import           GHC.Generics
+import           Network.Wai.Handler.Warp (HostPreference)
+import           Servant                  (ServerError)
 
 type Instance = Text
 
@@ -59,7 +59,6 @@ data UniswapLog = UniswapLog
     _logLevel          :: Text
   } deriving (Show, Generic, FromJSON, ToJSON)
 
-
 data UniswapDefinition = UniswapDefiniotion
   { contents :: Value,
     tag      :: Text
@@ -68,7 +67,6 @@ data UniswapDefinition = UniswapDefiniotion
 
 -- | add ADT to handle all possible types in Result
 type UniswapMethodResult = Either Text UniswapSuccessMethodResult
-
 
 data UniswapSuccessMethodResult = UniswapSuccessMethodResult
   { contents :: Maybe Value,
@@ -86,7 +84,6 @@ newtype UniswapWallet = UniswapWallet
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
-
 data PabConfig = MkPabConfig
   { pabUrl  :: String
   , pabPort :: Int
@@ -96,5 +93,3 @@ data AppContext = MkAppContext
   { pab  :: PabConfig
   , port :: Int
   } deriving (Show)
-
-

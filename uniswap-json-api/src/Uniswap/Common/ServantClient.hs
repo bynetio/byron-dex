@@ -1,4 +1,5 @@
 {-# LANGUAGE TypeOperators #-}
+
 module Uniswap.Common.ServantClient
   ( ServantClient
   , runClient
@@ -6,17 +7,19 @@ module Uniswap.Common.ServantClient
   , runServantClientUrl
   ) where
 
-
-import Control.DeepSeq           (NFData)
-import Control.Monad             ((>=>))
-import Control.Monad.Freer       (Eff, LastMember, Member, Members, interpretM, send, sendM, type (~>))
-import Control.Monad.Freer.Error (Error, throwError)
-import Control.Monad.Freer.TH    (makeEffect)
-import Control.Monad.IO.Class    (MonadIO, liftIO)
-import Network.HTTP.Client       (newManager)
-import Network.HTTP.Client.TLS   (tlsManagerSettings)
-import Servant.Client.Streaming  (ClientError, ClientM, mkClientEnv, parseBaseUrl, runClientM, withClientM)
-import Uniswap.Common.Utils      (fromEither)
+import           Control.DeepSeq           (NFData)
+import           Control.Monad             ((>=>))
+import           Control.Monad.Freer       (Eff, LastMember, Member, Members,
+                                            interpretM, send, sendM, type (~>))
+import           Control.Monad.Freer.Error (Error, throwError)
+import           Control.Monad.Freer.TH    (makeEffect)
+import           Control.Monad.IO.Class    (MonadIO, liftIO)
+import           Network.HTTP.Client       (newManager)
+import           Network.HTTP.Client.TLS   (tlsManagerSettings)
+import           Servant.Client.Streaming  (ClientError, ClientM, mkClientEnv,
+                                            parseBaseUrl, runClientM,
+                                            withClientM)
+import           Uniswap.Common.Utils      (fromEither)
 
 data ServantClient r where
   RunClient' :: NFData o => ClientM o -> ServantClient (Either ClientError o)
