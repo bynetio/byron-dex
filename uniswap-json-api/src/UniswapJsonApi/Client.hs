@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 {-# LANGUAGE TypeOperators     #-}
 
-{-# LANGUAGE RecordWildCards   #-}
 module UniswapJsonApi.Client
   where
 
@@ -173,4 +173,3 @@ uniswapStop :: MonadIO m => PabConfig -> Instance -> HistoryId -> m (Either Clie
 uniswapStop c i hid = pabEndpoint c i "stop" v
   where
     v = object [ "historyId" .= hid, "content" .= emptyArray ]
-

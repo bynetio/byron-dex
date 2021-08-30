@@ -1,5 +1,8 @@
+{-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RankNTypes        #-}
 {-# LANGUAGE RecordWildCards   #-}
+
 module Uniswap.App
   ( runApp )
   where
@@ -49,7 +52,6 @@ type AppEffs =
    , Handler
    ]
 
-
 liftToHandler :: forall a. AppContext -> Eff AppEffs a -> Handler a
 liftToHandler MkAppContext{..} effs = do
   handler <- runEffects pab effs
@@ -61,7 +63,6 @@ liftToHandler MkAppContext{..} effs = do
 
     toPabUrl :: PabConfig -> String
     toPabUrl MkPabConfig{..} = pabUrl <> ":" <> show pabPort
-
 
 mapError :: Err -> Handler a
 mapError =
@@ -86,4 +87,3 @@ corsPolicy =
 
 corsConfig :: Middleware
 corsConfig = cors (const $ Just corsPolicy)
-
