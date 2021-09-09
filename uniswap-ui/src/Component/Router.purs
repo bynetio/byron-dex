@@ -16,6 +16,7 @@ import Type.Proxy (Proxy(..))
 import Uniswap.Capability.Funds (class ManageFunds)
 import Uniswap.Capability.Navigate (class Navigate, navigate)
 import Uniswap.Capability.Pool (class ManagePool)
+import Uniswap.Capability.Swap (class ManageSwap)
 import Uniswap.Capability.Timer (class Timer)
 import Uniswap.Data.Route (Route(..), routeCodec)
 import Uniswap.Data.Wallet (Wallet)
@@ -57,6 +58,7 @@ component ::
   Navigate m =>
   ManagePool m =>
   ManageFunds m =>
+  ManageSwap m =>
   Timer m =>
   H.Component Query Unit Void m
 component =

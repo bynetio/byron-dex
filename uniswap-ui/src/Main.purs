@@ -16,6 +16,8 @@ import Uniswap.Component.Router as Router
 import Uniswap.Data.Route (routeCodec)
 import Uniswap.Data.Wallet (Wallet)
 import Uniswap.Store (Store)
+import Uniswap.Data.SlippageTolerance as SlippageTolerance
+import Uniswap.Data.SlippageTolerance (SlippageTolerance)
 
 main :: Effect Unit
 main =
@@ -23,13 +25,16 @@ main =
     body <- HA.awaitBody
     let
       currentWallet :: Maybe Wallet
-      currentWallet = Just ({ instance: "b5b981ae-c655-4957-b7a9-ef2702dd51a1" })
+      currentWallet = Just ({ instance: "90539f8a-d02f-4d64-808a-04dc434d755b" })
 
       apiUrl :: ApiURL
       apiUrl = ApiURL "http://localhost:3000"
 
+      slippageTolerance :: SlippageTolerance
+      slippageTolerance = SlippageTolerance.ofInt 1
+
       initialStore :: Store
-      initialStore = { apiUrl, currentWallet }
+      initialStore = { apiUrl, currentWallet, slippageTolerance }
     rootComponent <- runAppM initialStore Router.component
     halogenIO <- runUI rootComponent unit body
     void $ liftEffect

@@ -1,0 +1,57 @@
+.swap-box {
+  margin: 2rem auto 0 auto;
+  position: relative;
+  max-width: 480px;
+  width: 100%;
+  box-shadow: rgba(0, 0, 0, 0.01) 0px 0px 1px, rgba(0, 0, 0, 0.04) 0px 4px 8px,
+    rgba(0, 0, 0, 0.04) 0px 16px 24px, rgba(0, 0, 0, 0.01) 0px 24px 32px;
+  border-radius: 24px;
+  background-color: #d4e6fc;
+}
+
+.coin-input-box {
+  display: flex;
+  flex-flow: row nowrap;
+  align-items: center;
+  padding: 1rem 1rem 0.75rem;
+  justify-content: space-between;
+  border-radius: 24px;
+  box-shadow: rgba(0, 0, 0, 0.2) 0px 0px 1px, rgba(0, 0, 0, 0.4) 0px 4px 8px,
+    rgba(0, 0, 0, 0.04) 0px 16px 24px, rgba(0, 0, 0, 0.01) 0px 24px 32px;
+}
+
+.currency-select-button {
+  justify-content: space-between;
+  margin-right: 12px;
+}
+
+.token-amount-input {
+  text-align: right;
+  text-overflow: ellipsis;
+  border: medium none;
+  width: 0px;
+  position: relative;
+  border: medium none;
+  flex: 1 1 auto;
+  font-size: 24px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0px;
+  appearance: textfield;
+  text-align: right;
+}
+
+.swap-arrow {
+  padding: 4px;
+  border-radius: 12px;
+  height: 32px;
+  width: 32px;
+  position: relative;
+  margin-top: -14px;
+  margin-bottom: -14px;
+  left: calc(50% - 16px);
+  background-color: rgb(169, 169, 169);
+  border: 4px solid rgb(190, 230, 252);
+  z-index: 2;
+}

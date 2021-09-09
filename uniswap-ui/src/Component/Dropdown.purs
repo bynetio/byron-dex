@@ -37,17 +37,18 @@ type State item
     )
 
 type Input item
-  = { items :: Array item
+  = { item :: Maybe item
+    , items :: Array item
     , placeholder :: String
     }
 
 input :: forall item. Input item -> Select.Input (State item)
-input { items, placeholder } =
+input { item, items, placeholder } =
   { inputType: Select.Toggle
   , search: Nothing
   , debounceTime: Nothing
   , getItemCount: length <<< _.items
-  , selected: Nothing
+  , selected: item
   , available: items
   , items
   , placeholder
@@ -63,7 +64,7 @@ toggle props st =
   HH.div
     [ css "dropdown-trigger" ]
     [ HH.button
-        ( [ css "button is-light dropdown-toggle" ]
+        ( [ css "button is-light dropdown-toggle is-rounded" ]
             <> Setters.setToggleProps props
         )
         [ HH.text $ fromMaybe st.placeholder (toText <$> st.selected) ]
