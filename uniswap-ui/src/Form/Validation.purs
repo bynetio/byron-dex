@@ -2,12 +2,16 @@ module Uniswap.Form.Validation where
 
 import Prelude
 import Data.BigInt (fromString)
+import Data.Codec.Argonaut (int)
 import Data.Decimal (Decimal)
 import Data.Decimal as Decimal
 import Data.Either (Either(..), note)
+import Data.Int as Int
 import Data.Lens (preview)
+import Data.List (List(..), (:))
 import Data.Maybe (Maybe(..), maybe)
 import Data.Show (show)
+import Data.String (Pattern(..), length, split)
 import Data.String as String
 import Formless as F
 import Uniswap.Data.Amount (Amount(..))
@@ -65,7 +69,7 @@ amountFormat = F.hoistFnE_ $ condMap (_ /= mempty) (\str -> note InvalidAmount (
 
 -- | We should represent Fee as an arbitrary precision number instead of fractional
 feeFormat :: forall form m. Monad m => F.Validation form m FormError String Fee
-feeFormat = F.hoistFnE_ $ condMap positiveDec (\str -> note InvalidFee (toFee <$> Decimal.fromString str)) InvalidFee
+feeFormat = F.hoistFnE_ $ condMap positiveDec (\str -> note InvalidFee (toFee str)) InvalidFee
   where
   positiveDec :: String -> Boolean
   positiveDec str = case Decimal.fromString str of
@@ -73,8 +77,16 @@ feeFormat = F.hoistFnE_ $ condMap positiveDec (\str -> note InvalidFee (toFee <$
       | (i >= Decimal.fromInt 0) && Decimal.isFinite i -> true
     _ -> false
 
-  toFee :: Decimal -> Fee
-  toFee _ = { numerator: 20, denominator: 500 }
+  toFee :: String -> Maybe Fee
+  toFee raw = case split (Pattern ".") raw of
+    [ int, rest ] -> do
+      let
+        restLen = length rest
+
+        denominator = (Int.pow 10 restLen) * 100
+      numerator <- Int.fromString (int <> rest)
+      pure $ { numerator, denominator }
+    _ -> Nothing
 
 cond :: forall a. (a -> Boolean) -> FormError -> a -> Either FormError a
 cond f err a = if f a then pure a else Left err

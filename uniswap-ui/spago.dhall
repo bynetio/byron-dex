@@ -26,6 +26,7 @@ You can edit this file as you like.
   , "halogen-select"
   , "halogen-store"
   , "halogen-subscriptions"
+  , "halogen-svg-elems"
   , "http-methods"
   , "integers"
   , "lists"

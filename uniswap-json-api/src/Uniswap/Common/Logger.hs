@@ -14,9 +14,9 @@ import           Control.Monad.IO.Class (MonadIO)
 import           Data.Text              (Text)
 
 data Logger r where
-  LogInfo   :: Text -> Logger ()
-  LogDebug  :: Text -> Logger ()
-  LogError  :: Text -> Logger ()
+  LogInfo :: Text -> Logger ()
+  LogDebug :: Text -> Logger ()
+  LogError :: Text -> Logger ()
 
 EffTH.makeEffect ''Logger
 

@@ -177,7 +177,7 @@ formComponent ::
 formComponent funds =
   F.component formInput
     $ F.defaultSpec
-        { render = renderCreateLP funds
+        { render = renderCreateLP
         , handleEvent = handleEvent
         , handleQuery = handleQuery
         , handleAction = handleAction
@@ -221,22 +221,22 @@ formComponent funds =
 
   proxies = F.mkSProxies (Proxy :: _ AddPoolForm)
 
-  renderCoin funds help slot label =
+  renderCoin help slot label =
     Field.field
       { label: label
       , help: help
       }
-      [ HH.slot DD._dropdown slot (Select.component DD.input DD.spec) coinsInput handler
-      ]
+      [ HH.slot DD._dropdown slot (Select.component DD.input DD.spec) coinsInput handler ]
     where
     handler = F.injAction <<< (HandleCoin slot)
 
     coinsInput =
       { placeholder: "Choose " <> label
+      , item: Nothing
       , items: map (\f -> f.coin) funds
       }
 
-  renderCreateLP funds { form, formError } =
+  renderCreateLP { form, formError } =
     HH.form
       [ HE.onSubmit \ev -> F.injAction $ Submit ev ]
       [ whenElem formError \_ ->
@@ -244,21 +244,21 @@ formComponent funds =
             [ css "error-messages" ]
             [ HH.text "all fields are required" ]
       , HH.fieldset_
-          [ renderCoin funds (F.getResult proxies.coinA form # V.resultToHelp "") CoinA "Coin A"
+          [ renderCoin (F.getResult proxies.coinA form # V.resultToHelp "") CoinA "Coin A"
           , Field.input'
               { label: "Amount A"
               , help: F.getResult proxies.amountA form # V.resultToHelp ""
-              , placeholder: "Amount of Lovelace"
+              , placeholder: "Amount"
               , inputType: HP.InputText
               }
               [ HP.value $ F.getInput proxies.amountA form
               , HE.onValueInput (F.setValidate proxies.amountA)
               ]
-          , renderCoin funds (F.getResult proxies.coinA form # V.resultToHelp "") CoinB "Coin B"
+          , renderCoin (F.getResult proxies.coinA form # V.resultToHelp "") CoinB "Coin B"
           , Field.input'
               { label: "Amount B"
               , help: F.getResult proxies.amountA form # V.resultToHelp ""
-              , placeholder: "Amount of Lovelace"
+              , placeholder: "Amount"
               , inputType: HP.InputText
               }
               [ HP.value $ F.getInput proxies.amountB form
@@ -266,7 +266,7 @@ formComponent funds =
               ]
           , Field.input'
               { label: "Fee"
-              , help: F.getResult proxies.amountA form # V.resultToHelp ""
+              , help: F.getResult proxies.fee form # V.resultToHelp ""
               , placeholder: "Fee"
               , inputType: HP.InputText
               }

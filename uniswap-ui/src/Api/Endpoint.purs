@@ -11,6 +11,13 @@ data Endpoint
   = Pools
   | Funds
   | CreatePool
+  | ClosePool
+  | AddToPool
+  | RemoveFromPool
+  | Swap
+  | SwapPreview
+  | IndirectSwap
+  | IndirectSwapPreview
 
 derive instance genericEndpoint :: Generic Endpoint _
 
@@ -21,4 +28,11 @@ endpointCodec wallet =
         { "Pools": "pools" / noArgs
         , "Funds": "funds" / noArgs
         , "CreatePool": "create" / noArgs
+        , "ClosePool": "close" / noArgs
+        , "AddToPool": "add" / noArgs
+        , "RemoveFromPool": "remove" / noArgs
+        , "Swap": "swap" / noArgs
+        , "SwapPreview": "swap-preview" / noArgs
+        , "IndirectSwap": "indirect-swap" / noArgs
+        , "IndirectSwapPreview": "indirect-swap-preview" / noArgs
         }
