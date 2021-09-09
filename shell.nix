@@ -37,7 +37,7 @@ let
     };
   };
 
-  nixpkgsInputs = (with pkgs; [ ghcid niv nixpkgs-fmt nodejs-14_x z3 zlib ]);
+  nixpkgsInputs = (with pkgs; [ ghcid niv nixpkgs-fmt nodejs-14_x z3 zlib nodePackages.parcel-bundler ]);
 
   localInputs = (with uniswap; [
     hlint
