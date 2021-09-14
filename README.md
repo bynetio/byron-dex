@@ -339,3 +339,11 @@ Usage:
   "extensions": ["haskell.haskell"]
 }
 ```
+
+## Launching dApp
+
+```bash
+$ cabal run uniswap-pab
+$ cabal run exe:uniswap-json-api
+$ cd uniswap-ui && npm run serve-dev
+```
