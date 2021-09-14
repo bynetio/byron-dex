@@ -57,22 +57,23 @@ component =
   render :: State -> H.ComponentHTML Action ChildSlots m
   render _ =
     container
-      [ HH.h1
-          [ css "title" ]
-          [ HH.text "Connect a Wallet" ]
-      , HH.slot F._formless unit formComponent unit HandleConnectFrom
+      [ HH.div
+          [ css "box connect-box" ]
+          [ HH.h1
+              [ css "title" ]
+              [ HH.text "Connect a Wallet" ]
+          , HH.slot F._formless unit formComponent unit HandleConnectFrom
+          ]
       ]
     where
     container html =
-      HH.div
-        [ css "" ]
+      HH.div_
         [ header Nothing ConnectWallet
         , HH.div
-            [ css "container" ]
-            [ HH.div
-                [ css "box columns is-centered" ]
+            [ css "container page" ]
+            [ HH.div_
                 [ HH.div
-                    [ css "column  is-one-third" ]
+                    [ css "column" ]
                     html
                 ]
             ]

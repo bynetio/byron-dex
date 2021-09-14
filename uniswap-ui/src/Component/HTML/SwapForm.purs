@@ -9,6 +9,7 @@ import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
+import Halogen.HTML.Properties as HP
 import Halogen.Svg.Attributes as SA
 import Halogen.Svg.Elements as SE
 import Type.Proxy (Proxy(..))
@@ -180,7 +181,11 @@ component funds =
       [ renderInputCoin CoinA "Select a Coin A"
       , renderArrow
       , renderInputCoin CoinB "Select a Coin B"
-      , Field.submit "Create!"
+      , HH.input
+          [ css "swap-button is-link is-light "
+          , HP.type_ HP.InputSubmit
+          , HP.value "Swap"
+          ]
       ]
     where
     renderInputCoin slot label = HH.slot CoinInputPanel._coinInputPanel slot CoinInputPanel.coinInputPanel inputForm handler

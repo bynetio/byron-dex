@@ -108,8 +108,7 @@ component =
         [ header currentWallet Route.Swap
         , HH.div
             [ css "container page" ]
-            [ HH.div
-                [ css "" ]
+            [ HH.div_
                 [ HH.div
                     [ css "column" ]
                     renderHtml

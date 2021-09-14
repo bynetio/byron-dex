@@ -101,6 +101,6 @@ instance timerAppM :: Timer AppM where
     _ <-
       H.liftAff $ Aff.forkAff
         $ forever do
-            Aff.delay $ Aff.Milliseconds 30000.0 -- 30 seconds
+            Aff.delay $ Aff.Milliseconds 5000.0 -- 5 seconds
             liftEffect $ HS.notify listener val
     pure emitter

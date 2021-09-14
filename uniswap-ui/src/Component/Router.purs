@@ -102,7 +102,7 @@ component =
     Just r -> case r of
       Home ->
         connected currentWallet do
-          HH.slot_ (Proxy :: _ "funds") unit Funds.component unit
+          HH.slot_ (Proxy :: _ "swap") unit Swap.component unit
       Pools ->
         connected currentWallet do
           HH.slot_ (Proxy :: _ "pools") unit LiquidityPools.component unit
