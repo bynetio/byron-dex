@@ -1,4 +1,4 @@
-# dex
+# Byron DEX
 
 ## Development setup
 
