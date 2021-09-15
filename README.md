@@ -1,4 +1,5 @@
 # Byron DEX
+More information about Byron Network Project and our plans you can find in our [whitepaper](https://github.com/byron-network/byron-whitepaper) and [website](https://byron.network).
 
 ## Development setup
 
