@@ -124,11 +124,12 @@ data AddForm
 
 data LiquidityPoolWithCoins
   = LiquidityPoolWithCoins
-      { coinA   :: Coin
-      , coinB   :: Coin
-      , fee     :: Fee
-      , amountA :: Integer
-      , amountB :: Integer
+      { coinA         :: Coin
+      , coinB         :: Coin
+      , fee           :: Fee
+      , amountA       :: Integer
+      , amountB       :: Integer
+      , liquidityCoin :: Coin
       }
   deriving (FromJSON, Generic, Show, ToJSON)
 

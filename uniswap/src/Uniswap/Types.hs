@@ -21,31 +21,29 @@
 
 module Uniswap.Types
   where
-import           Control.Lens                 hiding ((.=))
-import           Data.Aeson                   (FromJSON (parseJSON),
-                                               ToJSON (toJSON), object,
-                                               withObject, (.:), (.=))
+
+import           Control.Lens                 ((^?!))
+import           Data.Aeson                   (FromJSON (parseJSON), ToJSON (toJSON), object, withObject,
+                                               (.:), (.=))
 import qualified Data.Aeson                   as JSON
 import qualified Data.Aeson.Extras            as JSON
 import           Data.Aeson.Lens              (key)
-import           Data.Maybe                   (fromJust)
-import           Data.String
-import           Data.Text.Encoding           (decodeUtf8)
+import           Data.String                  (IsString (fromString))
 import qualified Data.Text.Encoding           as E
-import           Ledger
+import           Ledger                       (AssetClass, CurrencySymbol, TokenName, Value)
 import           Ledger.Value                 (AssetClass (..),
-                                               CurrencySymbol (CurrencySymbol, unCurrencySymbol),
-                                               TokenName (unTokenName),
-                                               assetClass, assetClassValue,
-                                               assetClassValueOf, tokenName)
-import           Playground.Contract          (FromJSON, Generic, ToJSON,
-                                               ToSchema)
+                                               CurrencySymbol (CurrencySymbol, unCurrencySymbol), assetClass,
+                                               assetClassValue, assetClassValueOf, tokenName)
+import           Playground.Contract          (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude
+import           PlutusTx.Prelude             (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, Bool,
+                                               ByteString, Eq (..), Integer, MultiplicativeSemigroup,
+                                               Ord (max, min, (<=)), fst, return, snd, ($), (&&), (.), (||))
 import           Prelude                      (Show, show)
 import qualified Prelude
 import           Text.Printf                  (PrintfArg)
-import           Uniswap.Common.WalletHistory
+import           Uniswap.Common.WalletHistory (HistoryId)
+
 type Fee = (Integer, Integer)
 
 -- | Uniswap coin token
@@ -80,49 +78,50 @@ PlutusTx.makeLift ''Liquidity
 
 -- | A single 'AssetClass'. Because we use three coins, we use a phantom type to track
 -- which one is which.
-newtype Coin a = Coin {unCoin :: AssetClass}
-  deriving stock (Show, Generic)
-  deriving newtype (ToSchema, Eq, Prelude.Eq, Prelude.Ord)
+newtype Coin a
+  = Coin { unCoin :: AssetClass }
+  deriving stock (Generic, Show)
+  deriving newtype (Eq, Prelude.Eq, Prelude.Ord, ToSchema)
 
 instance ToJSON (Coin a) where
   toJSON coin =
-    object [
-      "currencySymbol" .= encodeCoin (JSON.encodeByteString . unCurrencySymbol . fst),
-      "tokenName" .= (toJSON (snd $ unAssetClass $ unCoin coin) ^?! key "unTokenName")
-    ]
-      where
-        encodeCoin f = JSON.String . f . unAssetClass . unCoin $ coin
+    object
+      [ "currencySymbol" .= encodeCoin (JSON.encodeByteString . unCurrencySymbol . fst),
+        "tokenName" .= (toJSON (snd $ unAssetClass $ unCoin coin) ^?! key "unTokenName")
+      ]
+    where
+      encodeCoin f = JSON.String . f . unAssetClass . unCoin $ coin
 
 instance FromJSON (Coin a) where
   parseJSON = withObject "Coin" $ \v -> do
-    rawTokenName      <- v .: "tokenName"
+    rawTokenName <- v .: "tokenName"
     rawCurrencySymbol <- v .: "currencySymbol"
     currencySymbolBytes <- JSON.decodeByteString rawCurrencySymbol
     let currencySymbol' = CurrencySymbol currencySymbolBytes
-        tokenName'      = tokenName . E.encodeUtf8 $ rawTokenName
+        tokenName' = tokenName . E.encodeUtf8 $ rawTokenName
     return . Coin $ assetClass currencySymbol' tokenName'
 
 PlutusTx.makeIsDataIndexed ''Coin [('Coin, 0)]
 PlutusTx.makeLift ''Coin
 
-
-
 -- | Likewise for 'Integer'; the corresponding amount we have of the
 -- particular 'Coin'.
-newtype Amount a = Amount {unAmount :: Integer}
-  deriving stock (Show, Generic)
-  deriving newtype (ToJSON, FromJSON, ToSchema, Eq, Ord, PrintfArg)
-  deriving newtype (Prelude.Eq, Prelude.Ord, Prelude.Num, Prelude.Enum, Prelude.Real, Prelude.Integral)
+newtype Amount a
+  = Amount { unAmount :: Integer }
+  deriving stock (Generic, Show)
+  deriving newtype (Eq, FromJSON, Ord, PrintfArg, ToJSON, ToSchema)
+  deriving newtype (Prelude.Enum, Prelude.Eq, Prelude.Integral, Prelude.Num, Prelude.Ord, Prelude.Real)
   deriving newtype (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, MultiplicativeSemigroup)
 
 PlutusTx.makeIsDataIndexed ''Amount [('Amount, 0)]
 PlutusTx.makeLift ''Amount
 
-data AmountOfCoin a = AmountOfCoin
-  { coin   :: Coin a
-  , amount :: Amount a
-  } deriving (Show,Generic,ToSchema,Eq, FromJSON, ToJSON)
-
+data AmountOfCoin a
+  = AmountOfCoin
+      { coin   :: Coin a
+      , amount :: Amount a
+      }
+  deriving (Eq, FromJSON, Generic, Show, ToJSON, ToSchema)
 
 {-# INLINEABLE valueOf #-}
 valueOf :: Coin a -> Amount a -> Value
@@ -145,23 +144,23 @@ mkCoin :: CurrencySymbol -> TokenName -> Coin a
 mkCoin c = Coin . assetClass c
 
 -- | Wraps uniswap NFT Token
-newtype Uniswap = Uniswap
-  { usCoin :: Coin U
-  }
-  deriving stock (Show, Generic)
-  deriving anyclass (ToJSON, FromJSON, ToSchema)
+newtype Uniswap
+  = Uniswap { usCoin :: Coin U }
+  deriving stock (Generic, Show)
+  deriving anyclass (FromJSON, ToJSON, ToSchema)
   deriving newtype (Prelude.Eq, Prelude.Ord)
 
 PlutusTx.makeIsDataIndexed ''Uniswap [('Uniswap, 0)]
 PlutusTx.makeLift ''Uniswap
 
-data LiquidityPool = LiquidityPool
-  { lpCoinA         :: Coin A,
-    lpCoinB         :: Coin B,
-    lpFee           :: Fee,
-    lpFeeByteString :: ByteString
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data LiquidityPool
+  = LiquidityPool
+      { lpCoinA         :: Coin A
+      , lpCoinB         :: Coin B
+      , lpFee           :: Fee
+      , lpFeeByteString :: ByteString
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed ''LiquidityPool [('LiquidityPool, 0)]
 PlutusTx.makeLift ''LiquidityPool
@@ -169,15 +168,26 @@ PlutusTx.makeLift ''LiquidityPool
 liquidityPool :: (Coin A, Coin B) -> Fee -> LiquidityPool
 liquidityPool (Coin a, Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a b)) fee $ fromString $ show fee
 
+data LiquidityPoolWithCoins
+  = LiquidityPoolWithCoins
+      { coinA         :: Coin A
+      , coinB         :: Coin B
+      , fee           :: Fee
+      , amountA       :: Amount A
+      , amountB       :: Amount B
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-data LiquidityPoolWithCoins = LiquidityPoolWithCoins
-  { coinA   :: Coin A,
-    coinB   :: Coin B,
-    fee     :: Fee,
-    amountA :: Amount A,
-    amountB :: Amount B
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
-
+data LiquidityPoolView
+  = LiquidityPoolView
+      { coinA         :: Coin A
+      , coinB         :: Coin B
+      , fee           :: Fee
+      , amountA       :: Amount A
+      , amountB       :: Amount B
+      , liquidityCoin :: Coin Liquidity
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | just swap in place the coins not touching types
 swapCoins :: (Coin A, Coin B) -> (Coin A, Coin B)
@@ -208,7 +218,13 @@ instance Prelude.Ord LiquidityPool where
       order :: (Coin A, Coin B) -> (Coin A, Coin B)
       order (ca, cb) = if unCoin ca <= unCoin cb then (ca, cb) else swapCoins (ca, cb)
 
-data UniswapAction = Create LiquidityPool | Close | Swap | ISwap | Remove | Add
+data UniswapAction
+  = Create LiquidityPool
+  | Close
+  | Swap
+  | ISwap
+  | Remove
+  | Add
   deriving (Show)
 
 PlutusTx.makeIsDataIndexed
@@ -237,140 +253,141 @@ PlutusTx.makeIsDataIndexed
 PlutusTx.makeLift ''UniswapDatum
 
 -- | Parameters for the @create@-endpoint, which creates a new liquidity pool.
-data CreateParams = CreateParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA   :: Coin A,
-    -- | The other 'Coin'.
-    coinB   :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee     :: Fee,
-    -- | Amount of liquidity for the first 'Coin'.
-    amountA :: Amount A,
-    -- | Amount of liquidity for the second 'Coin'.
-    amountB :: Amount B
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data CreateParams
+  = CreateParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA   :: Coin A
+        -- | The other 'Coin'.
+      , coinB   :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee     :: Fee
+        -- | Amount of liquidity for the first 'Coin'.
+      , amountA :: Amount A
+        -- | Amount of liquidity for the second 'Coin'.
+      , amountB :: Amount B
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | Parameters for the @swap@-endpoint, which allows swaps between the two different coins in a liquidity pool.
 -- One of the provided amounts must be positive, the other must be zero.
-data SwapParams = SwapParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA    :: Coin A,
-    -- | The other 'Coin'.
-    coinB    :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee      :: Fee,
-    -- | The amount the first 'Coin' that should be swapped.
-    amount   :: Amount A,
-    -- | The expected amount of swaped 'Coin B' (quoted amount)
-    result   :: Amount B,
-    -- | The expected % difference between quoted and executed prices.
-    slippage :: Integer
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data SwapParams
+  = SwapParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA    :: Coin A
+        -- | The other 'Coin'.
+      , coinB    :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee      :: Fee
+        -- | The amount the first 'Coin' that should be swapped.
+      , amount   :: Amount A
+        -- | The expected amount of swaped 'Coin B' (quoted amount)
+      , result   :: Amount B
+        -- | The expected % difference between quoted and executed prices.
+      , slippage :: Integer
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-data SwapPreviewParams = SwapPreviewParams
-  {
-    coinA  :: Coin A,
-    coinB  :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee    :: Fee,
-    amount :: Amount A
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data SwapPreviewParams
+  = SwapPreviewParams
+      { coinA  :: Coin A
+      , coinB  :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee    :: Fee
+      , amount :: Amount A
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-data IndirectSwapParams = IndirectSwapParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA    :: Coin A,
-    -- | The other 'Coin'.
-    coinB    :: Coin B,
-    -- | The amount of the first 'Coin' that should be swapped.
-    amount   :: Amount A,
-    result   :: Amount B,
-    slippage :: Integer
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data IndirectSwapParams
+  = IndirectSwapParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA    :: Coin A
+        -- | The other 'Coin'.
+      , coinB    :: Coin B
+        -- | The amount of the first 'Coin' that should be swapped.
+      , amount   :: Amount A
+      , result   :: Amount B
+      , slippage :: Integer
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-data ISwapPreviewParams = ISwapPreviewParams
-  {
-    coinA  :: Coin A,
-    coinB  :: Coin B,
-    amount :: Amount A
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data ISwapPreviewParams
+  = ISwapPreviewParams
+      { coinA  :: Coin A
+      , coinB  :: Coin B
+      , amount :: Amount A
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | Parameters for the @close@-endpoint, which closes a liquidity pool.
-data CloseParams = CloseParams
-  {
-    -- | One 'Coin' of the liquidity pair.
-    coinA :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee   :: Fee
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data CloseParams
+  = CloseParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA :: Coin A
+        -- | The other 'Coin' of the liquidity pair.
+      , coinB :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee   :: Fee
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | Parameters for the @remove@-endpoint, which removes some liquidity from a liquidity pool.
-data RemoveParams = RemoveParams
-  {
-     -- | One 'Coin' of the liquidity pair.
-    coinA :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee   :: Fee,
-    -- | The amount of liquidity tokens to burn in exchange for liquidity from the pool.
-    diff  :: Amount Liquidity
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data RemoveParams
+  = RemoveParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA :: Coin A
+        -- | The other 'Coin' of the liquidity pair.
+      , coinB :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee   :: Fee
+        -- | The amount of liquidity tokens to burn in exchange for liquidity from the pool.
+      , diff  :: Amount Liquidity
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | Parameters for the @add@-endpoint, which adds liquidity to a liquidity pool in exchange for liquidity tokens.
-data AddParams = AddParams
-  {
-     -- | One 'Coin' of the liquidity pair.
-    coinA   :: Coin A,
-    -- | The other 'Coin' of the liquidity pair.
-    coinB   :: Coin B,
-    -- | Numerator and denominator of the swap fee
-    fee     :: Fee,
-    -- | The amount of coins of the first kind to add to the pool.
-    amountA :: Amount A,
-    -- | The amount of coins of the second kind to add to the pool.
-    amountB :: Amount B
-  }
-  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data AddParams
+  = AddParams
+      { -- | One 'Coin' of the liquidity pair.
+        coinA   :: Coin A
+        -- | The other 'Coin' of the liquidity pair.
+      , coinB   :: Coin B
+        -- | Numerator and denominator of the swap fee
+      , fee     :: Fee
+        -- | The amount of coins of the first kind to add to the pool.
+      , amountA :: Amount A
+        -- | The amount of coins of the second kind to add to the pool.
+      , amountB :: Amount B
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- | Parameters for the @clearState-@endpoint, which removes entry from the state corresponding to given HistoryId
-newtype ClearStateParams = ClearStateParams
-  {
-    -- | Identifier of Operation that should be removed from state
-    removeId :: HistoryId
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+newtype ClearStateParams
+  = ClearStateParams { removeId :: HistoryId }
+  -- | Identifier of Operation that should be removed from state
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
+data SwapPreviewResultData
+  = SwapPreviewResultData
+      { coinA   :: Coin A
+      , amountA :: Amount A
+      , coinB   :: Coin B
+      , amountB :: Amount B
+      , fee     :: Fee
+      }
+  deriving (FromJSON, Generic, Show, ToJSON)
 
-data SwapPreviewResultData = SwapPreviewResultData
-  { coinA   :: Coin A,
-    amountA :: Amount A,
-    coinB   :: Coin B,
-    amountB :: Amount B,
-    fee     :: Fee
-  } deriving (Show, Generic, FromJSON, ToJSON)
+data ISwapPreviewResultData
+  = ISwapPreviewResultData
+      { coinA   :: Coin A
+      , amountA :: Amount A
+      , coinB   :: Coin B
+      , amountB :: Amount B
+      }
+  deriving (FromJSON, Generic, Show, ToJSON)
 
-data ISwapPreviewResultData = ISwapPreviewResultData
-  { coinA   :: Coin A,
-    amountA :: Amount A,
-    coinB   :: Coin B,
-    amountB :: Amount B
-  } deriving (Show, Generic, FromJSON, ToJSON)
-
-
-
-data WithHistoryId a = WithHistoryId
-  {
-    historyId :: HistoryId,
-    content   :: a
-  } deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+data WithHistoryId a
+  = WithHistoryId
+      { historyId :: HistoryId
+      , content   :: a
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
