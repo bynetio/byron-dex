@@ -1,5 +1,8 @@
 image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
+before_script:
+  - cabal update
+
 .automatic:
   rules:
     - if: $CI_MERGE_REQUEST_IID
@@ -26,11 +29,15 @@ image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
 .cabal-cache:
   cache:
-    key: cache-dot-cabal-$CI_COMMIT_REF_SLUG
+    key: cache-dot-caba
     paths:
       - /builds/plutus/dex/prebuild-cache/
 
 .copy-cabal-cache:
+  cache:
+    key: cache-dot-caba
+    paths:
+      - /builds/plutus/dex/prebuild-cache/
   variables:
     GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/
   before_script:
@@ -100,7 +107,7 @@ build_uniswap:
   stage: build
   extends:
     - .automatic
-    - .copy-cabal-cache
+    - .cabal-cache
     # - .uniswap-cache
   needs:
     - prebuild
