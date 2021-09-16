@@ -1,8 +1,5 @@
 image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
-before_script:
-  - cabal update
-
 .automatic:
   rules:
     - if: $CI_MERGE_REQUEST_IID
@@ -15,34 +12,47 @@ before_script:
       allow_failure: false
     - when: on_success
 
-.uniswap-cache:
-  cache:
-    key: uniswap-cachee-$CI_COMMIT_REF_SLUG
-    paths:
-      - /builds/plutus/dex/dist-newstyle
-
-.uniswap-json-api-cache:
-  cache:
-    key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
-    paths:
-      - /builds/plutus/dex/dist-newstyle
-
 .cabal-cache:
-  cache:
-    key: cache-dot-caba
+  cache: &cabal_cache
+    key: cache-dot-cabal
     paths:
       - /builds/plutus/dex/prebuild-cache/
+    policy: pull-push
 
 .copy-cabal-cache:
+  extends: .cabal-cache
   cache:
-    key: cache-dot-caba
-    paths:
-      - /builds/plutus/dex/prebuild-cache/
+    policy: pull
   variables:
     GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/
   before_script:
     - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
     - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
+
+.base-cache: &base_cache
+  variables:
+    GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/ -e dist-newstyle/
+  before_script:
+    - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
+    - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
+
+.uniswap-cache:
+  <<: *base_cache
+  cache:
+    - <<: *cabal_cache
+    - key: uniswap-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/dex/dist-newstyle
+      policy: pull-push
+
+.uniswap-json-api-cache:
+  <<: *base_cache
+  cache:
+    - <<: *cabal_cache
+    - key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/dex/dist-newstyle
+      policy: pull-push
 
 stages:
   - lint
@@ -77,8 +87,7 @@ build_uniswap-json-api:
   stage: build
   extends:
     - .automatic
-    - .copy-cabal-cache
-    # - .uniswap-json-api-cache
+    - .uniswap-json-api-cache
   needs:
     - prebuild
     - lint_uniswap-json-api
@@ -89,8 +98,7 @@ uniswap-json-api_specs:
   stage: test
   extends:
     - .automatic
-    - .copy-cabal-cache
-    # - .uniswap-cache
+    - .uniswap-cache
   needs:
     - prebuild
     - build_uniswap-json-api
@@ -107,8 +115,7 @@ build_uniswap:
   stage: build
   extends:
     - .automatic
-    - .cabal-cache
-    # - .uniswap-cache
+    - .uniswap-cache
   needs:
     - prebuild
     - lint_uniswap
@@ -120,8 +127,7 @@ uniswap_specs:
   stage: test
   extends:
     - .automatic
-    - .copy-cabal-cache
-    # - .uniswap-cache
+    - .uniswap-cache
   needs:
     - prebuild
     - build_uniswap
