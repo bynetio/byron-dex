@@ -26,7 +26,7 @@ image: "plutus4binarapps/dex-plutus-dev:v1.1"
 
 .cabal-cache:
   cache:
-    key: cache-dot-cabal
+    key: cache-dot-cabal-$CI_COMMIT_REF_SLUG
     paths:
       - /builds/plutus/dex/prebuild-cache/
 
