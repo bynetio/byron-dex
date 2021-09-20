@@ -1,6 +1,6 @@
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 module Uniswap.Pool
   ( calculateAdditionalLiquidity,
@@ -11,7 +11,7 @@ module Uniswap.Pool
   )
 where
 
-import Ledger.Value (TokenName (..), unAssetClass, unCurrencySymbol)
+import Ledger.Value     (TokenName (..), unAssetClass, unCurrencySymbol)
 import PlutusTx.Prelude
 import PlutusTx.Sqrt
 import Uniswap.Types

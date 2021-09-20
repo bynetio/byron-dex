@@ -90,7 +90,7 @@ component =
       case operation of
         Just AddLiquidity -> addToLiquidityPool form
         Just RemoveLiquidity -> do
-          removeFromLiquidityPool { coinA: form.coinA, coinB: form.coinB, fee: form.fee, diff: 1000 }
+          removeFromLiquidityPool { coinA: form.coinA, coinB: form.coinB, fee: form.fee, diff: 254 }
         Nothing -> pure unit
       H.modify_ _ { pool = Nothing, operation = Nothing }
     CloseModal -> H.modify_ _ { pool = Nothing, operation = Nothing }

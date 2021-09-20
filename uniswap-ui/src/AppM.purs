@@ -2,6 +2,7 @@ module Uniswap.AppM where
 
 import Prelude
 import Control.Monad.Rec.Class (forever)
+import Data.Array (filter)
 import Data.Codec.Argonaut as CA
 import Data.Codec.Argonaut as Codec
 import Data.Maybe (Maybe(..))
@@ -32,6 +33,7 @@ import Uniswap.Data.LiquidityPool as LP
 import Uniswap.Data.Log as Log
 import Uniswap.Data.Route as Route
 import Uniswap.Data.Swap as Swap
+import Uniswap.Data.Amount as Amount
 import Uniswap.Store (Action, Store)
 import Uniswap.Store as Store
 
@@ -82,7 +84,8 @@ mkPost codec body = Post $ Just $ Codec.encode codec body
 instance manageFundsAppM :: ManageFunds AppM where
   getFunds = do
     mbJson <- mkRequest { endpoint: Endpoint.Funds, method: Get }
-    decode (CA.array F.codec) mbJson
+    rawMbArray <- decode (CA.array F.codec) mbJson
+    pure $ filter (\f -> f.amount /= Amount.zero) <$> rawMbArray
 
 instance nowAppM :: Now AppM where
   now = liftEffect Now.now

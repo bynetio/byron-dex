@@ -1,7 +1,7 @@
 module Uniswap.Page.LiquidityPools where
 
 import Prelude
-import Data.Array (mapWithIndex)
+import Data.Array (elem, mapWithIndex)
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
@@ -167,7 +167,7 @@ poolTable res =
     ]
   where
   row :: forall p. Int -> LiquidityPoolView -> HH.HTML p Action
-  row idx lp@{ coinA, coinB, amountA, amountB, fee } =
+  row idx lp@{ coinA, coinB, amountA, amountB, fee, liquidityCoin } =
     HH.tr_
       [ HH.th_ [ HH.text (show (idx + 1)) ]
       , HH.td_ [ HH.text $ Coin.toTokenNameString coinA <> "/" <> Coin.toTokenNameString coinB ]
@@ -179,9 +179,15 @@ poolTable res =
               [ HH.a
                   [ css "button", HE.onClick \_ -> ShowModal Modal.AddLiquidity lp ]
                   [ HH.text "Add" ]
-              , HH.a
-                  [ css "button", HE.onClick \_ -> ShowModal Modal.RemoveLiquidity lp ]
-                  [ HH.text "Remove" ]
+              , renderRemoveButton
               ]
           ]
       ]
+    where
+    renderRemoveButton =
+      if elem liquidityCoin $ _.coin <$> res.funds then
+        HH.a
+          [ css "button", HE.onClick \_ -> ShowModal Modal.RemoveLiquidity lp ]
+          [ HH.text "Remove" ]
+      else
+        HH.text ""
