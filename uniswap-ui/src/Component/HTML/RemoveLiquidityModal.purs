@@ -1,4 +1,4 @@
-module Uniswap.Component.HTML.AddLiquidityModal where  -- rename this component to ManageLiquidityModal
+module Uniswap.Component.HTML.RemoveLiquidityModal where  -- rename this component to ManageLiquidityModal
 
 import Prelude
 import Data.Either (either)
@@ -9,16 +9,14 @@ import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.HTML.Events as HE
-import Network.RemoteData (RemoteData(..), fromMaybe)
 import Type.Proxy (Proxy(..))
-import Uniswap.Capability.Funds (class ManageFunds, getFunds)
-import Uniswap.Capability.Pool (class ManagePool, addToLiquidityPool, removeFromLiquidityPool)
+import Uniswap.Capability.Funds (class ManageFunds)
+import Uniswap.Capability.Pool (class ManagePool)
 import Uniswap.Component.CoinInputPanel as CoinInputPanel
-import Uniswap.Component.HTML.Utils (css, load, toRight, whenElem)
+import Uniswap.Component.HTML.Utils (css, toRight, whenElem)
 import Uniswap.Data.Amount (Amount)
 import Uniswap.Data.Coin (Coin)
 import Uniswap.Data.Fee (Fee)
-import Uniswap.Data.Funds (Fund)
 import Uniswap.Data.LiquidityPool (LiquidityPool)
 import Uniswap.Form.Field as Field
 import Uniswap.Form.Validation as V
@@ -26,21 +24,11 @@ import Web.Event.Event as Event
 
 -- Modal comonent to add liquidity
 data Action
-  = Initialize
-  | HandleManageLiquidity LiquidityPool
+  = HandleRemoveLiquidity LiquidityPool
   | CloseModal
-  | LoadFunds
-
-data OperationType
-  = AddLiquidity
-  | RemoveLiquidity
-
-derive instance eqOperationType :: Eq OperationType
-
-derive instance ordOperationType :: Ord OperationType
 
 data Query a
-  = ShowModal OperationType Pool a
+  = ShowModal Pool a
 
 type Pool
   = { coinA :: Coin
@@ -50,14 +38,12 @@ type Pool
 
 type State
   = { pool :: Maybe Pool
-    , operation :: Maybe OperationType
-    , funds :: RemoteData String (Array Fund)
     }
 
 type ChildSlots
-  = ( manageLiquidityForm :: FormSlot Unit )
+  = ( removeLiquidityForm :: FormSlot Unit )
 
-modalProxy = Proxy :: Proxy "manageLiquidityModal"
+modalProxy = Proxy :: Proxy "removeLiquidityModal"
 
 component ::
   forall o m.
@@ -67,38 +53,27 @@ component ::
   H.Component Query Unit o m
 component =
   H.mkComponent
-    { initialState: \_ -> { funds: NotAsked, pool: Nothing, operation: Nothing }
+    { initialState: \_ -> { pool: Nothing }
     , render
     , eval:
         H.mkEval
           $ H.defaultEval
               { handleAction = handleAction
               , handleQuery = handleQuery
-              , initialize = Just Initialize
               }
     }
   where
   handleAction :: Action -> H.HalogenM State Action ChildSlots o m Unit
   handleAction = case _ of
-    Initialize -> void $ H.fork $ handleAction $ LoadFunds
-    LoadFunds -> do
-      H.modify_ _ { funds = Loading }
-      funds <- getFunds
-      H.modify_ _ { funds = fromMaybe funds }
-    HandleManageLiquidity form -> do
-      { operation } <- H.get
-      case operation of
-        Just AddLiquidity -> addToLiquidityPool form
-        Just RemoveLiquidity -> do
-          removeFromLiquidityPool { coinA: form.coinA, coinB: form.coinB, fee: form.fee, diff: 1000 }
-        Nothing -> pure unit
-      H.modify_ _ { pool = Nothing, operation = Nothing }
-    CloseModal -> H.modify_ _ { pool = Nothing, operation = Nothing }
+    HandleRemoveLiquidity form -> do
+      -- removeFromLiquidityPool form
+      H.modify_ _ { pool = Nothing }
+    CloseModal -> H.modify_ _ { pool = Nothing }
 
   handleQuery :: forall a. Query a -> H.HalogenM _ _ _ _ _ (Maybe a)
   handleQuery = case _ of
-    ShowModal operation pool a -> do
-      H.modify_ _ { pool = Just pool, operation = Just operation }
+    ShowModal pool a -> do
+      H.modify_ _ { pool = Just pool }
       pure (Just a)
 
   render :: State -> H.ComponentHTML Action ChildSlots m
@@ -106,12 +81,10 @@ component =
     either identity identity renderEither
     where
     renderEither = do
-      funds <- load state.funds "funds"
-      operation <- toRight state.operation
       pool <- toRight state.pool
-      pure $ renderModal funds pool operation
+      pure $ renderModal pool
 
-  renderModal walletFunds pool operation =
+  renderModal pool =
     HH.div
       [ css "modal is-active" ]
       [ HH.div [ css "modal-background" ] []
@@ -121,7 +94,7 @@ component =
               [ css "modal-card-head" ]
               [ HH.p
                   [ css "modal-card-title" ]
-                  [ HH.text title ]
+                  [ HH.text "Remove Liquidity" ]
               , HH.button
                   [ css "delete"
                   , HE.onClick \_ -> CloseModal
@@ -132,38 +105,35 @@ component =
           ]
       ]
     where
-    title = case operation of
-      AddLiquidity -> "Add Liquidity"
-      RemoveLiquidity -> "Remove Liquidity"
-
     renderForm = do
       let
-        form = formComponent pool walletFunds operation
-      HH.slot _manageLiquidityForm unit form unit HandleManageLiquidity
+        form = formComponent pool
+      HH.slot _removeLiquidityForm unit form unit HandleRemoveLiquidity
 
 -- Form types
-newtype ManageLiquidityForm (r :: Row Type -> Type) f
-  = ManageLiquidityForm (r (ManageLiquidityRow f))
+newtype RemoveLiquidityForm (r :: Row Type -> Type) f
+  = RemoveLiquidityForm (r (RemoveLiquidityRow f))
 
-derive instance newtypeManageLiquidityForm :: Newtype (ManageLiquidityForm r f) _
+derive instance newtypeRemoveLiquidityForm :: Newtype (RemoveLiquidityForm r f) _
 
-type ManageLiquidityRow :: (Type -> Type -> Type -> Type) -> Row Type
-type ManageLiquidityRow f
+type RemoveLiquidityRow :: (Type -> Type -> Type -> Type) -> Row Type
+type RemoveLiquidityRow f
   = ( coinA :: f V.FormError (Maybe Coin) Coin
     , coinB :: f V.FormError (Maybe Coin) Coin
     , amountA :: f V.FormError (Maybe Amount) Amount
     , amountB :: f V.FormError (Maybe Amount) Amount
     , fee :: f V.FormError (Maybe Fee) Fee
+    --, diff :: f V.FormError (Maybe Int) Int
     )
 
 -- Form component types
 type FormSlot
-  = H.Slot (F.Query ManageLiquidityForm FormQuery FormChildSlots) LiquidityPool
+  = H.Slot (F.Query RemoveLiquidityForm FormQuery FormChildSlots) LiquidityPool
 
 type FormChildSlots
   = ( coinInputPanel :: H.Slot CoinInputPanel.Query CoinInputPanel.Message CoinSlot )
 
-_manageLiquidityForm = Proxy :: Proxy "manageLiquidityForm"
+_removeLiquidityForm = Proxy :: Proxy "removeLiquidityForm"
 
 data CoinSlot
   = CoinA
@@ -185,17 +155,15 @@ data FormQuery a
 
 derive instance functorFormQuery :: Functor FormQuery
 
-prx :: F.SProxies ManageLiquidityForm
-prx = F.mkSProxies (Proxy :: Proxy ManageLiquidityForm)
+prx :: F.SProxies RemoveLiquidityForm
+prx = F.mkSProxies (Proxy :: Proxy RemoveLiquidityForm)
 
 formComponent ::
   forall i m.
   MonadAff m =>
   Pool ->
-  (Array Fund) ->
-  OperationType ->
-  F.Component ManageLiquidityForm FormQuery FormChildSlots i LiquidityPool m
-formComponent { coinA, coinB, fee } _ operation =  -- use funds to validatie amount to avoid invest over user funds
+  F.Component RemoveLiquidityForm FormQuery FormChildSlots i LiquidityPool m
+formComponent { coinA, coinB, fee } =  -- use funds to validatie amount to avoid invest over user funds
   F.component input
     $ F.defaultSpec
         { render = render
@@ -204,10 +172,10 @@ formComponent { coinA, coinB, fee } _ operation =  -- use funds to validatie amo
         , handleQuery = handleQuery
         }
   where
-  input :: i -> F.Input ManageLiquidityForm FormState m
+  input :: i -> F.Input RemoveLiquidityForm FormState m
   input _ =
     { validators:
-        ManageLiquidityForm
+        RemoveLiquidityForm
           { coinA: V.exists
           , amountA: V.exists
           , coinB: V.exists
@@ -260,7 +228,7 @@ formComponent { coinA, coinB, fee } _ operation =  -- use funds to validatie amo
               [ css " is-rounded" ]
               [ HH.h1
                   [ css "label" ]
-                  [ HH.text title ]
+                  [ HH.text "Withdrawal Liquidity" ]
               , HH.div
                   [ css "card-content" ]
                   [ HH.div
@@ -285,7 +253,3 @@ formComponent { coinA, coinB, fee } _ operation =  -- use funds to validatie amo
         , label: ""
         , coins: []
         }
-
-    title = case operation of
-      AddLiquidity -> "Deposit Amouts"
-      RemoveLiquidity -> "Withdrawal Amounts"

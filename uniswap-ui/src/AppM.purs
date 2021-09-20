@@ -63,7 +63,7 @@ instance navigateAppM :: Navigate AppM where
 instance managePoolAppM :: ManagePool AppM where
   getLiquidityPools = do
     mbJson <- mkRequest { endpoint: Endpoint.Pools, method: Get }
-    decode (CA.array LP.codecLiquidityPool) mbJson
+    decode (CA.array LP.codecLiquidityPoolView) mbJson
   createLiquidityPool body = void $ mkRequest { endpoint: Endpoint.CreatePool, method: mkPost LP.codecLiquidityPool body }
   closeLiquidityPool body = void $ mkRequest { endpoint: Endpoint.ClosePool, method: mkPost LP.codecCloseLiquidityPool body }
   addToLiquidityPool body = void $ mkRequest { endpoint: Endpoint.AddToPool, method: mkPost LP.codecLiquidityPool body }

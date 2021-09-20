@@ -3,11 +3,11 @@ module Uniswap.Capability.Pool where
 import Prelude
 import Data.Maybe (Maybe)
 import Halogen (HalogenM, lift)
-import Uniswap.Data.LiquidityPool (LiquidityPool, RemoveLiquidityPool, CloseLiquidityPool)
+import Uniswap.Data.LiquidityPool (CloseLiquidityPool, LiquidityPool, RemoveLiquidityPool, LiquidityPoolView)
 
 class
   Monad m <= ManagePool m where
-  getLiquidityPools :: m (Maybe (Array LiquidityPool))
+  getLiquidityPools :: m (Maybe (Array LiquidityPoolView))
   createLiquidityPool :: LiquidityPool -> m Unit
   closeLiquidityPool :: CloseLiquidityPool -> m Unit
   addToLiquidityPool :: LiquidityPool -> m Unit
