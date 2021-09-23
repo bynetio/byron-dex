@@ -2,6 +2,7 @@ index-state: 2021-07-07T00:00:00Z
 
 packages: uniswap
         , uniswap-json-api
+        , dex
 
 -- You never, ever, want this.
 write-ghc-environment-files: never
