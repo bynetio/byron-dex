@@ -11,6 +11,7 @@ library
                  , Dex.OffChain
                  , Dex.Types
                  , Dex.Manual
+                 , Dex.WalletHistory
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
@@ -34,3 +35,27 @@ library
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
+executable dex-pab
+  main-is: Main.hs
+  hs-source-dirs: pab
+  other-modules: Trace
+  ghc-options:
+    -threaded
+  build-depends:
+    base >= 4.9 && < 5,
+    plutus-contract -any,
+    plutus-pab -any,
+    dex -any,
+    aeson -any,
+    freer-simple -any,
+    prettyprinter -any,
+    filemanip -any,
+    freer-extras -any,
+    plutus-ledger -any,
+    aeson -any,
+    containers -any,
+    text -any,
+    plutus-use-cases -any,
+    plutus-ledger-api -any,
+    bytestring,
+    data-default

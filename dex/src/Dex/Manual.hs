@@ -57,9 +57,11 @@ runTrace = runEmulatorTraceIO' def emulatorCfg def
 
 dexTrace :: EmulatorTrace ()
 dexTrace = do
-  h1 <- activateContractWallet (Wallet 1) dexEndpoint
-  h2 <- activateContractWallet (Wallet 2) dexEndpoint
-  void $ callEndpoint @"sell" h1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) (1,2) 100)
+  h1 <- activateContractWallet (Wallet 1) dexEndpoints
+  h2 <- activateContractWallet (Wallet 2) dexEndpoints
+  void $ callEndpoint @"sell" h1 (WithHistoryId "a" (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) (1,2) 100))
   void $ waitNSlots 10
-  void $ callEndpoint @"perform" h2 ()
+  void $ callEndpoint @"sell" h1 (WithHistoryId "b" (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) (1,2) 200))
+  void $ waitNSlots 10
+  void $ callEndpoint @"perform" h2 (WithHistoryId "c" ())
   void $ waitNSlots 10

@@ -30,8 +30,9 @@ import qualified Data.Aeson.Extras   as JSON
 import           Data.Aeson.Lens     (key)
 import           Data.String         (IsString (fromString))
 import qualified Data.Text.Encoding  as E
+import           Dex.WalletHistory
 import           Ledger              (AssetClass, CurrencySymbol, PubKeyHash,
-                                      TokenName, Value)
+                                      TokenName, TxOutRef, Value)
 import           Ledger.Value        (AssetClass (..),
                                       CurrencySymbol (CurrencySymbol, unCurrencySymbol),
                                       assetClass, assetClassValue,
@@ -76,7 +77,7 @@ data SellOrderInfo
   , coinOut   :: AssetClass
   , ratio     :: (Integer, Integer)
   , ownerHash :: PubKeyHash
-  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema, Eq)
 PlutusTx.makeIsDataIndexed ''SellOrderInfo [('SellOrderInfo,0)]
 PlutusTx.makeLift ''SellOrderInfo
 
@@ -84,9 +85,34 @@ PlutusTx.makeLift ''SellOrderInfo
 newtype DexDatum
   = SellOrder SellOrderInfo
   deriving stock (Show)
+  deriving newtype (Eq)
+  deriving (FromJSON, Generic, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed
   ''DexDatum
   [ ('SellOrder, 0)
   ]
 PlutusTx.makeLift ''DexDatum
+
+
+data WithHistoryId a
+  = WithHistoryId
+      { historyId :: HistoryId
+      , content   :: a
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+
+data DexContractState
+  = Orders [(SellOrderInfo, TxOutRef)]
+  | Sold
+  | Performed
+  | Stopped
+  | Funds [(AssetClass, Integer)]
+  deriving (FromJSON, Generic, Show, ToJSON)
+PlutusTx.makeIsDataIndexed ''DexContractState
+  [ ('Orders,0),
+    ('Sold,1),
+    ('Performed, 2),
+    ('Stopped, 3),
+    ('Funds, 4)]
+PlutusTx.makeLift ''DexContractState

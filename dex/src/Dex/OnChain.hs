@@ -39,12 +39,24 @@ mkDexValidator ::
   ScriptContext ->
   Bool
 mkDexValidator (SellOrder SellOrderInfo {..}) Perform ctx =
-  traceIfFalse "not enough coins given" (inAmount * numerator <= outAmount * denominator)
+  traceIfFalse "zero input" (expectedAmount > 0) &&
+  traceIfFalse "not enough coins given" (expectedAmount <= outAmount )
   where
+    txInfo = scriptContextTxInfo ctx
+    inputs = map txInInfoResolved $ txInfoInputs txInfo
+    expectedAmount = sum
+      [ (assetClassValueOf (txOutValue o) coinIn * numerator) `divide` denominator
+      | o <- inputs
+      --, txOutAddress o == pubKeyHashAddress ownerHash
+      , let order = txOutDatumHash o >>= \datumHash -> findDatum datumHash txInfo >>= \(Datum bd) -> PlutusTx.fromBuiltinData bd
+      , isJust order
+      , let Just (SellOrder SellOrderInfo {..}) = order
+      , let (numerator, denominator) = ratio
+      ]
+
     (numerator, denominator) = ratio
     ownInput = findOwnInput' ctx
     inVal = valueWithin ownInput
-    inAmount = assetClassValueOf inVal coinIn
 
     outAmount :: Integer
     outAmount = sum [ assetClassValueOf o coinOut
