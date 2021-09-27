@@ -1,5 +1,6 @@
 { haskell-nix, compiler-nix-name, gitignore-nix }:
 let
+  deferPluginErrors = true;
   project = haskell-nix.project {
     src = haskell-nix.haskellLib.cleanGit {
       name = "uniswap";
@@ -39,8 +40,6 @@ let
       "https://github.com/input-output-hk/hedgehog-extras"."8bcd3c9dc22cc44f9fcfe161f4638a384fc7a187" =
         "12viwpahjdfvlqpnzdgjp40nw31rvyznnab1hml9afpaxd6ixh70";
     };
-
-    deferPluginErrors = true;
 
     modules = [{
       packages = {
