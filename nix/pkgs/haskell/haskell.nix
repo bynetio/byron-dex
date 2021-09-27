@@ -53,6 +53,7 @@ let
         # Broken due to haddock errors. Refer to https://github.com/input-output-hk/plutus/blob/master/nix/pkgs/haskell/haskell.nix
         plutus-ledger.doHaddock = false;
         plutus-use-cases.doHaddock = false;
+        plutus-contract.doHaddock = false;
         plutus-core.ghcOptions = [ "-Werror" ];
       };
     }];
