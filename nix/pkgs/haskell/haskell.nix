@@ -40,6 +40,8 @@ let
         "12viwpahjdfvlqpnzdgjp40nw31rvyznnab1hml9afpaxd6ixh70";
     };
 
+    deferPluginErrors = true;
+
     modules = [{
       packages = {
         eventful-sql-common = {
@@ -50,9 +52,15 @@ let
           doHaddock = false;
         };
 
-        # Broken due to haddock errors. Refer to https://github.com/input-output-hk/plutus/blob/master/nix/pkgs/haskell/haskell.nix
-        plutus-ledger.doHaddock = false;
-        plutus-use-cases.doHaddock = false;
+        plutus-contract.doHaddock = deferPluginErrors;
+        plutus-contract.flags.defer-plugin-errors = deferPluginErrors;
+
+        plutus-use-cases.doHaddock = deferPluginErrors;
+        plutus-use-cases.flags.defer-plugin-errors = deferPluginErrors;
+
+        plutus-ledger.doHaddock = deferPluginErrors;
+        plutus-ledger.flags.defer-plugin-errors = deferPluginErrors;
+
         plutus-core.ghcOptions = [ "-Werror" ];
       };
     }];
