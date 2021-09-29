@@ -85,10 +85,10 @@ PlutusTx.makeLift ''DexAction
 
 data SellOrderParams
   = SellOrderParams
-  { coinIn   :: AssetClass
-  , coinOut  :: AssetClass
-  , ratio    :: (Nat, Nat)
-  , amountIn :: Integer
+  { coinIn         :: AssetClass
+  , coinOut        :: AssetClass
+  , amountIn       :: Nat
+  , expectedAmount :: Nat
   } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed ''SellOrderParams [('SellOrderParams,0)]
@@ -97,10 +97,10 @@ PlutusTx.makeLift ''SellOrderParams
 
 data SellOrderInfo
   = SellOrderInfo
-  { coinIn    :: AssetClass
-  , coinOut   :: AssetClass
-  , ratio     :: (Nat, Nat)
-  , ownerHash :: PubKeyHash
+  { coinIn         :: AssetClass
+  , coinOut        :: AssetClass
+  , expectedAmount :: Nat
+  , ownerHash      :: PubKeyHash
   } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''SellOrderInfo [('SellOrderInfo,0)]
 PlutusTx.makeLift ''SellOrderInfo

@@ -23,7 +23,9 @@ module Dex.OffChain
 where
 
 import           Control.Monad        hiding (fmap, mapM, mapM_)
+import           Data.List            (foldl', sortOn)
 import qualified Data.Map             as Map
+import           Data.Ord             (comparing)
 import           Data.Proxy           (Proxy (..))
 import           Data.Text            (Text)
 import           Data.Void            (Void)
@@ -42,8 +44,7 @@ import           Plutus.Contract
 import qualified PlutusTx
 import qualified PlutusTx.AssocMap    as AssocMap
 import           PlutusTx.Prelude     hiding (Semigroup (..), unless)
-import           Prelude              (Semigroup (..), div)
-
+import           Prelude              (Semigroup (..), fromIntegral, (/))
 data Uniswapping
 
 instance Scripts.ValidatorTypes Uniswapping where
@@ -72,9 +73,45 @@ type DexSchema =
 sell :: SellOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
 sell SellOrderParams {..} = do
   ownerHash <- pubKeyHash <$> ownPubKey
-  let order = SellOrder (SellOrderInfo coinIn coinOut ratio ownerHash)
-  let tx = Constraints.mustPayToTheScript order (assetClassValue coinIn amountIn)
-  void $ submitTxConstraints dexInstance tx
+
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxoAt address
+  mapped <- mapM (\(oref, o) -> getOrderDatum o >>= \d -> return (o, oref, d)) utxos
+  let filtered =
+        [ (oref, o, d)
+        | (oref, o, d@(SellOrder (SellOrderInfo coinIn' coinOut' _ _))) <- mapped
+        , coinIn == coinOut'
+        , coinOut == coinIn'
+        ]
+  let sorted = sortOn (\(o,_,SellOrder SellOrderInfo {coinIn=coinIn', expectedAmount=expectedAmount'}) ->
+                                  let amountIn' = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn'
+                                  in fromIntegral (fromNat expectedAmount') / fromIntegral amountIn') filtered
+
+
+  let (utxosToCollect, _, reward) =
+        foldl' (\(utxosAcc, moneyToSpend, rewardAcc) order@(o,oref,SellOrder (SellOrderInfo coinIn' coinOut' cost _)) ->
+          let reward = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn'
+          in if moneyToSpend - fromNat cost < 0
+            then (utxosAcc, moneyToSpend, rewardAcc)
+            else (order:utxosAcc, moneyToSpend - fromNat cost, rewardAcc + reward)
+          ) ([], fromNat amountIn, 0) sorted
+  if reward >= fromNat expectedAmount
+    then do
+      let tx = foldl' (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
+                let inValue = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn
+
+                in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut (fromNat expectedAmount))
+                      <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
+                ) mempty utxosToCollect
+      let lookups = Constraints.typedValidatorLookups dexInstance
+            <> Constraints.ownPubKeyHash ownerHash
+            <> Constraints.otherScript (Scripts.validatorScript dexInstance)
+            <> Constraints.unspentOutputs (Map.fromList (map (\(o,oref,_) -> (oref,o)) utxosToCollect))
+      void $ submitTxConstraintsWith lookups tx
+    else do
+      let order = SellOrder (SellOrderInfo coinIn coinOut expectedAmount ownerHash)
+      let tx = Constraints.mustPayToTheScript order (assetClassValue coinIn (fromNat amountIn))
+      void $ submitTxConstraints dexInstance tx
 
 
 findOrders :: Contract (History (Either Text DexContractState)) DexSchema Text [(SellOrderInfo, TxOutRef)]
@@ -96,12 +133,10 @@ perform = do
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> Constraints.unspentOutputs (Map.fromList utxos)
-      tx = foldl (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
+      tx = foldl' (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
         let inValue = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn
-            (numerator, denominator) = ratio
-            expectedValue = (inValue * fromNat numerator `div` fromNat denominator)
 
-        in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut expectedValue)
+        in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut (fromNat expectedAmount))
               <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
         ) mempty mapped
   void $ submitTxConstraintsWith lookups tx
