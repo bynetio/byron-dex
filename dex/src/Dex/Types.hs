@@ -12,6 +12,7 @@
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
 {-# LANGUAGE TemplateHaskell            #-}
+{-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
@@ -22,31 +23,54 @@
 module Dex.Types
   where
 
-import           Control.Lens        ((^?!))
-import           Data.Aeson          (FromJSON (parseJSON), ToJSON (toJSON),
-                                      object, withObject, (.:), (.=))
-import qualified Data.Aeson          as JSON
-import qualified Data.Aeson.Extras   as JSON
-import           Data.Aeson.Lens     (key)
-import           Data.String         (IsString (fromString))
-import qualified Data.Text.Encoding  as E
+import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
+
 import           Dex.WalletHistory
-import           Ledger              (AssetClass, CurrencySymbol, PubKeyHash,
-                                      TokenName, TxOutRef, Value)
-import           Ledger.Value        (AssetClass (..),
-                                      CurrencySymbol (CurrencySymbol, unCurrencySymbol),
-                                      assetClass, assetClassValue,
-                                      assetClassValueOf, tokenName)
+import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, Bool, ByteString,
-                                      Eq (..), Integer, MultiplicativeSemigroup,
-                                      Ord (max, min, (<=)), fst, return, snd,
-                                      ($), (&&), (.), (||))
-import           Prelude             (Show, show)
+                                      AdditiveSemigroup, Integer, return, ($),
+                                      (<))
+import           Prelude             (Show)
 import qualified Prelude
-import           Text.Printf         (PrintfArg)
+
+
+
+
+newtype Nat = Nat Integer
+  deriving stock (Generic)
+  deriving newtype
+  ( Show
+  , AdditiveGroup
+  , AdditiveMonoid
+  , AdditiveSemigroup
+  , ToSchema
+  , ToJSON
+  , Prelude.Integral
+  , Prelude.Real
+  , Prelude.Enum
+  , Prelude.Num
+  , Prelude.Ord
+  , Prelude.Eq
+  )
+
+fromNat :: Nat -> Integer
+fromNat (Nat x) = x
+
+PlutusTx.makeIsDataIndexed ''Nat [('Nat,0)]
+PlutusTx.makeLift ''Nat
+
+
+instance FromJSON Nat where
+  parseJSON value = do
+    integer <- parseJSON @Integer value
+    if integer < 0 then
+        Prelude.fail "parsing Natural failed, unexpected negative number "
+    else
+        return $ Nat integer
+
+
 
 data DexAction
   = Perform
@@ -63,7 +87,7 @@ data SellOrderParams
   = SellOrderParams
   { coinIn   :: AssetClass
   , coinOut  :: AssetClass
-  , ratio    :: (Integer, Integer)
+  , ratio    :: (Nat, Nat)
   , amountIn :: Integer
   } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
@@ -75,18 +99,17 @@ data SellOrderInfo
   = SellOrderInfo
   { coinIn    :: AssetClass
   , coinOut   :: AssetClass
-  , ratio     :: (Integer, Integer)
+  , ratio     :: (Nat, Nat)
   , ownerHash :: PubKeyHash
-  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema, Eq)
+  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''SellOrderInfo [('SellOrderInfo,0)]
 PlutusTx.makeLift ''SellOrderInfo
 
 
 newtype DexDatum
   = SellOrder SellOrderInfo
-  deriving stock (Show)
-  deriving newtype (Eq)
-  deriving (FromJSON, Generic, ToJSON, ToSchema)
+  deriving stock (Show, Generic)
+  deriving newtype (FromJSON, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed
   ''DexDatum

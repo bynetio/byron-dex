@@ -5,19 +5,15 @@
 
 module Dex.Manual where
 
-import           Control.Monad.Freer.Extras as Extras
 import           Data.Default
-import           Data.Functor               (void)
-import qualified Data.Map                   as Map
-import           Data.Monoid
-import           Data.Text                  (Text)
-import           Data.Void                  (Void)
+import           Data.Functor           (void)
+import qualified Data.Map               as Map
 import           Dex.OffChain
 import           Dex.Types
-import           Plutus.Trace.Emulator      as Emulator
-import qualified Plutus.V1.Ledger.Ada       as Ada
-import qualified Plutus.V1.Ledger.Value     as Value
-import           Wallet.Emulator.Wallet     as Wallet
+import           Plutus.Trace.Emulator  as Emulator
+import qualified Plutus.V1.Ledger.Ada   as Ada
+import qualified Plutus.V1.Ledger.Value as Value
+import           Wallet.Emulator.Wallet as Wallet
 
 
 customSymbol :: [Char]

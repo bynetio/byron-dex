@@ -22,32 +22,27 @@
 module Dex.OffChain
 where
 
-import           Control.Applicative       ((<|>))
-import           Control.Monad             hiding (fmap, mapM, mapM_)
-import           Control.Monad.Freer
-import           Data.List                 (scanl)
-import qualified Data.Map                  as Map
-import           Data.Proxy                (Proxy (..))
-import           Data.Text                 (Text, pack)
-import           Data.Void                 (Void, absurd)
-import           Dex.OnChain               (mkDexValidator)
+import           Control.Monad        hiding (fmap, mapM, mapM_)
+import qualified Data.Map             as Map
+import           Data.Proxy           (Proxy (..))
+import           Data.Text            (Text)
+import           Data.Void            (Void)
+import           Dex.OnChain          (mkDexValidator)
 import           Dex.Types
-import           Dex.WalletHistory         as WH
+import           Dex.WalletHistory    as WH
 import qualified GHC.Classes
-import           GHC.TypeLits              (symbolVal)
-import           Ledger                    hiding (fee, singleton)
-import           Ledger.Constraints        as Constraints
-import qualified Ledger.Typed.Scripts      as Scripts
-import           Ledger.Value              (AssetClass (..), assetClassValue,
-                                            assetClassValueOf, getValue)
+import           GHC.TypeLits         (symbolVal)
+import           Ledger               hiding (fee, singleton)
+import           Ledger.Constraints   as Constraints
+import qualified Ledger.Typed.Scripts as Scripts
+import           Ledger.Value         (AssetClass (..), assetClassValue,
+                                       assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
-import qualified Plutus.Contracts.Currency as Currency
 import qualified PlutusTx
-import qualified PlutusTx.AssocMap         as AssocMap
-import           PlutusTx.Prelude          hiding (Semigroup (..), unless)
-import           Prelude                   (Semigroup (..), String, div, show)
-import           Text.Printf               (printf)
+import qualified PlutusTx.AssocMap    as AssocMap
+import           PlutusTx.Prelude     hiding (Semigroup (..), unless)
+import           Prelude              (Semigroup (..), div)
 
 data Uniswapping
 
@@ -90,6 +85,7 @@ findOrders = do
     SellOrder sellOrder -> return (sellOrder, oref)
     ) utxos
 
+
 perform :: Contract (History (Either Text DexContractState)) DexSchema Text ()
 perform = do
   pkh <- pubKeyHash <$> ownPubKey
@@ -100,13 +96,12 @@ perform = do
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> Constraints.unspentOutputs (Map.fromList utxos)
-
       tx = foldl (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
         let inValue = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn
             (numerator, denominator) = ratio
-            outValue = (inValue * numerator `div` denominator)
+            expectedValue = (inValue * fromNat numerator `div` fromNat denominator)
 
-        in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut outValue)
+        in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut expectedValue)
               <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
         ) mempty mapped
   void $ submitTxConstraintsWith lookups tx
@@ -116,8 +111,8 @@ funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
   os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
-  let value = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
-  return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList value, (tn, a) <- AssocMap.toList tns]
+  let walletValue = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
 
 
