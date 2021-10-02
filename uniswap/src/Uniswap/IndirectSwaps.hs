@@ -16,7 +16,7 @@ import           Control.Monad       hiding (fmap)
 import           Control.Monad.Freer
 import           Data.List           (foldl', sortOn)
 import qualified Data.Map            as Map
-import           Data.Maybe
+import           Data.Maybe          hiding (listToMaybe)
 import           Data.Text           (Text, pack)
 import           PlutusTx.Prelude    hiding (Semigroup (..), unless)
 import           Prelude             (div, (^))
@@ -56,26 +56,20 @@ findPaths (start, goal) keys = go start (keys ++ map (\(a, b, fee) -> (b, a, fee
 
 findBestSwap :: (Prelude.Ord b, Ord b) => Map.Map (b, b, Fee) (Integer, Integer) -> (b, b) -> Integer -> Maybe ([(b, b, Fee)], Integer)
 findBestSwap pools (ca, cb) swapAmount =
-  case map (\(a, (b, _)) -> (a, - b)) $
-    sortOn
-      snd
-      [(x, (- p, x)) | (x, Just p) <- map (\x -> (x, price' swapAmount x)) paths] of
-    []           -> Nothing
-    ((a, p) : _) -> Just (a, p)
+    listToMaybe
+    $ map (\(a, (b, _)) -> (a, - b))
+    $ sortOn snd
+        [(x, (- p, x)) | (x, Just p) <- map (\x -> (x, price' swapAmount x)) paths]
   where
     paths = findPaths (ca, cb) (Map.keys pools)
     allPools = Map.union pools (Map.fromList $ map (\((c1, c2, fee), (a, b)) -> ((c2, c1, fee), (b, a))) $ Map.toList pools)
     price' initialSwapAmount path =
       foldl'
-        ( \maybeAmount (a, b, fee) ->
-            case maybeAmount of
-              Nothing                -> Nothing
-              Just currentSwapAmount -> findSwap' currentSwapAmount (a, b, fee)
-        )
+        (\maybeAmount x -> findSwap' x =<< maybeAmount)
         (Just initialSwapAmount)
         path
 
-    findSwap' currentSwapAmount (ca', cb', fee) = do
+    findSwap' (ca', cb', fee) currentSwapAmount = do
       (a, b) <- Map.lookup (ca', cb', fee) allPools
       let out = findSwap (Amount a) (Amount b) (Amount currentSwapAmount) fee
       guard (out > 0)
@@ -129,7 +123,7 @@ iswap IndirectSwapParams {..} = do
   return ()
 
 mapWithState :: (s -> a -> (b, s)) -> s -> [a] -> [b]
-mapWithState f s [] = []
+mapWithState _ _ [] = []
 mapWithState f s (a : as) =
   let (b, s') = f s a
    in b : mapWithState f s' as
