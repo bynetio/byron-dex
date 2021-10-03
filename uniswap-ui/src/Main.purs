@@ -25,8 +25,10 @@ main =
     body <- HA.awaitBody
     let
       currentWallet :: Maybe Wallet
-      currentWallet = Nothing --Just ({ instance: "50673b6a-d74c-4a53-b243-82053a9505df" })
+      currentWallet = Nothing -- Just ({ instance: "61d59e43-fa08-49fb-86bd-d31805c8b25f" })
 
+      -- 58d8f2bf-1d1a-4e3e-a30d-5b4176a646c8 on W4
+      --  726d0ed5-e9e4-4246-aa4e-260df2ce4670 on W2
       apiUrl :: ApiURL
       apiUrl = ApiURL "http://localhost:3000"
 

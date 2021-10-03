@@ -4,7 +4,6 @@ import Prelude
 import Data.Either (Either(..))
 import Data.Maybe (Maybe(..))
 import Effect.Aff.Class (class MonadAff)
-import Formless as F
 import Halogen as H
 import Halogen.HTML as HH
 import Halogen.Store.Connect (Connected, connect)
@@ -17,9 +16,9 @@ import Uniswap.Capability.Pool (class ManagePool, getLiquidityPools)
 import Uniswap.Capability.Swap (class ManageSwap, indirectSwap)
 import Uniswap.Component.HTML.Header (header)
 import Uniswap.Component.HTML.SwapForm as Form
-import Uniswap.Component.HTML.Utils (css)
+import Uniswap.Component.HTML.Utils (css, loadRemoteData)
 import Uniswap.Data.Funds (Fund)
-import Uniswap.Data.LiquidityPool (LiquidityPool)
+import Uniswap.Data.LiquidityPool (LiquidityPoolView)
 import Uniswap.Data.Route as Route
 import Uniswap.Data.Swap (SwapPreviewResponse)
 import Uniswap.Data.Swap as Swap
@@ -36,7 +35,7 @@ data Action
 type State
   = { currentWallet :: Maybe Wallet
     , funds :: RemoteData String (Array Fund)
-    , pools :: RemoteData String (Array LiquidityPool)
+    , pools :: RemoteData String (Array LiquidityPoolView)
     }
 
 type Slots
@@ -116,19 +115,6 @@ component =
             ]
         ]
       where
-      renderHtml = case loadRemoteData of
+      renderHtml = case loadRemoteData { pools: state.pools, funds: state.funds } of
         Left err -> [ err ]
         Right rd -> html rd
-
-      loadRemoteData :: forall w i. Either (HH.HTML w i) { pools :: Array LiquidityPool, funds :: Array Fund }
-      loadRemoteData = do
-        pools <- load state.pools "pools"
-        funds <- load state.funds "wallets funds"
-        pure $ { pools, funds }
-
-      load :: forall a w i. RemoteData String (Array a) -> String -> Either (HH.HTML w i) (Array a)
-      load remoteData what = case remoteData of
-        NotAsked -> Left $ HH.text (what <> " not loaded")
-        Loading -> Left $ HH.text ("Loading  " <> what <> "...")
-        Failure err -> Left $ HH.text ("Error during loading " <> what <> ": " <> err)
-        Success xa -> Right xa

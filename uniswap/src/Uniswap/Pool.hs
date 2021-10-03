@@ -32,8 +32,8 @@ calculateInitialLiquidity outA outB = Amount $ case isqrt (unAmount outA * unAmo
 calculateAdditionalLiquidity :: Amount A -> Amount B -> Amount Liquidity -> Amount A -> Amount B -> Amount Liquidity
 calculateAdditionalLiquidity oldA' oldB' liquidity delA' delB' =
   case rsqrt ratio of
-    Imaginary       -> traceError "insufficient liquidity"
-    Exactly x       -> Amount x - liquidity
+    Imaginary -> traceError "insufficient liquidity"
+    Exactly x -> Amount x - liquidity
     Approximately x -> Amount x - liquidity
   where
     ratio = unAmount (liquidity * liquidity * newProd) % unAmount oldProd
