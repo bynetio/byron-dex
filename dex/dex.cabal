@@ -11,6 +11,7 @@ library
                  , Dex.OffChain
                  , Dex.Types
                  , Dex.Manual
+                 , Dex.Trace
                  , Dex.WalletHistory
   build-depends:       aeson
                      , base ^>=4.14.1.0
@@ -38,7 +39,6 @@ library
 executable dex-pab
   main-is: Main.hs
   hs-source-dirs: pab
-  other-modules: Trace
   ghc-options:
     -threaded
   build-depends:

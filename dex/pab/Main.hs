@@ -30,6 +30,7 @@ import qualified Data.Semigroup                      as Semigroup
 import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import qualified Dex.OffChain                        as Dex
+import qualified Dex.Trace                           as Trace
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
@@ -48,7 +49,6 @@ import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
-import qualified Trace
 import           Wallet.Emulator.Types               (Wallet (..))
 main :: IO ()
 main = void $

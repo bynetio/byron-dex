@@ -9,6 +9,7 @@ import           Data.Default
 import           Data.Functor           (void)
 import qualified Data.Map               as Map
 import           Dex.OffChain
+import           Dex.Trace              (customTraceConfig)
 import           Dex.Types
 import           Plutus.Trace.Emulator  as Emulator
 import qualified Plutus.V1.Ledger.Ada   as Ada
@@ -42,7 +43,7 @@ main :: IO ()
 main = runTrace dexTrace
 
 runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' def emulatorCfg def
+runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg def
   where
     emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1 .. 4]])
       where
