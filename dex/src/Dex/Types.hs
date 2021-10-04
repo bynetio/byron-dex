@@ -29,31 +29,29 @@ import           Dex.WalletHistory
 import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, Integer, return, ($),
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, Integer, return, ($),
                                       (<))
 import           Prelude             (Show)
 import qualified Prelude
 
 
-
-
-newtype Nat = Nat Integer
+newtype Nat
+  = Nat Integer
   deriving stock (Generic)
   deriving newtype
-  ( Show
-  , AdditiveGroup
-  , AdditiveMonoid
-  , AdditiveSemigroup
-  , ToSchema
-  , ToJSON
-  , Prelude.Integral
-  , Prelude.Real
-  , Prelude.Enum
-  , Prelude.Num
-  , Prelude.Ord
-  , Prelude.Eq
-  )
+    ( AdditiveGroup
+    , AdditiveMonoid
+    , AdditiveSemigroup
+    , Prelude.Enum
+    , Prelude.Eq
+    , Prelude.Integral
+    , Prelude.Num
+    , Prelude.Ord
+    , Prelude.Real
+    , Show
+    , ToJSON
+    , ToSchema
+    )
 
 fromNat :: Nat -> Integer
 fromNat (Nat x) = x
@@ -71,25 +69,24 @@ instance FromJSON Nat where
         return $ Nat integer
 
 
-
-data DexAction
-  = Perform
-  deriving (Show)
+data DexAction = Perform | CancelOrder deriving (Show)
 
 PlutusTx.makeIsDataIndexed
   ''DexAction
   [ ('Perform, 0)
+  , ('CancelOrder, 1)
   ]
 PlutusTx.makeLift ''DexAction
 
 
 data SellOrderParams
   = SellOrderParams
-  { coinIn         :: AssetClass
-  , coinOut        :: AssetClass
-  , amountIn       :: Nat
-  , expectedAmount :: Nat
-  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+      { coinIn         :: AssetClass
+      , coinOut        :: AssetClass
+      , amountIn       :: Nat
+      , expectedAmount :: Nat
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed ''SellOrderParams [('SellOrderParams,0)]
 PlutusTx.makeLift ''SellOrderParams
@@ -97,19 +94,26 @@ PlutusTx.makeLift ''SellOrderParams
 
 data SellOrderInfo
   = SellOrderInfo
-  { coinIn         :: AssetClass
-  , coinOut        :: AssetClass
-  , expectedAmount :: Nat
-  , ownerHash      :: PubKeyHash
-  } deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+      { coinIn         :: AssetClass
+      , coinOut        :: AssetClass
+      , expectedAmount :: Nat
+      , ownerHash      :: PubKeyHash
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''SellOrderInfo [('SellOrderInfo,0)]
 PlutusTx.makeLift ''SellOrderInfo
 
+newtype CancelOrderParams
+  = CancelOrderParams { orderHash :: TxOutRef }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+PlutusTx.makeIsDataIndexed ''CancelOrderParams [('CancelOrderParams, 0)]
+PlutusTx.makeLift ''CancelOrderParams
 
 newtype DexDatum
   = SellOrder SellOrderInfo
-  deriving stock (Show, Generic)
+  deriving stock (Generic, Show)
   deriving newtype (FromJSON, ToJSON, ToSchema)
+
 
 PlutusTx.makeIsDataIndexed
   ''DexDatum
@@ -125,17 +129,39 @@ data WithHistoryId a
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
+
+data OrderInfo
+  = OrderInfo
+      { orderHash      :: TxOutRef
+      , coinIn         :: AssetClass
+      , coinOut        :: AssetClass
+      , expectedAmount :: Nat
+      , ownerHash      :: PubKeyHash
+      }
+  deriving (FromJSON, Generic, Show, ToJSON)
+
+PlutusTx.makeIsDataIndexed ''OrderInfo [('OrderInfo, 0)]
+PlutusTx.makeLift ''OrderInfo
+
+
 data DexContractState
   = Orders [(SellOrderInfo, TxOutRef)]
   | Sold
   | Performed
   | Stopped
   | Funds [(AssetClass, Integer)]
+  | MyOrders [OrderInfo]
+  | Cancel
   deriving (FromJSON, Generic, Show, ToJSON)
+
 PlutusTx.makeIsDataIndexed ''DexContractState
-  [ ('Orders,0),
-    ('Sold,1),
-    ('Performed, 2),
-    ('Stopped, 3),
-    ('Funds, 4)]
+  [ ('Orders, 0)
+  , ('Sold, 1)
+  , ('Performed, 2)
+  , ('Stopped, 3)
+  , ('Funds, 4)
+  , ('MyOrders, 5)
+  , ('Cancel, 6)
+  ]
+
 PlutusTx.makeLift ''DexContractState

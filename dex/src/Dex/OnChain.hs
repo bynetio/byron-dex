@@ -36,13 +36,18 @@ mkDexValidator (SellOrder SellOrderInfo {..}) Perform ctx =
     expectedTotalAmount = sum
       [ expectedAmount
       | o <- txInputs
-      --, txOutAddress o == pubKeyHashAddress ownerHash
+     --, txOutAddress o == pubKeyHashAddress ownerHash
       , let order = txOutDatumHash o >>= \datumHash' -> findDatum datumHash' txInfo >>= \(Datum bd) -> PlutusTx.fromBuiltinData bd
       , isJust order
       , let Just (SellOrder SellOrderInfo {..}) = order
       ]
 
     outAmount :: Integer
-    outAmount = sum [ assetClassValueOf o coinOut
-                       | o <- pubKeyOutputsAt ownerHash $ scriptContextTxInfo ctx
-                    ]
+    outAmount = sum [ assetClassValueOf o coinOut | o <- pubKeyOutputsAt ownerHash $ scriptContextTxInfo ctx ]
+
+mkDexValidator (SellOrder SellOrderInfo {..}) CancelOrder ctx =
+  traceIfFalse "Not signed by owner" checkSignatories
+  where
+    txInfo = scriptContextTxInfo ctx
+    signs = txInfoSignatories txInfo
+    checkSignatories = all (== ownerHash) signs
