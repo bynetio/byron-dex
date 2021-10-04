@@ -49,10 +49,10 @@ image: "plutus4binarapps/dex-plutus-dev:v1.1"
   <<: *base_cache
   cache:
     - <<: *cabal_cache
-      # - key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
-      # paths:
-      #  - /builds/plutus/dex/dist-newstyle
-      # policy: pull-push
+    - key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/dex/dist-newstyle
+      policy: pull-push
 
 stages:
   - lint
@@ -98,7 +98,7 @@ uniswap-json-api_specs:
   stage: test
   extends:
     - .automatic
-    - .uniswap-cache
+    - .uniswap-json-api-cache
   needs:
     - prebuild
     - build_uniswap-json-api
