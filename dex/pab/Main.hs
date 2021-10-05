@@ -9,19 +9,17 @@
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE ViewPatterns       #-}
-module Main (main) where
+module Main
+  ( main
+  ) where
 
 import           Control.Monad                       (forM, void)
-import           Control.Monad.Freer                 (Eff, Member, interpret,
-                                                      type (~>))
+import           Control.Monad.Freer                 (Eff, Member, interpret, type (~>))
 import           Control.Monad.Freer.Error           (Error)
 import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON (..),
-                                                      Options (..), Result (..),
-                                                      ToJSON (..),
-                                                      defaultOptions, fromJSON,
-                                                      genericParseJSON,
+import           Data.Aeson                          (FromJSON (..), Options (..), Result (..), ToJSON (..),
+                                                      defaultOptions, fromJSON, genericParseJSON,
                                                       genericToJSON)
 import           Data.Default
 import qualified Data.Map                            as Map
@@ -36,27 +34,25 @@ import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
 import           Ledger.Ada                          (adaSymbol, adaToken)
 import           Ledger.Value                        (AssetClass (..))
-import           Plutus.Contract                     (ContractError, Empty,
-                                                      awaitPromise)
+import           Plutus.Contract                     (ContractError, Empty, awaitPromise)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
-import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
-                                                      type (.\\))
+import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..), type (.\\))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
-import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
-                                                      logString)
+import           Plutus.PAB.Simulator                (SimulatorEffectHandlers, logString)
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
-import           Wallet.Emulator.Types               (Wallet (..))
+import           Wallet.Emulator.Types               (knownWallet)
+
 main :: IO ()
 main = void $
   Simulator.runSimulationWith handlers $ do
     logString @(Builtin DexContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
-    cidInit <- Simulator.activateContract (Wallet 1) DexInit
+    cidInit <- Simulator.activateContract (knownWallet 1) DexInit
     cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
       Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
       _                                   -> Nothing
@@ -83,10 +79,7 @@ main = void $
     _ <- liftIO getLine
     shutdown
 
-data DexContracts
-  = DexContract
-  | DexInit
-  deriving (Eq, Ord, Show, Generic)
+data DexContracts = DexContract | DexInit deriving (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON)
 
 instance Pretty DexContracts where
@@ -103,4 +96,5 @@ instance Builtin.HasDefinitions DexContracts where
 
 handlers :: SimulatorEffectHandlers (Builtin DexContracts)
 handlers =
-  Simulator.mkSimulatorHandlers def $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @DexContracts))
+    Simulator.mkSimulatorHandlers def def
+    $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @DexContracts))

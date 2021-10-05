@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TypeApplications   #-}
 
-module Dex.Manual where
+module Dex.Manual
+  where
 
 import           Data.Default
 import           Data.Functor           (void)
@@ -43,9 +44,9 @@ main :: IO ()
 main = runTrace dexTrace
 
 runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg def
+runTrace = runEmulatorTraceIO' customTraceConfig (emulatorCfg def def)
   where
-    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1 .. 4]])
+    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])
       where
         v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
@@ -54,8 +55,8 @@ runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg def
 
 dexTrace :: EmulatorTrace ()
 dexTrace = do
-  h1 <- activateContractWallet (Wallet 1) dexEndpoints
-  h2 <- activateContractWallet (Wallet 2) dexEndpoints
+  h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+  h2 <- activateContractWallet (knownWallet 2) dexEndpoints
   void $ callEndpoint @"sell" h1 (WithHistoryId "a" (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 100 200))
   void $ waitNSlots 10
   void $ callEndpoint @"sell" h1 (WithHistoryId "b" (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))

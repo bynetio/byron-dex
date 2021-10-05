@@ -37,6 +37,7 @@ import           Plutus.Contract                    (awaitPromise)
 import           Plutus.Contract.Test
 import           Plutus.Contract.Test.ContractModel
 import           Plutus.Trace.Emulator
+import qualified Plutus.Trace.Emulator              as Trace
 import qualified Plutus.V1.Ledger.Value             as Value
 import           Prettyprinter
 import           Test.QuickCheck
@@ -169,7 +170,7 @@ instance ContractModel UModel where
 
   arbitraryAction _ =
     oneof $
-      pure (StartA $ Wallet 1) :
+      pure (StartA $ knownWallet 1) :
       [CreateA <$> genWallet <*> genLPKey <*> genNonNeg <*> genNonNeg]
         ++ [AddA <$> genWallet <*> genLPKey <*> genNonNeg <*> genNonNeg]
         ++ [RemoveA <$> genWallet <*> genLPKey <*> genNonNeg]
@@ -467,14 +468,14 @@ deriving instance Show (ContractInstanceKey UModel w s e)
 
 instanceSpec :: [ContractInstanceSpec UModel]
 instanceSpec =
-  ContractInstanceSpec (StartKey (Wallet 1)) (Wallet 1) (awaitPromise ownerEndpoint') :
+  ContractInstanceSpec (StartKey (knownWallet 1)) (knownWallet 1) (awaitPromise ownerEndpoint') :
     [ContractInstanceSpec (UseKey w) w $ awaitPromise $ userEndpoints sampleUniswap | w <- wallets]
 
 delay :: Int -> EmulatorTrace ()
 delay = void . waitNSlots . fromIntegral
 
 wallets :: [Wallet]
-wallets = map Wallet [2 .. 3]
+wallets = map knownWallet [2 .. 3]
 
 genWallet :: Gen Wallet
 genWallet = elements wallets
@@ -522,14 +523,14 @@ prop_U :: Actions UModel -> Property
 prop_U =
   withMaxSuccess 1000
     . propRunActionsWithOptions
-      (defaultCheckOptions & emulatorConfig .~ EmulatorConfig (Left d))
+      (defaultCheckOptions & emulatorConfig . Trace.initialChainState .~ Left d)
       instanceSpec
       (\s -> flip Folds.postMapM (generalize Folds.userLog) $ \lg -> tell @(Doc Void) (pretty $ show (s ^. contractState)) >> return True)
   where
     d :: InitialDistribution
     d =
       Map.fromList $
-        ( Wallet 1,
+        ( knownWallet 1,
           lovelaceValueOf 1_000_000_000
             <> mconcat (map (\(symbol, tn) -> Value.singleton symbol tn tokenAmt) customSymbolsAndTokens)
             <> nft
