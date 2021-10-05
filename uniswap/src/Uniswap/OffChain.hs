@@ -19,6 +19,7 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
+{-# LANGUAGE NamedFieldPuns             #-}
 module Uniswap.OffChain
   ( poolStateCoinFromUniswcurrency,
     liquidityCoin,
@@ -52,6 +53,7 @@ module Uniswap.OffChain
 where
 
 import           Control.Applicative          ((<|>))
+import           Control.Lens                 (view)
 import           Control.Monad                hiding (fmap, mapM, mapM_)
 import           Control.Monad.Freer
 import           Data.List                    (scanl)
@@ -144,8 +146,8 @@ uniswapInstance us =
 uniswapScript :: Uniswap -> Validator
 uniswapScript = Scripts.validatorScript . uniswapInstance
 
-uniswaddress :: Uniswap -> Ledger.Address
-uniswaddress = Ledger.scriptAddress . uniswapScript
+uniswapAddress :: Uniswap -> Ledger.Address
+uniswapAddress = Ledger.scriptAddress . uniswapScript
 
 -- | Given a currency symbol creates NFT token to identify a uniswap instance
 uniswap :: CurrencySymbol -> Uniswap
@@ -205,7 +207,7 @@ start mcs = do
       tx = mustPayToTheScript (Factory []) $ unitValue c
   ledgerTx <- submitTxConstraints inst tx
   void $ awaitTxConfirmed $ txId ledgerTx
-  logInfo @String $ printf "started Uniswap %s at address %s" (show us) (show $ uniswaddress us)
+  logInfo @String $ printf "started Uniswap %s at address %s" (show us) (show $ uniswapAddress us)
   return us
 
 -- | Creates a liquidity pool for a pair of coins. The creator provides liquidity for both coins and gets liquidity tokens in return.
@@ -286,7 +288,7 @@ remove us RemoveParams {..} = do
       lC = mkCoin (liquidityCurrency us) $ lpTicker lp
       psVal = unitValue psC
       lVal = valueOf lC diff
-      inVal = txOutValue $ txOutTxOut o
+      inVal = view ciTxOutValue o
       inA = amountOf inVal coinA
       inB = amountOf inVal coinB
       (outA, outB) = calculateRemoval inA inB liquidity diff
@@ -315,7 +317,7 @@ add us AddParams {..} = do
   (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
   logInfo @String $ printf "old liquidity = %d" $ unAmount liquidity
   when (amountA < 0 || amountB < 0) $ throwError "amounts must not be negative"
-  let outVal = txOutValue $ txOutTxOut o
+  let outVal = view ciTxOutValue o
       oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
       newA = oldA + amountA
@@ -357,7 +359,7 @@ add us AddParams {..} = do
 swapPreview :: Uniswap -> SwapPreviewParams -> Contract w s Text SwapPreviewResultData
 swapPreview us SwapPreviewParams {..} = do
   (_, (_, o, _, _)) <- findUniswapFactoryAndPool us coinA coinB fee
-  let outVal = txOutValue $ txOutTxOut o
+  let outVal = view ciTxOutValue o
   let oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
   let outB = Amount $ findSwap oldA oldB amount fee
@@ -368,7 +370,7 @@ swap :: Uniswap -> SwapParams -> Contract w s Text ()
 swap us SwapParams {..} = do
   unless (amount > 0) $ throwError "amount must be positive"
   (_, (oref, o, lp, liquidity)) <- findUniswapFactoryAndPool us coinA coinB fee
-  let outVal = txOutValue $ txOutTxOut o
+  let outVal = view ciTxOutValue o
   let oldA = amountOf outVal coinA
       oldB = amountOf outVal coinB
   (newA, newB, outB) <- do
@@ -415,7 +417,7 @@ uniquePoolsWithCoins us = do
           distinctPools $
             map
               ( \((_, pO, _), LiquidityPool {..}) ->
-                  let pOutVal = txOutValue $ txOutTxOut pO
+                  let pOutVal = view ciTxOutValue pO
                       amountA = unAmount $ amountOf pOutVal lpCoinA
                       amountB = unAmount $ amountOf pOutVal lpCoinB
                    in ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (amountA, amountB))
@@ -437,7 +439,7 @@ uniquePools us = do
           distinctPools $
             map
               ( \((_, pO, _), LiquidityPool {..}) ->
-                  let pOutVal = txOutValue $ txOutTxOut pO
+                  let pOutVal = view ciTxOutValue pO
                       amountA = unAmount $ amountOf pOutVal lpCoinA
                       amountB = unAmount $ amountOf pOutVal lpCoinB
                    in ((unCoin lpCoinA, unCoin lpCoinB, lpFee), (amountA, amountB))
@@ -450,39 +452,39 @@ uniquePools us = do
       where
         eqPool ((a1, a2, f1), _) ((b1, b2, f2), _) = f1 == f2 && ((a1, a2) == (b1, b2) || (a1, a2) == (b2, b1))
 
-indirectSwap2 :: forall w s. Uniswap -> IndirectSwapParams -> Contract w s Text ()
-indirectSwap2 us IndirectSwapParams {..} =
-  runM $
-    translate
-      ( \case
-          IndirectSwapFail message -> throwError message
-          IndirectSwapPools -> uniquePoolsWithCoins us
-          IndirectSwapStep (unspentOutputs, constraints) (LiquidityPoolWithCoins {..}, (inAmount, outAmount)) -> do
-            (oref, o, liquidity) <- findUniswapPool us $ liquidityPool (coinA, coinB) fee
-            let (newA, newB) = (amountA + inAmount, amountB - outAmount)
-            let val = valueOf coinA newA <> valueOf coinB newB <> unitValue (poolStateCoin us)
-            return
-              ( Map.insert oref o unspentOutputs,
-                constraints
-                  <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap)
-                  <> Constraints.mustPayToTheScript (Pool (liquidityPool (coinA, coinB) fee) liquidity) val
-              )
-          IndirectSwapInitStepState -> return (Map.empty, mempty)
-          IndirectSwapCommit (unspentOutputs, constraints) ->
-            do
-              pkh <- pubKeyHash <$> ownPubKey
-              let inst = uniswapInstance us
+-- indirectSwap2 :: forall w s. Uniswap -> IndirectSwapParams -> Contract w s Text ()
+-- indirectSwap2 us IndirectSwapParams {..} =
+--   runM $
+--     translate
+--       ( \case
+--           IndirectSwapFail message -> throwError message
+--           IndirectSwapPools -> uniquePoolsWithCoins us
+--           IndirectSwapStep (unspentOutputs, constraints) (LiquidityPoolWithCoins {..}, (inAmount, outAmount)) -> do
+--             (oref, o, liquidity) <- findUniswapPool us $ liquidityPool (coinA, coinB) fee
+--             let (newA, newB) = (amountA + inAmount, amountB - outAmount)
+--             let val = valueOf coinA newA <> valueOf coinB newB <> unitValue (poolStateCoin us)
+--             return
+--               ( Map.insert oref o unspentOutputs,
+--                 constraints
+--                   <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Swap)
+--                   <> Constraints.mustPayToTheScript (Pool (liquidityPool (coinA, coinB) fee) liquidity) val
+--               )
+--           IndirectSwapInitStepState -> return (Map.empty, mempty)
+--           IndirectSwapCommit (unspentOutputs, constraints) ->
+--             do
+--               pkh <- pubKeyHash <$> ownPubKey
+--               let inst = uniswapInstance us
 
-                  lookups =
-                    Constraints.typedValidatorLookups inst
-                      <> Constraints.otherScript (Scripts.validatorScript inst)
-                      <> Constraints.unspentOutputs unspentOutputs
-                      <> Constraints.ownPubKeyHash pkh
+--                   lookups =
+--                     Constraints.typedValidatorLookups inst
+--                       <> Constraints.otherScript (Scripts.validatorScript inst)
+--                       <> Constraints.unspentOutputs unspentOutputs
+--                       <> Constraints.ownPubKeyHash pkh
 
-              void $ submitTxConstraintsWith lookups constraints
-          IndirectSwapLog message -> logInfo @Text message
-      )
-      (iswap @(Map.Map TxOutRef TxOutTx, TxConstraints UniswapAction UniswapDatum) IndirectSwapParams {..})
+--               void $ submitTxConstraintsWith lookups constraints
+--           IndirectSwapLog message -> logInfo @Text message
+--       )
+--       (iswap @(Map.Map TxOutRef TxOutTx, TxConstraints UniswapAction UniswapDatum) IndirectSwapParams {..})
 
 indirectSwap :: Uniswap -> IndirectSwapParams -> Contract w s Text ()
 indirectSwap us IndirectSwapParams {..} = do
@@ -534,14 +536,14 @@ indirectSwap us IndirectSwapParams {..} = do
 -- This merely inspects the blockchain and does not issue any transactions.
 pools :: forall w s. Uniswap -> Contract w s Text [LiquidityPoolView]
 pools us = do
-  utxos <- utxoAt (uniswaddress us)
+  utxos <- utxosAt (uniswapAddress us)
   go $ snd <$> Map.toList utxos
   where
-    go :: [TxOutTx] -> Contract w s Text [LiquidityPoolView]
+    go :: [ChainIndexTxOut] -> Contract w s Text [LiquidityPoolView]
     go [] = return []
     go (o : os) = do
-      let v = txOutValue $ txOutTxOut o
-      if isUnity v c
+        let v = view ciTxOutValue o
+        if isUnity v c
         then do
           d <- getUniswapDatum o
           case d of
@@ -566,45 +568,60 @@ pools us = do
 funds :: Contract w s Text [AmountOfCoin A]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
-  os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
-  let value = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
-  return [AmountOfCoin (mkCoin cs tn) (Amount a) | (cs, tns) <- AssocMap.toList value, (tn, a) <- AssocMap.toList tns]
+  os <- map snd . Map.toList <$> utxosAt (pubKeyHashAddress pkh)
+  let v = getValue $ mconcat [view ciTxOutValue o | o <- os]
+  return [AmountOfCoin (mkCoin cs tn) (Amount a) | (cs, tns) <- AssocMap.toList v, (tn, a) <- AssocMap.toList tns]
 
 clearState :: ClearStateParams -> Contract (History (Either Text UserContractState)) s Text ()
 clearState ClearStateParams {..} = do
   tell $ WH.remove removeId
 
-getUniswapDatum :: TxOutTx -> Contract w s Text UniswapDatum
-getUniswapDatum o = case txOutDatumHash $ txOutTxOut o of
-  Nothing -> throwError "datumHash not found"
-  Just h -> case Map.lookup h $ txData $ txOutTxTx o of
-    Nothing -> throwError "datum not found"
-    Just (Datum e) -> case PlutusTx.fromBuiltinData e of
-      Nothing -> throwError "datum has wrong type"
-      Just d -> return d
 
-findUniswapInstance :: Uniswap -> Coin b -> (UniswapDatum -> Maybe a) -> Contract w s Text (TxOutRef, TxOutTx, a)
+getUniswapDatum :: ChainIndexTxOut -> Contract w s Text UniswapDatum
+getUniswapDatum o =
+  case o of
+      PublicKeyChainIndexTxOut {} ->
+        throwError "no datum for a txout of a public key address"
+      ScriptChainIndexTxOut { _ciTxOutDatum } -> do
+        (Datum e) <- either getDatum pure _ciTxOutDatum
+        maybe (throwError "datum hash wrong type")
+              pure
+              (PlutusTx.fromBuiltinData e)
+  where
+    getDatum :: DatumHash -> Contract w s Text Datum
+    getDatum dh =
+      datumFromHash dh >>= \case Nothing -> throwError "datum not found"
+                                 Just d  -> pure d
+
+
+findUniswapInstance ::
+    forall a b w s.
+    Uniswap
+    -> Coin b
+    -> (UniswapDatum -> Maybe a)
+    -> Contract w s Text (TxOutRef, ChainIndexTxOut, a)
 findUniswapInstance us c f = do
-  let addr = uniswaddress us
-  logInfo @String $ printf "looking for Uniswap instance at address %s containing coin %s " (show addr) (show c)
-  utxos <- utxoAt addr
-  go [x | x@(_, o) <- Map.toList utxos, isUnity (txOutValue $ txOutTxOut o) c]
+    let addr = uniswapAddress us
+    logInfo @String $ printf "looking for Uniswap instance at address %s containing coin %s " (show addr) (show c)
+    utxos <- utxosAt addr
+    go  [x | x@(_, o) <- Map.toList utxos, isUnity (view ciTxOutValue o) c]
   where
     go [] = throwError "Uniswap instance not found"
     go ((oref, o) : xs) = do
-      d <- getUniswapDatum o
-      case f d of
-        Nothing -> go xs
-        Just a -> do
-          logInfo @String $ printf "found Uniswap instance with datum: %s" (show d)
-          return (oref, o, a)
+        d <- getUniswapDatum o
+        case f d of
+            Nothing -> go xs
+            Just a  -> do
+                logInfo @String $ printf "found Uniswap instance with datum: %s" (show d)
+                return (oref, o, a)
 
-findUniswapFactory :: Uniswap -> Contract w s Text (TxOutRef, TxOutTx, [LiquidityPool])
-findUniswapFactory us@Uniswap {..} = findUniswapInstance us usCoin $ \case
-  Factory lps -> Just lps
-  Pool _ _ -> Nothing
 
-findUniswapPool :: Uniswap -> LiquidityPool -> Contract w s Text (TxOutRef, TxOutTx, Amount Liquidity)
+findUniswapFactory :: forall w s. Uniswap -> Contract w s Text (TxOutRef, ChainIndexTxOut, [LiquidityPool])
+findUniswapFactory us@Uniswap{..} = findUniswapInstance us usCoin $ \case
+    Factory lps -> Just lps
+    Pool _ _    -> Nothing
+
+findUniswapPool :: Uniswap -> LiquidityPool -> Contract w s Text (TxOutRef, ChainIndexTxOut, Amount Liquidity)
 findUniswapPool us lp = findUniswapInstance us (poolStateCoin us) $ \case
   Pool lp' l
     | lp == lp' -> Just l
@@ -619,8 +636,8 @@ findUniswapFactoryAndPool ::
     w
     s
     Text
-    ( (TxOutRef, TxOutTx, [LiquidityPool]),
-      (TxOutRef, TxOutTx, LiquidityPool, Amount Liquidity)
+    ( (TxOutRef, ChainIndexTxOut, [LiquidityPool]),
+      (TxOutRef, ChainIndexTxOut, LiquidityPool, Amount Liquidity)
     )
 findUniswapFactoryAndPool us coinA coinB fee = do
   (oref1, o1, lps) <- findUniswapFactory us
@@ -680,7 +697,7 @@ userEndpoints us =
     `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId {..} -> create us content)
                    `select` f (Proxy @"swap") historyId (const Swapped) (\us WithHistoryId {..} -> swap us content)
                    `select` f (Proxy @"swapPreview") historyId SwapPreviewResult (\us WithHistoryId {..} -> swapPreview us content)
-                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId {..} -> indirectSwap2 us content)
+                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId {..} -> indirectSwap us content)
                    `select` f (Proxy @"iSwapPreview") historyId ISwapPreviewResult (\us WithHistoryId {..} -> indirectSwapPreview us content)
                    `select` f (Proxy @"close") historyId (const Closed) (\us WithHistoryId {..} -> close us content)
                    `select` f (Proxy @"remove") historyId (const Removed) (\us WithHistoryId {..} -> remove us content)

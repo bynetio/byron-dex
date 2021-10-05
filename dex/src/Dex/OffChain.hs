@@ -19,9 +19,11 @@
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
 
+{-# LANGUAGE NamedFieldPuns             #-}
 module Dex.OffChain
-where
+  where
 
+import           Control.Lens.Getter  (view)
 import           Control.Monad        hiding (fmap, mapM, mapM_)
 import           Data.List            (foldl', sortOn)
 import qualified Data.Map             as Map
@@ -37,8 +39,7 @@ import           GHC.TypeLits         (symbolVal)
 import           Ledger               hiding (fee, singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
-import           Ledger.Value         (AssetClass (..), assetClassValue,
-                                       assetClassValueOf, getValue)
+import           Ledger.Value         (AssetClass (..), assetClassValue, assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
@@ -52,15 +53,13 @@ instance Scripts.ValidatorTypes Uniswapping where
   type DatumType Uniswapping = DexDatum
 
 
-
 dexInstance :: Scripts.TypedValidator Uniswapping
 dexInstance =
   Scripts.mkTypedValidator @Uniswapping
-    ( $$(PlutusTx.compile [||mkDexValidator||]))
+    $$(PlutusTx.compile [||mkDexValidator||])
     $$(PlutusTx.compile [||wrap||])
   where
     wrap = Scripts.wrapValidator @DexDatum @DexAction
-
 
 
 type DexSchema =
@@ -75,7 +74,7 @@ sell SellOrderParams {..} = do
   ownerHash <- pubKeyHash <$> ownPubKey
 
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
-  utxos <- Map.toList <$> utxoAt address
+  utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, o) -> getOrderDatum o >>= \d -> return (o, oref, d)) utxos
   let filtered =
         [ (oref, o, d)
@@ -84,13 +83,13 @@ sell SellOrderParams {..} = do
         , coinOut == coinIn'
         ]
   let sorted = sortOn (\(o,_,SellOrder SellOrderInfo {coinIn=coinIn', expectedAmount=expectedAmount'}) ->
-                                  let amountIn' = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn'
+                                  let amountIn' = assetClassValueOf (view ciTxOutValue o) coinIn'
                                   in fromIntegral (fromNat expectedAmount') / fromIntegral amountIn') filtered
 
 
   let (utxosToCollect, _, reward) =
         foldl' (\(utxosAcc, moneyToSpend, rewardAcc) order@(o,oref,SellOrder (SellOrderInfo coinIn' coinOut' cost _)) ->
-          let reward = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn'
+          let reward = assetClassValueOf (view ciTxOutValue o) coinIn'
           in if moneyToSpend - fromNat cost < 0
             then (utxosAcc, moneyToSpend, rewardAcc)
             else (order:utxosAcc, moneyToSpend - fromNat cost, rewardAcc + reward)
@@ -98,7 +97,7 @@ sell SellOrderParams {..} = do
   if reward >= fromNat expectedAmount
     then do
       let tx = foldl' (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
-                let inValue = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn
+                let inValue = assetClassValueOf (view ciTxOutValue o) coinIn
 
                 in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut (fromNat expectedAmount))
                       <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
@@ -117,7 +116,7 @@ sell SellOrderParams {..} = do
 findOrders :: Contract (History (Either Text DexContractState)) DexSchema Text [(SellOrderInfo, TxOutRef)]
 findOrders = do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
-  utxos <- Map.toList <$> utxoAt address
+  utxos <- Map.toList <$> utxosAt address
   mapM (\(oref, o) -> getOrderDatum o >>= \case
     SellOrder sellOrder -> return (sellOrder, oref)
     ) utxos
@@ -127,14 +126,14 @@ perform :: Contract (History (Either Text DexContractState)) DexSchema Text ()
 perform = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
-  utxos <- Map.toList <$> utxoAt address
+  utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, o) -> getOrderDatum o >>= \d -> return (o, oref, d)) utxos
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> Constraints.unspentOutputs (Map.fromList utxos)
       tx = foldl' (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
-        let inValue = assetClassValueOf (txOutValue $ txOutTxOut o) coinIn
+        let inValue = assetClassValueOf (view ciTxOutValue o) coinIn
 
         in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut (fromNat expectedAmount))
               <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
@@ -145,20 +144,26 @@ perform = do
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
-  os <- map snd . Map.toList <$> utxoAt (pubKeyHashAddress pkh)
-  let walletValue = getValue $ mconcat [txOutValue $ txOutTxOut o | o <- os]
+  os <- map snd . Map.toList <$> utxosAt (pubKeyHashAddress pkh)
+  let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
 
-
-getOrderDatum :: TxOutTx -> Contract w s Text DexDatum
-getOrderDatum o = case txOutDatumHash $ txOutTxOut o of
-  Nothing -> throwError "datumHash not found"
-  Just h -> case Map.lookup h $ txData $ txOutTxTx o of
-    Nothing -> throwError "datum not found"
-    Just (Datum e) -> case PlutusTx.fromBuiltinData e of
-      Nothing -> throwError "datum has wrong type"
-      Just d  -> return d
+getOrderDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
+getOrderDatum o =
+  case o of
+      PublicKeyChainIndexTxOut {} ->
+        throwError "no datum for a txout of a public key address"
+      ScriptChainIndexTxOut { _ciTxOutDatum } -> do
+        (Datum e) <- either getDatum pure _ciTxOutDatum
+        maybe (throwError "datum hash wrong type")
+              pure
+              (PlutusTx.fromBuiltinData e)
+  where
+    getDatum :: DatumHash -> Contract w s Text Datum
+    getDatum dh =
+      datumFromHash dh >>= \case Nothing -> throwError "datum not found"
+                                 Just d  -> pure d
 
 
 dexEndpoints :: Promise (History (Either Text DexContractState)) DexSchema Void ()

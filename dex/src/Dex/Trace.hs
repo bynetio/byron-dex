@@ -2,12 +2,12 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Dex.Trace(
-      setupTokens
-    , tokenNames
-    , wallets
-    , customTraceConfig
-    ) where
+module Dex.Trace
+  ( customTraceConfig
+  , setupTokens
+  , tokenNames
+  , wallets
+  ) where
 
 import           Control.Monad                           (forM_, when)
 import qualified Data.Semigroup                          as Semigroup
@@ -16,17 +16,13 @@ import           Ledger.Constraints
 import           Ledger.Value                            as Value
 import           Plutus.Contract                         hiding (throwError)
 import qualified Plutus.Contracts.Currency               as Currency
-import           Plutus.Trace.Emulator.Types             (ContractInstanceLog (..),
-                                                          ContractInstanceMsg (..))
-import           Wallet.Emulator.Types                   (Wallet (..),
-                                                          walletPubKey)
+import           Plutus.Trace.Emulator.Types             (ContractInstanceLog (..), ContractInstanceMsg (..))
+import           Wallet.Emulator.Types                   (Wallet, knownWallet, walletPubKey)
 
 import           Wallet.Emulator.MultiAgent              (EmulatorEvent' (..))
 
 import qualified Data.Aeson                              as A
-import           Data.Text.Prettyprint.Doc               (Pretty,
-                                                          defaultLayoutOptions,
-                                                          layoutPretty, pretty)
+import           Data.Text.Prettyprint.Doc               (Pretty, defaultLayoutOptions, layoutPretty, pretty)
 import           Data.Text.Prettyprint.Doc.Render.String (renderString)
 import           Plutus.Trace.Emulator                   (TraceConfig (..))
 import           System.IO                               (stdout)
@@ -50,7 +46,7 @@ setupTokens = do
     amount = 1000000
 
 wallets :: [Wallet]
-wallets = [Wallet i | i <- [1 .. 4]]
+wallets = [knownWallet i | i <- [1 .. 4]]
 
 tokenNames :: [TokenName]
 tokenNames = ["A", "B", "C", "D"]
