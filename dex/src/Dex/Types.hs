@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+{-# LANGUAGE StrictData                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -31,11 +32,9 @@ import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, BuiltinByteString, Eq,
-                                      Integer, MultiplicativeMonoid,
-                                      MultiplicativeSemigroup, Ord, return, ($),
-                                      (&&), (<), (==))
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid, MultiplicativeSemigroup, Ord, return,
+                                      ($), (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 
@@ -46,19 +45,19 @@ newtype Nat
     ( AdditiveGroup
     , AdditiveMonoid
     , AdditiveSemigroup
+    , Eq
     , MultiplicativeMonoid
     , MultiplicativeSemigroup
+    , Ord
     , Prelude.Enum
     , Prelude.Eq
     , Prelude.Integral
     , Prelude.Num
     , Prelude.Ord
     , Prelude.Real
-    , Ord
     , Show
     , ToJSON
     , ToSchema
-    , Eq
     )
 
 fromNat :: Nat -> Integer
@@ -79,15 +78,10 @@ instance FromJSON Nat where
 toDouble :: (Nat,Nat) -> Double
 toDouble (a,b) = fromIntegral a / fromIntegral b
 
-
 singleton :: AssetClass -> Nat -> Value
 singleton assetClass amount = assetClassValue assetClass (fromNat amount)
 
-data DexAction
-  = Swap
-  | CancelOrder
-  | CollectCoins
-  deriving (Show)
+data DexAction = Swap | CancelOrder | CollectCoins deriving (Show)
 
 PlutusTx.makeIsDataIndexed
   ''DexAction
@@ -143,7 +137,7 @@ data LiquidityPoolParams
       , amountA         :: Nat
       , poolPartsParams :: PoolPartsParams
       , swapFee         :: (Nat, Nat)
-      , exchangeRate    :: (Nat,Nat)
+      , exchangeRate    :: (Nat, Nat)
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
@@ -214,7 +208,7 @@ PlutusTx.makeLift ''LiquidityOrderInfo
 data Order
   = SellOrder SellOrderInfo
   | LiquidityOrder LiquidityOrderInfo
-  deriving (Generic, Show, FromJSON, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON)
 
 PlutusTx.makeIsDataIndexed
  ''Order
@@ -226,7 +220,7 @@ PlutusTx.makeLift ''Order
 data DexDatum
   = Order Order
   | Payout PayoutInfo
-  deriving (Generic, Show, FromJSON, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON)
 
 
 PlutusTx.makeIsDataIndexed

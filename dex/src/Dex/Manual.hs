@@ -6,17 +6,19 @@
 module Dex.Manual
   where
 
+import qualified Cardano.Api                   as C
 import           Data.Default
-import           Data.Functor           (void)
-import qualified Data.Map               as Map
+import           Data.Functor                  (void)
+import qualified Data.Map                      as Map
 import           Dex.OffChain
-import           Dex.Trace              (customTraceConfig)
+import           Dex.Trace                     (customTraceConfig)
 import           Dex.Types
-import           Plutus.Trace.Emulator  as Emulator
-import qualified Plutus.V1.Ledger.Ada   as Ada
-import qualified Plutus.V1.Ledger.Value as Value
-import           Wallet.Emulator.Wallet as Wallet
-
+import           Ledger.Index                  (ValidatorMode (..))
+import           Plutus.Trace.Emulator         as Emulator
+import           Plutus.Trace.Emulator.Extract (Command (..), ScriptsConfig (..), writeScriptsTo)
+import qualified Plutus.V1.Ledger.Ada          as Ada
+import qualified Plutus.V1.Ledger.Value        as Value
+import           Wallet.Emulator.Wallet        as Wallet
 
 customSymbol :: [Char]
 customSymbol = "ff"
@@ -43,12 +45,29 @@ customToken3 = "ETH"
 main :: IO ()
 main = runTrace dexTrace
 
-runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' customTraceConfig (emulatorCfg def def)
-  where
-    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])
+emulatorCfg :: EmulatorConfig
+emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])) def def
       where
         v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
+
+scriptsConfig1 :: ScriptsConfig
+scriptsConfig1 = ScriptsConfig "./" (Scripts FullyAppliedValidators  )
+
+scriptsConfig2 :: ScriptsConfig
+scriptsConfig2 = ScriptsConfig "./" (Scripts UnappliedValidators  )
+
+scriptsConfig3 :: ScriptsConfig
+scriptsConfig3 = ScriptsConfig "./" (Transactions (C.Testnet $ C.NetworkMagic 0) "protocol-parameters.json")
+
+
+mainInfo :: IO ()
+mainInfo = do
+  r <- writeScriptsTo scriptsConfig1 "Wiksa" dexTrace emulatorCfg
+  print r
+  return ()
+
+runTrace :: EmulatorTrace () -> IO ()
+runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg
 
 
 

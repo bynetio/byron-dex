@@ -91,5 +91,4 @@ mkDexValidator (Payout PayoutInfo {..}) CollectCoins ctx =
     signs = txInfoSignatories txInfo
     checkSignatories = ownerHash `elem` signs
 
-
 mkDexValidator _ _ _ = False

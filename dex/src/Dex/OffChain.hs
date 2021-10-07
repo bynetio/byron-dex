@@ -43,17 +43,14 @@ import           Ledger                      hiding (fee, singleton)
 import           Ledger.Constraints          (TxConstraints (..))
 import qualified Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
-import           Ledger.Value                (AssetClass (..), assetClassValue,
-                                              assetClassValueOf, getValue)
+import           Ledger.Value                (AssetClass (..), assetClassValue, assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
 import qualified PlutusTx.AssocMap           as AssocMap
 import           PlutusTx.Builtins.Class     (stringToBuiltinByteString)
-import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum,
-                                              unless, (*), (+), (-))
-import           Prelude                     (Double, Semigroup (..), ceiling,
-                                              fromIntegral, round, sum, (*),
+import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum, unless, (*), (+), (-))
+import           Prelude                     (Double, Semigroup (..), ceiling, fromIntegral, round, sum, (*),
                                               (/))
 import qualified Prelude
 import           System.Random
@@ -128,23 +125,6 @@ createSellOrder smgen SellOrderParams {..} = do
   void $ submitTxConstraints dexInstance tx
   return uuid
 
-
-createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
-createLiquidityOrder smgen LiquidityOrderParams {..} = do
-  ownerHash <- ownPubKeyHash
-  let uuid = head $ randoms @UUID.UUID smgen
-  let orderInfo =
-        LiquidityOrderInfo
-          { expectedCoin = expectedCoin
-          , lockedCoin = lockedCoin
-          , expectedAmount = expectedAmount
-          , swapFee = swapFee
-          , ownerHash = ownerHash
-          , orderId = uuidToBBS uuid
-          }
-  let tx = Constraints.mustPayToTheScript (Order $ LiquidityOrder orderInfo) (singleton lockedCoin lockedAmount)
-  void $ submitTxConstraints dexInstance tx
-  return uuid
 
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
 createLiquidityPool smgen LiquidityPoolParams {..} = do
@@ -363,10 +343,10 @@ dexEndpoints =
         Right (Request hId _ _) -> WH.append hId $ Right Stopped
 
     createLiquidityOrder' = f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
-    createSellOrder'    = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
-    createLiquidityPool' = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
-    perform' = f (Proxy @"perform") historyId (const Performed) (const perform)
-    orders'  = f (Proxy @"orders") historyId MyOrders (const orders)
-    funds'   = f (Proxy @"funds") historyId Funds (const funds)
-    cancel'  = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
-    collectFunds' = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
+    createSellOrder'      = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
+    createLiquidityPool'  = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
+    perform'              = f (Proxy @"perform") historyId (const Performed) (const perform)
+    orders'               = f (Proxy @"orders") historyId MyOrders (const orders)
+    funds'                = f (Proxy @"funds") historyId Funds (const funds)
+    cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
+    collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
