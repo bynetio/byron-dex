@@ -46,6 +46,8 @@ import qualified PlutusTx
 import qualified PlutusTx.AssocMap    as AssocMap
 import           PlutusTx.Prelude     hiding (Semigroup (..), unless)
 import           Prelude              (Semigroup (..), fromIntegral, (/))
+
+
 data Uniswapping
 
 instance Scripts.ValidatorTypes Uniswapping where
@@ -68,6 +70,9 @@ type DexSchema =
   .\/ Endpoint "stop" (WithHistoryId ())
   .\/ Endpoint "funds" (WithHistoryId ())
   .\/ Endpoint "findOrders" (WithHistoryId ())
+  .\/ Endpoint "orders" (WithHistoryId ())
+  .\/ Endpoint "cancel" (WithHistoryId CancelOrderParams)
+
 
 sell :: SellOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
 sell SellOrderParams {..} = do
@@ -149,6 +154,44 @@ funds = do
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
 
+orders :: Contract (History (Either Text DexContractState)) DexSchema Text [OrderInfo]
+orders = do
+  pkh <- pubKeyHash <$> ownPubKey
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  mapped <- mapM toOrderInfo utxos
+  return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
+  where
+    toOrderInfo (orderHash, o) = do
+      SellOrder SellOrderInfo {..} <- getOrderDatum o
+      return $ OrderInfo {..}
+
+cancel :: CancelOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
+cancel CancelOrderParams {..} = do
+  pkh <- pubKeyHash <$> ownPubKey
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos  <- Map.toList . Map.filterWithKey (\oref' _ -> oref' == orderHash) <$> utxosAt address
+  hashes <- mapM (toOwnerHash . snd) utxos
+
+  when (any (/= pkh) hashes || null hashes) (throwError "Cannot find order by provided hash")
+
+  let lookups =
+        Constraints.typedValidatorLookups dexInstance
+        <> Constraints.ownPubKeyHash pkh
+        <> Constraints.otherScript (Scripts.validatorScript dexInstance)
+        <> Constraints.unspentOutputs (Map.fromList utxos)
+
+      tx     = Constraints.mustSpendScriptOutput orderHash $ Redeemer $ PlutusTx.toBuiltinData CancelOrder
+
+  void $ submitTxConstraintsWith lookups tx
+
+  where
+    toOwnerHash :: ChainIndexTxOut -> Contract w s Text PubKeyHash
+    toOwnerHash o = do
+      SellOrder SellOrderInfo {..} <- getOrderDatum o
+      return ownerHash
+
+
 getOrderDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
 getOrderDatum o =
   case o of
@@ -172,7 +215,9 @@ dexEndpoints =
     `select` ( ( f (Proxy @"sell") historyId (const Sold) (\WithHistoryId {..} -> sell content)
                   `select` f (Proxy @"perform") historyId (const Performed) (const perform)
                   `select` f (Proxy @"findOrders") historyId Orders (const findOrders)
+                  `select` f (Proxy @"orders") historyId MyOrders (const orders)
                   `select` f (Proxy @"funds") historyId Funds (const funds)
+                  `select` f (Proxy @"cancel") historyId (const Cancel) (\WithHistoryId {..} -> cancel content)
                )
                  <> dexEndpoints
              )
