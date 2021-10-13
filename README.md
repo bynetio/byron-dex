@@ -296,7 +296,7 @@ docker-compose up
 ## CI
 
 This project use GitLab as CI. Check the configuration [file](./.gitlab-ci.yaml) for more information.
-GitLab use custom docker image (`silquenarmo/dex-plutus-dev`) which cointains neccesary dependencies.
+GitLab use custom docker image (`plutus4binarapps/dex-plutus-dev`) which contains necessary dependencies.
 The image is build using [devcontainer](./nix/devcontainer/uniswap-devcontainer.nix).
 To update it or rebuild manually:
 
