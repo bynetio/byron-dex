@@ -122,4 +122,5 @@ executable uniswap-pab
     plutus-use-cases -any,
     plutus-ledger-api -any,
     bytestring,
-    data-default
+    data-default,
+    openapi3

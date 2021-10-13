@@ -17,11 +17,11 @@
     "homepage": "",
     "owner": "input-output-hk",
     "repo": "plutus",
-    "rev": "52b23b80dc46048214ea169933e79678f806aa2b",
-    "sha256": "1mpwgrr8bc21k0d2aannhizxdazlpfg222449syjh43ipka6jvcn",
+    "rev": "plutus-pab/v0.0.2",
+    "sha256": "0aicyg6skqhpfciakwn68b9ppkpm95j1x3d4sj3xmc542sr6932g",
     "type": "tarball",
-    "url": "https://github.com/input-output-hk/plutus/archive/52b23b80dc46048214ea169933e79678f806aa2b.tar.gz",
-    "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
+    "url": "https://github.com/input-output-hk/plutus/archive/refs/tags/plutus-pab/v0.0.2.tar.gz",
+    "url_template": "https://github.com/<owner>/<repo>/archive/refs/tags/<rev>.tar.gz"
   },
   "pre-commit-hooks-nix": {
     "branch": "master",

@@ -37,7 +37,9 @@ let
     };
   };
 
-  nixpkgsInputs = (with pkgs; [ ghcid niv nixpkgs-fmt nodejs-14_x z3 zlib nodePackages.parcel-bundler ]);
+  nixpkgsInputs = (with pkgs;
+    [ libsodium-vrf xz ghcid niv nixpkgs-fmt nodejs-14_x z3 zlib nodePackages.parcel-bundler ]
+    ++ lib.optionals stdenv.isDarwin [ clang ]);
 
   localInputs = (with uniswap; [
     hlint
@@ -68,6 +70,7 @@ haskell.project.shellFor {
     ${utillinux}/bin/taskset -pc 0-1000 $$
   '' + ''
     export PATH=$(pwd)/.ghcup/bin:$PATH
+
   '';
 
   nativeBuildInputs = nixpkgsInputs ++ localInputs ++ devInputs;
