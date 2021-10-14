@@ -204,9 +204,11 @@ orders = do
       case order of
         LiquidityOrder LiquidityOrderInfo {..} ->
           let orderType = "Liquidity"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
           in return OrderInfo {..}
         SellOrder      SellOrderInfo      {..} ->
           let orderType = "Sell"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
           in return OrderInfo {..}
 
 cancel :: CancelOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
