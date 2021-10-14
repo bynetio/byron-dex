@@ -98,7 +98,7 @@ data SellOrderParams
       , lockedAmount   :: Nat
       , expectedAmount :: Nat
       }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed ''SellOrderParams [('SellOrderParams,0)]
 PlutusTx.makeLift ''SellOrderParams
@@ -110,7 +110,7 @@ data LiquidityOrderParams
       , lockedAmount   :: Nat
       , expectedAmount :: Nat
       }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 PlutusTx.makeIsDataIndexed ''LiquidityOrderParams [('LiquidityOrderParams,0)]
 PlutusTx.makeLift ''LiquidityOrderParams
@@ -131,7 +131,7 @@ PlutusTx.makeLift ''SellOrderInfo
 
 newtype CancelOrderParams
   = CancelOrderParams { orderHash :: TxOutRef }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''CancelOrderParams [('CancelOrderParams, 0)]
 PlutusTx.makeLift ''CancelOrderParams
 
@@ -206,10 +206,10 @@ PlutusTx.makeLift ''DexDatum
 data Request a
   = Request
       { historyId  :: HistoryId
-      , randomSeed :: Word64
+      , randomSeed :: Integer
       , content    :: a
       }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 
 data OrderInfo

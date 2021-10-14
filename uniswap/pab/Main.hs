@@ -72,7 +72,7 @@ main = void $
         ada = Uniswap.mkCoin adaSymbol adaToken
 
     cidStart <- Simulator.activateContract (knownWallet 1) UniswapOwnerContract
-    _ <- Simulator.callEndpointOnInstance cidStart "start" (Uniswap.WithHistoryId "StartId" ())
+    _ <- Simulator.callEndpointOnInstance cidStart "start" (Uniswap.Request "StartId" 0 ())
     us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
       Success (WH.lookup "StartId" -> Just (Right us)) -> Just us
       _                                                -> Nothing
@@ -83,7 +83,7 @@ main = void $
         cid <- Simulator.activateContract w $ UniswapUserContract us
         logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Uniswap.WithHistoryId "FundsId" ())
+        _ <- Simulator.callEndpointOnInstance cid "funds" (Uniswap.Request "FundsId" 1 ())
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
           Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing

@@ -77,7 +77,7 @@ main = void $
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" ())
+        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Dex.DexContractState))) of
           Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing

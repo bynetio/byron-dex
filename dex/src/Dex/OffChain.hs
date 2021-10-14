@@ -260,7 +260,7 @@ getOrder o =
 dexEndpoints :: Promise (History (Either Text DexContractState)) DexSchema Void ()
 dexEndpoints =
   stop
-    `select` ( ( f (Proxy @"sell") historyId (const Sold) (\Request {..} -> sell (mkSMGen randomSeed) content)
+    `select` ( ( f (Proxy @"sell") historyId (const Sold) (\Request {..} -> sell (mkSMGen $ fromIntegral randomSeed) content)
                   `select` f (Proxy @"perform") historyId (const Performed) (const perform)
                   `select` f (Proxy @"findOrders") historyId Orders (const findOrders)
                   `select` f (Proxy @"orders") historyId MyOrders (const orders)
