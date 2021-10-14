@@ -3,7 +3,6 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
@@ -33,8 +32,13 @@ import           Data.OpenApi.Internal.Schema        (ToSchema)
 import qualified Data.Semigroup                      as Semigroup
 import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
+import qualified Dex.OffChain                        as Dex
+import qualified Dex.Trace                           as Trace
+import qualified Dex.Types                           as Dex
+import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
 import           Ledger.Ada                          (adaSymbol, adaToken)
+import           Ledger.Value                        (AssetClass (..))
 import           Plutus.Contract                     (ContractError, Empty,
                                                       awaitPromise)
 import qualified Plutus.Contracts.Currency           as Currency
@@ -48,76 +52,57 @@ import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
-import qualified Uniswap.Common.WalletHistory        as WH
-import qualified Uniswap.OffChain                    as Uniswap
-import qualified Uniswap.Trace                       as Uniswap
-import qualified Uniswap.Types                       as Uniswap
-import           Wallet.Emulator.Types               (Wallet, knownWallet)
+import           Wallet.Emulator.Types               (knownWallet)
 
 main :: IO ()
 main = void $
   Simulator.runSimulationWith handlers $ do
-    logString @(Builtin UniswapContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
+    logString @(Builtin DexContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
-    cidInit <- Simulator.activateContract (knownWallet 1) UniswapInit
+    cidInit <- Simulator.activateContract (knownWallet 1) DexInit
     cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
       Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
       _                                   -> Nothing
     _ <- Simulator.waitUntilFinished cidInit
 
-    logString @(Builtin UniswapContracts) $ "Initialization finished. Minted: " ++ show cs
+    logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
 
-    let coins = Map.fromList [(tn, Uniswap.mkCoin cs tn) | tn <- Uniswap.tokenNames]
-        ada = Uniswap.mkCoin adaSymbol adaToken
 
-    cidStart <- Simulator.activateContract (knownWallet 1) UniswapOwnerContract
-    _ <- Simulator.callEndpointOnInstance cidStart "start" (Uniswap.WithHistoryId "StartId" ())
-    us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
-      Success (WH.lookup "StartId" -> Just (Right us)) -> Just us
-      _                                                -> Nothing
-    logString @(Builtin UniswapContracts) $ "Uniswap instance created: " ++ show us
+    let coins = Map.fromList [(tn, AssetClass ("ff", tn)) | tn <- Trace.tokenNames]
+        ada = AssetClass (adaSymbol, adaToken)
 
     cids <- fmap Map.fromList $
-      forM Uniswap.wallets $ \w -> do
-        cid <- Simulator.activateContract w $ UniswapUserContract us
-        logString @(Builtin UniswapContracts) $ "Uniswap user contract started for " ++ show w
+      forM Trace.wallets $ \w -> do
+        cid <- Simulator.activateContract w DexContract
+        logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Uniswap.WithHistoryId "FundsId" ())
-        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.UserContractState))) of
+        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" ())
+        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Dex.DexContractState))) of
           Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing
-        logString @(Builtin UniswapContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
+        logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
     _ <- liftIO getLine
     shutdown
 
-instance ToSchema (Uniswap.Coin Uniswap.U)
-instance ToSchema Uniswap.Uniswap
+data DexContracts = DexContract | DexInit deriving (Eq, Generic, Ord, Show)
+  deriving anyclass (FromJSON, ToJSON, ToSchema)
 
-data UniswapContracts
-  = UniswapOwnerContract
-  | UniswapUserContract Uniswap.Uniswap
-  | UniswapInit
-  deriving (Eq, Generic, Ord, Show, ToSchema)
-  deriving anyclass (FromJSON, ToJSON)
-
-instance Pretty UniswapContracts where
+instance Pretty DexContracts where
   pretty = viaShow
 
-instance Builtin.HasDefinitions UniswapContracts where
-    getDefinitions = [UniswapInit, UniswapOwnerContract]
+instance Builtin.HasDefinitions DexContracts where
+    getDefinitions = [DexContract]
     getSchema = \case
-      UniswapOwnerContract  -> Builtin.endpointsToSchemas @Uniswap.UniswapOwnerSchema
-      UniswapUserContract _ -> Builtin.endpointsToSchemas @Uniswap.UniswapUserSchema
-      UniswapInit           -> Builtin.endpointsToSchemas @Empty
+      DexContract -> Builtin.endpointsToSchemas @Dex.DexSchema
+      DexInit     -> Builtin.endpointsToSchemas @Empty
     getContract = \case
-      UniswapOwnerContract  -> SomeBuiltin (awaitPromise Uniswap.ownerEndpoint)
-      UniswapUserContract u -> SomeBuiltin (awaitPromise (Uniswap.userEndpoints u))
-      UniswapInit           -> SomeBuiltin Uniswap.setupTokens
+      DexContract -> SomeBuiltin (awaitPromise Dex.dexEndpoints)
+      DexInit     -> SomeBuiltin Trace.setupTokens
 
-handlers :: SimulatorEffectHandlers (Builtin UniswapContracts)
+handlers :: SimulatorEffectHandlers (Builtin DexContracts)
 handlers =
     Simulator.mkSimulatorHandlers def def
-    $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @UniswapContracts))
+    $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @DexContracts))

@@ -3,7 +3,8 @@
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE TypeApplications   #-}
 
-module Main where
+module Main
+  where
 
 import           Control.Monad.Freer.Extras   as Extras
 import           Data.Default
@@ -50,9 +51,9 @@ main :: IO ()
 main = return ()
 
 runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' def emulatorCfg def
+runTrace = runEmulatorTraceIO' def (emulatorCfg def def)
   where
-    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(Wallet i, v) | i <- [1 .. 4]])
+    emulatorCfg = EmulatorConfig $ Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])
       where
         v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
@@ -74,7 +75,7 @@ adaCoin = Coin $ Value.assetClass "" ""
 
 iswapTrace :: EmulatorTrace ()
 iswapTrace = do
-  h1 <- activateContractWallet (Wallet 1) ownerEndpoint
+  h1 <- activateContractWallet (knownWallet 1) ownerEndpoint
   void $ callEndpoint @"start" h1 (WithHistoryId "guid1" ())
   void $ waitNSlots 10
   maybePool <- WH.lookup "guid1" <$> observableState h1
@@ -85,8 +86,8 @@ iswapTrace = do
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
-        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
-        h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
+        h2 <- activateContractWallet (knownWallet 2) $ userEndpoints pool
+        h4 <- activateContractWallet (knownWallet 4) $ userEndpoints pool
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
@@ -104,7 +105,7 @@ iswapTrace = do
 
 slippageTrace :: EmulatorTrace ()
 slippageTrace = do
-  h1 <- activateContractWallet (Wallet 1) ownerEndpoint
+  h1 <- activateContractWallet (knownWallet 1) ownerEndpoint
   void $ callEndpoint @"start" h1 (WithHistoryId "guid3" ())
   void $ waitNSlots 10
   maybePool <- WH.lookup "guid3" <$> observableState h1
@@ -115,8 +116,8 @@ slippageTrace = do
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
-        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
-        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
+        h2 <- activateContractWallet (knownWallet 2) $ userEndpoints pool
+        h3 <- activateContractWallet (knownWallet 3) $ userEndpoints pool
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
@@ -143,7 +144,7 @@ slippageTrace = do
 
 customFeesTrace :: EmulatorTrace ()
 customFeesTrace = do
-  h1 <- activateContractWallet (Wallet 1) ownerEndpoint
+  h1 <- activateContractWallet (knownWallet 1) ownerEndpoint
   void $ callEndpoint @"start" h1 (WithHistoryId "guid5" ())
   void $ waitNSlots 10
   maybePool <- WH.lookup "guid5" <$> observableState h1
@@ -154,8 +155,8 @@ customFeesTrace = do
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
-        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
-        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
+        h2 <- activateContractWallet (knownWallet 2) $ userEndpoints pool
+        h3 <- activateContractWallet (knownWallet 3) $ userEndpoints pool
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin2 customCoin1 (3,1000) 100 500)
         void $ waitNSlots 1
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin3 customCoin1 (3,1000) 1000 1000)
@@ -172,7 +173,7 @@ customFeesTrace = do
 
 mixedTrace :: EmulatorTrace ()
 mixedTrace = do
-  h1 <- activateContractWallet (Wallet 1) ownerEndpoint
+  h1 <- activateContractWallet (knownWallet 1) ownerEndpoint
   void $ callEndpoint @"start" h1 (WithHistoryId "guid6" ())
   void $ waitNSlots 10
   maybePool <- WH.lookup "guid6" <$> observableState h1
@@ -183,9 +184,9 @@ mixedTrace = do
   where
     userTrace :: Uniswap -> EmulatorTrace ()
     userTrace pool = do
-        h2 <- activateContractWallet (Wallet 2) $ userEndpoints pool
-        h3 <- activateContractWallet (Wallet 3) $ userEndpoints pool
-        h4 <- activateContractWallet (Wallet 4) $ userEndpoints pool
+        h2 <- activateContractWallet (knownWallet 2) $ userEndpoints pool
+        h3 <- activateContractWallet (knownWallet 3) $ userEndpoints pool
+        h4 <- activateContractWallet (knownWallet 4) $ userEndpoints pool
         let fee = (3,1000)
         void $ callEndpoint @"create" h2 (WithHistoryId "" $ CreateParams customCoin2 customCoin1 fee 100 500)
         void $ waitNSlots 1
