@@ -64,7 +64,7 @@ main = void $
     cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
       Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
       _                                   -> Nothing
-    _ <- Simulator.waitUntilFinished cidInit
+    Simulator.waitUntilFinished cidInit
 
     logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
 
@@ -77,14 +77,14 @@ main = void $
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" ())
+        Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" ())
         v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Dex.DexContractState))) of
           Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
           _                                               -> Nothing
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
-    _ <- liftIO getLine
+    liftIO getLine
     shutdown
 
 data DexContracts = DexContract | DexInit deriving (Eq, Generic, Ord, Show)
