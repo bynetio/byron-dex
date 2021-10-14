@@ -33,6 +33,9 @@ library
                      , lens
                      , lens-aeson
                      , freer-simple
+                     , random
+                     , splitmix
+                     , uuid
   default-language:    Haskell2010
   ghc-options:         -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
