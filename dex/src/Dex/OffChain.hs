@@ -205,9 +205,10 @@ getOrderDatum o =
               (PlutusTx.fromBuiltinData e)
   where
     getDatum :: DatumHash -> Contract w s Text Datum
-    getDatum dh =
-      datumFromHash dh >>= \case Nothing -> throwError "datum not found"
-                                 Just d  -> pure d
+    getDatum =
+      datumFromHash >=>
+      \case Nothing -> throwError "datum not found"
+            Just d  -> pure d
 
 
 dexEndpoints :: Promise (History (Either Text DexContractState)) DexSchema Void ()
