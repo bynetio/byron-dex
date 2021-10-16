@@ -194,8 +194,8 @@ cancel CancelOrderParams {..} = do
 
 
 getOrderDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
-getOrderDatum o =
-  case o of
+getOrderDatum =
+  \case
       PublicKeyChainIndexTxOut {} ->
         throwError "no datum for a txout of a public key address"
       ScriptChainIndexTxOut { _ciTxOutDatum } -> do
