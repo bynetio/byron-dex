@@ -39,7 +39,8 @@ import           GHC.TypeLits         (symbolVal)
 import           Ledger               hiding (fee, singleton)
 import           Ledger.Constraints   as Constraints
 import qualified Ledger.Typed.Scripts as Scripts
-import           Ledger.Value         (AssetClass (..), assetClassValue, assetClassValueOf, getValue)
+import           Ledger.Value         (AssetClass (..), assetClassValue,
+                                       assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
@@ -149,7 +150,7 @@ perform = do
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
-  os <- map snd . Map.toList <$> utxosAt (pubKeyHashAddress pkh)
+  os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
