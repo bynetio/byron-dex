@@ -158,14 +158,6 @@ sell smgen SellOrderParams {..} = do
 
 
 
-findOrders :: Contract (History (Either Text DexContractState)) DexSchema Text [(SellOrderInfo, TxOutRef)]
-findOrders = do
-  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
-  utxos <- Map.toList <$> utxosAt address
-  mapM (\(oref, o) -> getOrderDatum o >>= \case
-    SellOrder sellOrder -> return (sellOrder, oref)
-    ) utxos
-
 
 perform :: Contract (History (Either Text DexContractState)) DexSchema Text ()
 perform = do
@@ -261,7 +253,6 @@ dexEndpoints =
   stop
     `select` ( ( f (Proxy @"sell") historyId (const Sold) (\Request {..} -> sell (mkSMGen $ fromIntegral randomSeed) content)
                   `select` f (Proxy @"perform") historyId (const Performed) (const perform)
-                  `select` f (Proxy @"findOrders") historyId Orders (const findOrders)
                   `select` f (Proxy @"orders") historyId MyOrders (const orders)
                   `select` f (Proxy @"funds") historyId Funds (const funds)
                   `select` f (Proxy @"cancel") historyId (const Cancel) (\Request {..} -> cancel content)

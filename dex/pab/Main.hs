@@ -81,8 +81,8 @@ main = void $
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" 0 ())
-        v <- getState "FundsId" contractState cid
+        Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
+        v <- getState (contractState "FundsId") cid
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
