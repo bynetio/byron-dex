@@ -27,7 +27,6 @@ import           Control.Lens.Getter  (view)
 import           Control.Monad        hiding (fmap, mapM, mapM_)
 import           Data.List            (foldl', sortOn)
 import qualified Data.Map             as Map
-import           Data.Ord             (comparing)
 import           Data.Proxy           (Proxy (..))
 import           Data.Text            (Text)
 import           Data.Void            (Void)
