@@ -25,12 +25,11 @@ module Dex.OffChain
 
 import           Control.Lens.Getter     (view)
 import           Control.Monad           hiding (fmap, mapM, mapM_)
-import           Data.List               (foldl', sortOn)
+import           Data.List               (foldl')
 import qualified Data.Map                as Map
-import           Data.Ord                (comparing)
 import           Data.Proxy              (Proxy (..))
 import           Data.Text               (Text)
-import qualified Data.UUID               as UUID
+import           Data.UUID               as UUID
 import           Data.Void               (Void)
 import           Dex.OnChain             (mkDexValidator)
 import           Dex.Types
@@ -163,7 +162,7 @@ findOrders :: Contract (History (Either Text DexContractState)) DexSchema Text [
 findOrders = do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
-  mapM (\(oref, o) -> getOrder o >>= \case
+  mapM (\(oref, o) -> getOrderDatum o >>= \case
     SellOrder sellOrder -> return (sellOrder, oref)
     ) utxos
 
@@ -173,7 +172,7 @@ perform = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
-  mapped <- mapM (\(oref, o) -> getOrder o >>= \d -> return (o, oref, d)) utxos
+  mapped <- mapM (\(oref, o) -> getOrderDatum o >>= \d -> return (o, oref, d)) utxos
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
@@ -186,7 +185,7 @@ perform = do
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- pubKeyHash <$> ownPubKey
-  os <- map snd . Map.toList <$> utxosAt (pubKeyHashAddress pkh)
+  os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
@@ -200,7 +199,7 @@ orders = do
   return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
   where
     toOrderInfo (orderHash, o) = do
-      order <- getOrder o
+      order <- getOrderDatum o
       case order of
         LiquidityOrder LiquidityOrderInfo {..} ->
           let orderType = "Liquidity"
@@ -218,7 +217,7 @@ cancel CancelOrderParams {..} = do
   utxos  <- Map.toList . Map.filterWithKey (\oref' _ -> oref' == orderHash) <$> utxosAt address
   hashes <- mapM (toOwnerHash . snd) utxos
 
-  when (any (/= pkh) hashes || null hashes) (throwError "Cannot find order by provided hash")
+  when (any (/= pkh) hashes || Prelude.null hashes) (throwError "Cannot find order by provided hash")
 
   let lookups =
         Constraints.typedValidatorLookups dexInstance
@@ -233,18 +232,14 @@ cancel CancelOrderParams {..} = do
   where
     toOwnerHash :: ChainIndexTxOut -> Contract w s Text PubKeyHash
     toOwnerHash o = do
-      order <- getOrder o
+      order <- getOrderDatum o
       case order of
         SellOrder SellOrderInfo {..}           -> return ownerHash
         LiquidityOrder LiquidityOrderInfo {..} -> return ownerHash
 
 
-getOrder :: ChainIndexTxOut -> Contract w s Text Order
-getOrder o =
-  case o of
-      PublicKeyChainIndexTxOut {} ->
-        throwError "no datum for a txout of a public key address"
-      ScriptChainIndexTxOut { _ciTxOutDatum } -> do
+getOrderDatum :: ChainIndexTxOut -> Contract w s Text Order
+getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
         (Datum e) <- either getDatum pure _ciTxOutDatum
         o <- maybe (throwError "datum hash wrong type")
               pure
@@ -254,9 +249,11 @@ getOrder o =
           _           -> throwError "datum hash wrong type"
   where
     getDatum :: DatumHash -> Contract w s Text Datum
-    getDatum dh =
-      datumFromHash dh >>= \case Nothing -> throwError "datum not found"
-                                 Just d  -> pure d
+    getDatum =
+      datumFromHash >=>
+      \case Nothing -> throwError "datum not found"
+            Just d  -> pure d
+getOrderDatum _ = throwError "no datum for a txout of a public key address"
 
 
 dexEndpoints :: Promise (History (Either Text DexContractState)) DexSchema Void ()

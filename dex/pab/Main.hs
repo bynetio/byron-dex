@@ -21,10 +21,11 @@ import           Control.Monad.Freer.Extras.Log      (LogMsg)
 import           Control.Monad.IO.Class              (MonadIO (..))
 import           Data.Aeson                          (FromJSON (..),
                                                       Options (..), Result (..),
-                                                      ToJSON (..),
+                                                      ToJSON (..), Value,
                                                       defaultOptions, fromJSON,
                                                       genericParseJSON,
                                                       genericToJSON)
+import           Data.Aeson.Types                    (parseMaybe)
 import           Data.Default
 import qualified Data.Map                            as Map
 import qualified Data.Monoid                         as Monoid
@@ -34,6 +35,7 @@ import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import qualified Dex.OffChain                        as Dex
 import qualified Dex.Trace                           as Trace
+import           Dex.Types                           (DexContractState)
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
@@ -47,12 +49,16 @@ import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
                                                       type (.\\))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
 import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
-import           Plutus.PAB.Simulator                (SimulatorEffectHandlers,
+import           Plutus.PAB.Simulator                (Simulation,
+                                                      SimulatorEffectHandlers,
                                                       logString)
 import qualified Plutus.PAB.Simulator                as Simulator
 import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Wallet.Emulator.Types               (knownWallet)
+import           Wallet.Types                        (ContractInstanceId)
+
+type ContractHistory = WH.History (Either Text Dex.DexContractState)
 
 main :: IO ()
 main = void $
@@ -61,13 +67,11 @@ main = void $
     shutdown <- PAB.Server.startServerDebug
 
     cidInit <- Simulator.activateContract (knownWallet 1) DexInit
-    cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
-      Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
-      _                                   -> Nothing
-    _ <- Simulator.waitUntilFinished cidInit
+    cs <- getState (Currency.currencySymbol . Semigroup.getLast) cidInit
+
+    Simulator.waitUntilFinished cidInit
 
     logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
-
 
     let coins = Map.fromList [(tn, AssetClass ("ff", tn)) | tn <- Trace.tokenNames]
         ada = AssetClass (adaSymbol, adaToken)
@@ -77,15 +81,24 @@ main = void $
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
-        v <- flip Simulator.waitForState cid $ \json -> case (fromJSON json :: Result (WH.History (Either Text Dex.DexContractState))) of
-          Success (WH.lookup "FundsId" -> Just (Right v)) -> Just v
-          _                                               -> Nothing
+        Simulator.callEndpointOnInstance cid "funds" (Dex.WithHistoryId "FundsId" 0 ())
+        v <- getState "FundsId" contractState cid
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
-    _ <- liftIO getLine
+    liftIO getLine
     shutdown
+  where
+    fromJSONValue :: FromJSON a => Value -> Maybe a
+    fromJSONValue = parseMaybe parseJSON
+
+    getState :: (FromJSON a) => (a -> b) -> ContractInstanceId -> Simulation t b
+    getState f = Simulator.waitForState (fmap f . fromJSONValue)
+
+    contractState :: Text -> ContractHistory -> Maybe DexContractState
+    contractState historyId (WH.lookup historyId -> Just (Right v)) = Just v
+    contractState _ _                                               = Nothing
+
 
 data DexContracts = DexContract | DexInit deriving (Eq, Generic, Ord, Show)
   deriving anyclass (FromJSON, ToJSON, ToSchema)
