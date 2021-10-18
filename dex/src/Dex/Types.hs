@@ -26,15 +26,13 @@ module Dex.Types
 import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
 
 import           Data.Text           (Text)
-import           Data.Word           (Word64)
 import           Dex.WalletHistory
-import           Ledger              (AssetClass, PubKeyHash, TxOutRef, ownHash)
+import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, BuiltinByteString,
-                                      BuiltinString, Eq, Integer,
-                                      MultiplicativeMonoid,
+                                      AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid,
                                       MultiplicativeSemigroup, return, ($),
                                       (&&), (<), (==))
 import           Prelude             (Show)
@@ -131,7 +129,8 @@ PlutusTx.makeLift ''SellOrderInfo
 
 newtype CancelOrderParams
   = CancelOrderParams { orderHash :: TxOutRef }
-  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+  deriving (Generic, Show)
+  deriving anyclass (FromJSON, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''CancelOrderParams [('CancelOrderParams, 0)]
 PlutusTx.makeLift ''CancelOrderParams
 
