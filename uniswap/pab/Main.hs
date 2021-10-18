@@ -3,13 +3,16 @@
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE FlexibleContexts   #-}
+{-# LANGUAGE FlexibleInstances  #-}
 {-# LANGUAGE LambdaCase         #-}
 {-# LANGUAGE OverloadedStrings  #-}
 {-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeApplications   #-}
 {-# LANGUAGE TypeFamilies       #-}
 {-# LANGUAGE ViewPatterns       #-}
-module Main (main) where
+module Main
+  ( main
+  ) where
 
 import           Control.Monad                       (forM, void)
 import           Control.Monad.Freer                 (Eff, Member, interpret,
@@ -26,6 +29,7 @@ import           Data.Aeson                          (FromJSON (..),
 import           Data.Default
 import qualified Data.Map                            as Map
 import qualified Data.Monoid                         as Monoid
+import           Data.OpenApi.Internal.Schema        (ToSchema)
 import qualified Data.Semigroup                      as Semigroup
 import           Data.Text
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
@@ -48,14 +52,15 @@ import qualified Uniswap.Common.WalletHistory        as WH
 import qualified Uniswap.OffChain                    as Uniswap
 import qualified Uniswap.Trace                       as Uniswap
 import qualified Uniswap.Types                       as Uniswap
-import           Wallet.Emulator.Types               (Wallet (..))
+import           Wallet.Emulator.Types               (Wallet, knownWallet)
+
 main :: IO ()
 main = void $
   Simulator.runSimulationWith handlers $ do
     logString @(Builtin UniswapContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
-    cidInit <- Simulator.activateContract (Wallet 1) UniswapInit
+    cidInit <- Simulator.activateContract (knownWallet 1) UniswapInit
     cs <- flip Simulator.waitForState cidInit $ \json -> case fromJSON json of
       Success (Just (Semigroup.Last cur)) -> Just $ Currency.currencySymbol cur
       _                                   -> Nothing
@@ -66,7 +71,7 @@ main = void $
     let coins = Map.fromList [(tn, Uniswap.mkCoin cs tn) | tn <- Uniswap.tokenNames]
         ada = Uniswap.mkCoin adaSymbol adaToken
 
-    cidStart <- Simulator.activateContract (Wallet 1) UniswapOwnerContract
+    cidStart <- Simulator.activateContract (knownWallet 1) UniswapOwnerContract
     _ <- Simulator.callEndpointOnInstance cidStart "start" (Uniswap.WithHistoryId "StartId" ())
     us <- flip Simulator.waitForState cidStart $ \json -> case (fromJSON json :: Result (WH.History (Either Text Uniswap.Uniswap))) of
       Success (WH.lookup "StartId" -> Just (Right us)) -> Just us
@@ -88,11 +93,14 @@ main = void $
     _ <- liftIO getLine
     shutdown
 
+instance ToSchema (Uniswap.Coin Uniswap.U)
+instance ToSchema Uniswap.Uniswap
+
 data UniswapContracts
   = UniswapOwnerContract
   | UniswapUserContract Uniswap.Uniswap
   | UniswapInit
-  deriving (Eq, Ord, Show, Generic)
+  deriving (Eq, Generic, Ord, Show, ToSchema)
   deriving anyclass (FromJSON, ToJSON)
 
 instance Pretty UniswapContracts where
@@ -101,9 +109,9 @@ instance Pretty UniswapContracts where
 instance Builtin.HasDefinitions UniswapContracts where
     getDefinitions = [UniswapInit, UniswapOwnerContract]
     getSchema = \case
-      UniswapOwnerContract -> Builtin.endpointsToSchemas @Uniswap.UniswapOwnerSchema
+      UniswapOwnerContract  -> Builtin.endpointsToSchemas @Uniswap.UniswapOwnerSchema
       UniswapUserContract _ -> Builtin.endpointsToSchemas @Uniswap.UniswapUserSchema
-      UniswapInit -> Builtin.endpointsToSchemas @Empty
+      UniswapInit           -> Builtin.endpointsToSchemas @Empty
     getContract = \case
       UniswapOwnerContract  -> SomeBuiltin (awaitPromise Uniswap.ownerEndpoint)
       UniswapUserContract u -> SomeBuiltin (awaitPromise (Uniswap.userEndpoints u))
@@ -111,4 +119,5 @@ instance Builtin.HasDefinitions UniswapContracts where
 
 handlers :: SimulatorEffectHandlers (Builtin UniswapContracts)
 handlers =
-  Simulator.mkSimulatorHandlers def $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @UniswapContracts))
+    Simulator.mkSimulatorHandlers def def
+    $ interpret (Builtin.contractHandler (Builtin.handleBuiltin @UniswapContracts))

@@ -36,8 +36,9 @@ import           Ledger.Value                 (AssetClass (..),
                                                assetClassValue, assetClassValueOf, tokenName)
 import           Playground.Contract          (Generic, ToSchema)
 import qualified PlutusTx
+import           PlutusTx.Builtins.Internal   (BuiltinByteString (..))
 import           PlutusTx.Prelude             (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, Bool,
-                                               ByteString, Eq (..), Integer, MultiplicativeSemigroup,
+                                               Eq (..), Integer, MultiplicativeSemigroup,
                                                Ord (max, min, (<=)), fst, return, snd, ($), (&&), (.), (||))
 import           Prelude                      (Show, show)
 import qualified Prelude
@@ -86,18 +87,19 @@ newtype Coin a
 instance ToJSON (Coin a) where
   toJSON coin =
     object
-      [ "currencySymbol" .= encodeCoin (JSON.encodeByteString . unCurrencySymbol . fst),
+      [ "currencySymbol" .= encodeCoin (JSON.encodeByteString . unBBS . unCurrencySymbol . fst),
         "tokenName" .= (toJSON (snd $ unAssetClass $ unCoin coin) ^?! key "unTokenName")
       ]
     where
       encodeCoin f = JSON.String . f . unAssetClass . unCoin $ coin
+      unBBS (BuiltinByteString bs) = bs
 
 instance FromJSON (Coin a) where
   parseJSON = withObject "Coin" $ \v -> do
     rawTokenName <- v .: "tokenName"
     rawCurrencySymbol <- v .: "currencySymbol"
     currencySymbolBytes <- JSON.decodeByteString rawCurrencySymbol
-    let currencySymbol' = CurrencySymbol currencySymbolBytes
+    let currencySymbol' = CurrencySymbol . BuiltinByteString $ currencySymbolBytes
         tokenName' = tokenName . E.encodeUtf8 $ rawTokenName
     return . Coin $ assetClass currencySymbol' tokenName'
 
@@ -158,7 +160,7 @@ data LiquidityPool
       { lpCoinA         :: Coin A
       , lpCoinB         :: Coin B
       , lpFee           :: Fee
-      , lpFeeByteString :: ByteString
+      , lpFeeByteString :: BuiltinByteString
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
@@ -170,11 +172,11 @@ liquidityPool (Coin a, Coin b) fee = LiquidityPool (Coin (min a b)) (Coin (max a
 
 data LiquidityPoolWithCoins
   = LiquidityPoolWithCoins
-      { coinA         :: Coin A
-      , coinB         :: Coin B
-      , fee           :: Fee
-      , amountA       :: Amount A
-      , amountB       :: Amount B
+      { coinA   :: Coin A
+      , coinB   :: Coin B
+      , fee     :: Fee
+      , amountA :: Amount A
+      , amountB :: Amount B
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 

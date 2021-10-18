@@ -23,6 +23,15 @@ find vendor/plutus/ -name "*.*hs" \
   | xargs  hs-tags --cabal uniswap/uniswap.cabal -c
 ```
 
+### Integrate nix and hie-bios
+
+```bash
+export NIX_GHC="$(which ghc)"
+export NIX_GHCPKG="$(which ghc-pkg)"
+export NIX_GHC_DOCDIR="$NIX_GHC/../../share/doc/ghc/html"
+export NIX_GHC_LIBDIR="$(ghc --print-libdir)"
+```
+
 ### vscode integration
 
 Plugins
@@ -287,7 +296,7 @@ docker-compose up
 ## CI
 
 This project use GitLab as CI. Check the configuration [file](./.gitlab-ci.yaml) for more information.
-GitLab use custom docker image (`silquenarmo/dex-plutus-dev`) which cointains neccesary dependencies.
+GitLab use custom docker image (`plutus4binarapps/dex-plutus-dev`) which contains necessary dependencies.
 The image is build using [devcontainer](./nix/devcontainer/uniswap-devcontainer.nix).
 To update it or rebuild manually:
 

@@ -2,11 +2,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-| Example trace for the uniswap contract
 -}
-module Uniswap.Trace(
-      setupTokens
-    , tokenNames
-    , wallets
-    ) where
+module Uniswap.Trace
+  ( setupTokens
+  , tokenNames
+  , wallets
+  ) where
 
 import           Control.Monad             (forM_, when)
 import qualified Data.Semigroup            as Semigroup
@@ -15,7 +15,7 @@ import           Ledger.Constraints
 import           Ledger.Value              as Value
 import           Plutus.Contract           hiding (throwError)
 import qualified Plutus.Contracts.Currency as Currency
-import           Wallet.Emulator.Types     (Wallet (..), walletPubKey)
+import           Wallet.Emulator.Types     (Wallet, knownWallet, walletPubKey)
 
 
 -- | Create some sample tokens and distribute them to
@@ -36,7 +36,7 @@ setupTokens = do
     amount = 1000000
 
 wallets :: [Wallet]
-wallets = [Wallet i | i <- [1 .. 4]]
+wallets = [knownWallet i | i <- [1 .. 4]]
 
 tokenNames :: [TokenName]
 tokenNames = ["A", "B", "C", "D"]
