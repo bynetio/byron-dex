@@ -16,8 +16,7 @@ module Main
 import           Control.Monad                       (forM, void)
 import           Control.Monad.Freer                 (interpret)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON (..),
-                                                      ToJSON (..), Value)
+import           Data.Aeson                          (FromJSON (..), ToJSON (..), Value)
 import           Data.Aeson.Types                    (parseMaybe)
 import           Data.Default                        (Default (def))
 import qualified Data.Map                            as Map
@@ -31,13 +30,11 @@ import           Dex.Types                           (DexContractState)
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
-import           Plutus.Contract                     (Empty)
+import           Plutus.Contract                     (Empty, awaitPromise)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
-import           Plutus.PAB.Simulator                (Simulation,
-                                                      SimulatorEffectHandlers,
-                                                      logString)
+import           Plutus.PAB.Simulator                (Simulation, SimulatorEffectHandlers, logString)
 import qualified Plutus.PAB.Simulator                as Simulator
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Wallet.Emulator.Types               (knownWallet)
@@ -53,7 +50,6 @@ main = void $
 
     cidInit <- Simulator.activateContract (knownWallet 1) DexInit
     cs <- getState (Currency.currencySymbol . Semigroup.getLast) cidInit
-
 
     void $ Simulator.waitUntilFinished cidInit
 
