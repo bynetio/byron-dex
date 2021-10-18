@@ -16,7 +16,7 @@ where
 
 import           Dex.Types
 import           Ledger
-import           Ledger.Value     (assetClassValueOf, valueOf)
+import           Ledger.Value     (assetClassValueOf)
 import qualified PlutusTx
 import           PlutusTx.Prelude
 
@@ -81,12 +81,12 @@ mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..}
 mkDexValidator (Order o) CancelOrder ctx =
   traceIfFalse "Not signed by owner" checkSignatories
   where
-    ownerHash = case o of
+    ownerHash' = case o of
       LiquidityOrder LiquidityOrderInfo {..} -> ownerHash
       SellOrder SellOrderInfo {..}           -> ownerHash
     txInfo = scriptContextTxInfo ctx
     signs = txInfoSignatories txInfo
-    checkSignatories = ownerHash `elem` signs
+    checkSignatories = ownerHash' `elem` signs
 
 
 mkDexValidator (Payout PayoutInfo {..}) CollectCoins ctx =
