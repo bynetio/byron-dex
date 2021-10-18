@@ -14,24 +14,15 @@ module Main
   ) where
 
 import           Control.Monad                       (forM, void)
-import           Control.Monad.Freer                 (Eff, Member, interpret,
-                                                      type (~>))
-import           Control.Monad.Freer.Error           (Error)
-import           Control.Monad.Freer.Extras.Log      (LogMsg)
+import           Control.Monad.Freer                 (interpret)
 import           Control.Monad.IO.Class              (MonadIO (..))
-import           Data.Aeson                          (FromJSON (..),
-                                                      Options (..), Result (..),
-                                                      ToJSON (..), Value,
-                                                      defaultOptions, fromJSON,
-                                                      genericParseJSON,
-                                                      genericToJSON)
+import           Data.Aeson                          (FromJSON (..), ToJSON (..), Value)
 import           Data.Aeson.Types                    (parseMaybe)
-import           Data.Default
+import           Data.Default                        (Default (def))
 import qualified Data.Map                            as Map
-import qualified Data.Monoid                         as Monoid
 import           Data.OpenApi.Internal.Schema        (ToSchema)
 import qualified Data.Semigroup                      as Semigroup
-import           Data.Text
+import           Data.Text                           (Text)
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import qualified Dex.OffChain                        as Dex
 import qualified Dex.Trace                           as Trace
@@ -39,21 +30,12 @@ import           Dex.Types                           (DexContractState)
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
-import           Ledger.Ada                          (adaSymbol, adaToken)
-import           Ledger.Value                        (AssetClass (..))
-import           Plutus.Contract                     (ContractError, Empty,
-                                                      awaitPromise)
+import           Plutus.Contract                     (Empty)
 import qualified Plutus.Contracts.Currency           as Currency
-import           Plutus.PAB.Effects.Contract         (ContractEffect (..))
-import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..),
-                                                      type (.\\))
+import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
-import           Plutus.PAB.Monitoring.PABLogMsg     (PABMultiAgentMsg)
-import           Plutus.PAB.Simulator                (Simulation,
-                                                      SimulatorEffectHandlers,
-                                                      logString)
+import           Plutus.PAB.Simulator                (Simulation, SimulatorEffectHandlers, logString)
 import qualified Plutus.PAB.Simulator                as Simulator
-import           Plutus.PAB.Types                    (PABError (..))
 import qualified Plutus.PAB.Webserver.Server         as PAB.Server
 import           Wallet.Emulator.Types               (knownWallet)
 import           Wallet.Types                        (ContractInstanceId)
@@ -69,24 +51,21 @@ main = void $
     cidInit <- Simulator.activateContract (knownWallet 1) DexInit
     cs <- getState (Currency.currencySymbol . Semigroup.getLast) cidInit
 
-    Simulator.waitUntilFinished cidInit
+    void $ Simulator.waitUntilFinished cidInit
 
     logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
 
-    let coins = Map.fromList [(tn, AssetClass ("ff", tn)) | tn <- Trace.tokenNames]
-        ada = AssetClass (adaSymbol, adaToken)
-
-    cids <- fmap Map.fromList $
+    void $ fmap Map.fromList $
       forM Trace.wallets $ \w -> do
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
+        void $ Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
         v <- getState (contractState "FundsId") cid
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
-    liftIO getLine
+    void $ liftIO getLine
     shutdown
   where
     fromJSONValue :: FromJSON a => Value -> Maybe a
@@ -112,7 +91,7 @@ instance Builtin.HasDefinitions DexContracts where
       DexContract -> Builtin.endpointsToSchemas @Dex.DexSchema
       DexInit     -> Builtin.endpointsToSchemas @Empty
     getContract = \case
-      DexContract -> SomeBuiltin (awaitPromise Dex.dexEndpoints)
+      DexContract -> SomeBuiltin Dex.dexEndpoints
       DexInit     -> SomeBuiltin Trace.setupTokens
 
 handlers :: SimulatorEffectHandlers (Builtin DexContracts)

@@ -691,23 +691,9 @@ ownerEndpoint' = startHandler <> ownerEndpoint'
 --      [@pools@]: Finds all liquidity pools and their liquidity belonging to the Uniswap instance. This merely inspects the blockchain and does not issue any transactions.
 --      [@funds@]: Gets the caller's funds. This merely inspects the blockchain and does not issue any transactions.
 --      [@stop@]: Stops the contract.
-userEndpoints :: Uniswap -> Promise (History (Either Text UserContractState)) UniswapUserSchema Void ()
+userEndpoints :: Uniswap -> Contract (History (Either Text UserContractState)) UniswapUserSchema Void ()
 userEndpoints us =
-  stop
-    `select` ( ( f (Proxy @"create") historyId (const Created) (\us WithHistoryId {..} -> create us content)
-                   `select` f (Proxy @"swap") historyId (const Swapped) (\us WithHistoryId {..} -> swap us content)
-                   `select` f (Proxy @"swapPreview") historyId SwapPreviewResult (\us WithHistoryId {..} -> swapPreview us content)
-                   `select` f (Proxy @"iSwap") historyId (const ISwapped) (\us WithHistoryId {..} -> indirectSwap us content)
-                   `select` f (Proxy @"iSwapPreview") historyId ISwapPreviewResult (\us WithHistoryId {..} -> indirectSwapPreview us content)
-                   `select` f (Proxy @"close") historyId (const Closed) (\us WithHistoryId {..} -> close us content)
-                   `select` f (Proxy @"remove") historyId (const Removed) (\us WithHistoryId {..} -> remove us content)
-                   `select` f (Proxy @"add") historyId (const Added) (\us WithHistoryId {..} -> add us content)
-                   `select` f (Proxy @"pools") historyId AvailablePools (\us _ -> pools us)
-                   `select` f (Proxy @"funds") historyId AvailableFunds (\_us _ -> funds)
-                   `select` f (Proxy @"clearState") historyId (const Cleared) (\us WithHistoryId {..} -> clearState content)
-               )
-                 <> userEndpoints us
-             )
+    selectList [stop', create', swap', swapPreview', indirectSwap', iSwapPreview', close', remove', add', pools', funds', clearState'] <> userEndpoints us
   where
     f ::
       forall l a p.
@@ -730,8 +716,19 @@ userEndpoints us =
             tell $ WH.append guid . Right . g $ a
         _ -> return ()
 
-    stop :: Promise (History (Either Text UserContractState)) UniswapUserSchema Void ()
-    stop = handleEndpoint @"stop" $ \e -> do
+    stop' = handleEndpoint @"stop" $ \e -> do
       tell $ case e of
         Left err -> WH.append "ERROR" $ Left err
         Right (WithHistoryId hId _) -> WH.append hId $ Right Stopped
+
+    create'       = f (Proxy @"create") historyId (const Created) (\us' WithHistoryId {..} -> create us' content)
+    swap'         = f (Proxy @"swap") historyId (const Swapped) (\us' WithHistoryId {..} -> swap us' content)
+    swapPreview'  = f (Proxy @"swapPreview") historyId SwapPreviewResult (\us' WithHistoryId {..} -> swapPreview us' content)
+    indirectSwap' = f (Proxy @"iSwap") historyId (const ISwapped) (\us' WithHistoryId {..} -> indirectSwap us' content)
+    iSwapPreview' = f (Proxy @"iSwapPreview") historyId ISwapPreviewResult (\us' WithHistoryId {..} -> indirectSwapPreview us' content)
+    close'        = f (Proxy @"close") historyId (const Closed) (\us' WithHistoryId {..} -> close us' content)
+    remove'       = f (Proxy @"remove") historyId (const Removed) (\us' WithHistoryId {..} -> remove us' content)
+    add'          = f (Proxy @"add") historyId (const Added) (\us' WithHistoryId {..} -> add us' content)
+    pools'        = f (Proxy @"pools") historyId AvailablePools (\us' _ -> pools us')
+    funds'        = f (Proxy @"funds") historyId AvailableFunds (\_ _ -> funds)
+    clearState'   = f (Proxy @"clearState") historyId (const Cleared) (\_ WithHistoryId {..} -> clearState content)
