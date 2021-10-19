@@ -20,9 +20,6 @@ import           Ledger.Value     (assetClassValueOf)
 import qualified PlutusTx
 import           PlutusTx.Prelude
 
-{-# INLINEABLE findOwnInput' #-}
-findOwnInput' :: ScriptContext -> TxInInfo
-findOwnInput' ctx = fromMaybe (error ()) (findOwnInput ctx)
 
 {-# INLINEABLE mkDexValidator #-}
 mkDexValidator ::
@@ -54,8 +51,6 @@ mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..}
     (numerator, denominator) = swapFee
     txInfo = scriptContextTxInfo ctx
     txOutputs = txInfoOutputs txInfo
-    liquidityInput = findOwnInput' ctx
-    liquidity = assetClassValueOf (txOutValue $ txInInfoResolved liquidityInput) lockedCoin
     payoutOutput = listToMaybe
       [ (txOut, PayoutInfo {..})
       | txOut <- txOutputs
@@ -74,7 +69,7 @@ mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..}
               datumHash' <- txOutDatumHash txOut
               (Datum datum) <- findDatum datumHash' txInfo
               PlutusTx.fromBuiltinData datum
-      , liquidityOrderInfo == reversedLiquidityOrder liquidity liquidityOrderInfo'
+      , liquidityOrderInfo == reversedLiquidityOrder (fromNat expectedAmount) liquidityOrderInfo'
       , assetClassValueOf (txOutValue txOut) expectedCoin >= fromNat expectedAmount
       ]
 

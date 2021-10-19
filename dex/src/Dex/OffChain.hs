@@ -54,6 +54,9 @@ import           System.Random
 import           System.Random.SplitMix
 data Dex
 
+
+type DexState = History (Either Text DexContractState)
+
 instance Scripts.ValidatorTypes Dex where
   type RedeemerType Dex = DexAction
   type DatumType Dex = DexDatum
@@ -69,7 +72,8 @@ dexInstance =
 
 
 type DexSchema =
-  Endpoint "sell" (Request SellOrderParams)
+  Endpoint "createSellOrder" (Request SellOrderParams)
+  .\/ Endpoint "createLiquidityOrder" (Request LiquidityOrderParams)
   .\/ Endpoint "perform" (Request ())
   .\/ Endpoint "stop" (Request ())
   .\/ Endpoint "funds" (Request ())
@@ -83,17 +87,19 @@ getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints 
 getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
   Constraints.mustPayToTheScript
     (Payout PayoutInfo {..})
-    (assetClassValue expectedCoin (fromNat expectedAmount))
+    (singleton expectedCoin expectedAmount)
   <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
 getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..}) =
   let (numerator, denominator) = swapFee
+      fee = fromIntegral expectedAmount Prelude.* fromIntegral numerator Prelude./ fromIntegral denominator
+      integerFee = ceiling @Double @Integer fee
   in Constraints.mustPayToTheScript
     (Payout PayoutInfo {..})
-    (assetClassValue expectedCoin (ceiling @Double @Integer (fromIntegral expectedAmount Prelude.* fromIntegral numerator Prelude./ fromIntegral denominator)))
+    (assetClassValue expectedCoin integerFee)
   <> Constraints.mustPayToTheScript
     (Order (LiquidityOrder (reversedLiquidityOrder (assetClassValueOf (view ciTxOutValue txOut) lockedCoin) lo)))
-    (assetClassValue expectedCoin (fromNat expectedAmount))
+    (singleton expectedCoin expectedAmount)
   <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
 
@@ -101,8 +107,8 @@ getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..})
 uuidToBBS :: UUID.UUID -> BuiltinByteString
 uuidToBBS = stringToBuiltinByteString . UUID.toString
 
-sell :: SMGen -> SellOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
-sell smgen SellOrderParams {..} = do
+createSellOrder :: SMGen -> SellOrderParams -> Contract DexState DexSchema Text UUID
+createSellOrder smgen SellOrderParams {..} = do
   ownerHash <- pubKeyHash <$> ownPubKey
   let uuid = head $ randoms @UUID.UUID smgen
   let orderInfo = SellOrderInfo
@@ -112,65 +118,42 @@ sell smgen SellOrderParams {..} = do
                     , ownerHash = ownerHash
                     , orderId = uuidToBBS uuid
                     }
-  let tx = Constraints.mustPayToTheScript (Order $ SellOrder orderInfo) (assetClassValue lockedCoin (fromNat lockedAmount))
+  let tx = Constraints.mustPayToTheScript (Order $ SellOrder orderInfo) (singleton lockedCoin lockedAmount)
   void $ submitTxConstraints dexInstance tx
+  return uuid
 
 
-
--- buy :: SellOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
--- buy SellOrderParams {..} = do
---   ownerHash <- pubKeyHash <$> ownPubKey
-
---   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
---   utxos <- Map.toList <$> utxosAt address
---   mapped <- mapM (\(oref, o) -> getOrder o >>= \d -> return (o, oref, d)) utxos
---   let filtered =
---         [ (oref, o, d)
---         | (oref, o, d@(SellOrder (SellOrderInfo coinIn' coinOut' _ _))) <- mapped
---         , coinIn == coinOut'
---         , coinOut == coinIn'
---         ]
---   let sorted = sortOn (\(o,_,SellOrder SellOrderInfo {coinIn=coinIn', expectedAmount=expectedAmount'}) ->
---                                   let amountIn' = assetClassValueOf (view ciTxOutValue o) coinIn'
---                                   in fromIntegral (fromNat expectedAmount') / fromIntegral amountIn') filtered
-
-
---   let (utxosToCollect, _, reward) =
---         foldl' (\(utxosAcc, moneyToSpend, rewardAcc) order@(o,oref,SellOrder (SellOrderInfo coinIn' coinOut' cost _)) ->
---           let reward = assetClassValueOf (view ciTxOutValue o) coinIn'
---           in if moneyToSpend - fromNat cost < 0
---             then (utxosAcc, moneyToSpend, rewardAcc)
---             else (order:utxosAcc, moneyToSpend - fromNat cost, rewardAcc + reward)
---           ) ([], fromNat amountIn, 0) sorted
---   when (reward < fromNat expectedAmount) throwError "couldn't find suiting orders"
-
---   let tx = foldl' (\acc (o, oref, SellOrder SellOrderInfo {..}) ->
---               let inValue = assetClassValueOf (view ciTxOutValue o) coinIn
-
---               in acc <> Constraints.mustPayToPubKey ownerHash (assetClassValue coinOut (fromNat expectedAmount))
---                     <> Constraints.mustSpendScriptOutput oref (Redeemer $ PlutusTx.toBuiltinData Perform)
---               ) mempty utxosToCollect
---   let lookups = Constraints.typedValidatorLookups dexInstance
---         <> Constraints.ownPubKeyHash ownerHash
---         <> Constraints.otherScript (Scripts.validatorScript dexInstance)
---         <> Constraints.unspentOutputs (Map.fromList (map (\(o,oref,_) -> (oref,o)) utxosToCollect))
---   void $ submitTxConstraintsWith lookups tx
+createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
+createLiquidityOrder smgen LiquidityOrderParams {..} = do
+  ownerHash <- pubKeyHash <$> ownPubKey
+  let uuid = head $ randoms @UUID.UUID smgen
+  let orderInfo =
+        LiquidityOrderInfo
+          { expectedCoin = expectedCoin
+          , lockedCoin = lockedCoin
+          , expectedAmount = expectedAmount
+          , swapFee = swapFee
+          , ownerHash = ownerHash
+          , orderId = uuidToBBS uuid
+          }
+  let tx = Constraints.mustPayToTheScript (Order $ LiquidityOrder orderInfo) (singleton lockedCoin lockedAmount)
+  void $ submitTxConstraints dexInstance tx
+  return uuid
 
 
-
-
-perform :: Contract (History (Either Text DexContractState)) DexSchema Text ()
+perform :: Contract DexState DexSchema Text ()
 perform = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
-  mapped <- mapM (\(oref, o) -> getOrderDatum o >>= \d -> return (o, oref, d)) utxos
+  mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
+  let filtered = [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> Constraints.unspentOutputs (Map.fromList utxos)
       tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
-        ) mempty mapped
+        ) mempty filtered
   void $ submitTxConstraintsWith lookups tx
 
 
@@ -182,7 +165,7 @@ funds = do
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
 
-orders :: Contract (History (Either Text DexContractState)) DexSchema Text [OrderInfo]
+orders :: Contract DexState DexSchema Text [OrderInfo]
 orders = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
@@ -202,7 +185,7 @@ orders = do
               lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
           in return OrderInfo {..}
 
-cancel :: CancelOrderParams -> Contract (History (Either Text DexContractState)) DexSchema Text ()
+cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
@@ -229,6 +212,17 @@ cancel CancelOrderParams {..} = do
         SellOrder SellOrderInfo {..}           -> return ownerHash
         LiquidityOrder LiquidityOrderInfo {..} -> return ownerHash
 
+getDexDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
+getDexDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
+        (Datum e) <- either getDatum pure _ciTxOutDatum
+        maybe (throwError "datum hash wrong type") pure (PlutusTx.fromBuiltinData e)
+  where
+    getDatum :: DatumHash -> Contract w s Text Datum
+    getDatum =
+      datumFromHash >=>
+      \case Nothing -> throwError "datum not found"
+            Just d  -> pure d
+getDexDatum _ = throwError "no datum for a txout of a public key address"
 
 getOrderDatum :: ChainIndexTxOut -> Contract w s Text Order
 getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
@@ -248,10 +242,11 @@ getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
 getOrderDatum _ = throwError "no datum for a txout of a public key address"
 
 
-dexEndpoints :: Promise (History (Either Text DexContractState)) DexSchema Void ()
+dexEndpoints :: Promise DexState DexSchema Void ()
 dexEndpoints =
   stop
-    `select` ( ( f (Proxy @"sell") historyId (const Sold) (\Request {..} -> sell (mkSMGen $ fromIntegral randomSeed) content)
+    `select` ( ( f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
+                  `select` f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
                   `select` f (Proxy @"perform") historyId (const Performed) (const perform)
                   `select` f (Proxy @"orders") historyId MyOrders (const orders)
                   `select` f (Proxy @"funds") historyId Funds (const funds)
@@ -266,8 +261,8 @@ dexEndpoints =
       Proxy l ->
       (p -> Text) ->
       (a -> DexContractState) ->
-      (p -> Contract (History (Either Text DexContractState)) DexSchema Text a) ->
-      Promise (History (Either Text DexContractState)) DexSchema Void ()
+      (p -> Contract DexState DexSchema Text a) ->
+      Promise DexState DexSchema Void ()
     f _ getGuid g c = handleEndpoint @l $ \p -> do
       let guid = either (const "ERROR") getGuid p
       e <- either (pure . Left) (runError @_ @_ @Text . c) p
