@@ -19,11 +19,11 @@ import           Control.Monad.IO.Class              (MonadIO (..))
 import           Data.Aeson                          (FromJSON (..),
                                                       ToJSON (..), Value)
 import           Data.Aeson.Types                    (parseMaybe)
-import           Data.Default
+import           Data.Default                        (Default (def))
 import qualified Data.Map                            as Map
 import           Data.OpenApi.Internal.Schema        (ToSchema)
 import qualified Data.Semigroup                      as Semigroup
-import           Data.Text
+import           Data.Text                           (Text)
 import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
 import qualified Dex.OffChain                        as Dex
 import qualified Dex.Trace                           as Trace
@@ -31,7 +31,7 @@ import           Dex.Types                           (DexContractState)
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
-import           Plutus.Contract                     (Empty, awaitPromise)
+import           Plutus.Contract                     (Empty)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
@@ -54,21 +54,22 @@ main = void $
     cidInit <- Simulator.activateContract (knownWallet 1) DexInit
     cs <- getState (Currency.currencySymbol . Semigroup.getLast) cidInit
 
-    _ <- Simulator.waitUntilFinished cidInit
+
+    void $ Simulator.waitUntilFinished cidInit
 
     logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
 
-    _ <- fmap Map.fromList $
+    void $ fmap Map.fromList $
       forM Trace.wallets $ \w -> do
         cid <- Simulator.activateContract w DexContract
         logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
-        _ <- Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
+        void $ Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
         v <- getState (contractState "FundsId") cid
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
-    _ <- liftIO getLine
+    void $ liftIO getLine
     shutdown
   where
     fromJSONValue :: FromJSON a => Value -> Maybe a
@@ -94,7 +95,7 @@ instance Builtin.HasDefinitions DexContracts where
       DexContract -> Builtin.endpointsToSchemas @Dex.DexSchema
       DexInit     -> Builtin.endpointsToSchemas @Empty
     getContract = \case
-      DexContract -> SomeBuiltin (awaitPromise Dex.dexEndpoints)
+      DexContract -> SomeBuiltin Dex.dexEndpoints
       DexInit     -> SomeBuiltin Trace.setupTokens
 
 handlers :: SimulatorEffectHandlers (Builtin DexContracts)

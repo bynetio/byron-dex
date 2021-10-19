@@ -469,7 +469,7 @@ deriving instance Show (ContractInstanceKey UModel w s e)
 instanceSpec :: [ContractInstanceSpec UModel]
 instanceSpec =
   ContractInstanceSpec (StartKey (knownWallet 1)) (knownWallet 1) (awaitPromise ownerEndpoint') :
-    [ContractInstanceSpec (UseKey w) w $ awaitPromise $ userEndpoints sampleUniswap | w <- wallets]
+    [ContractInstanceSpec (UseKey w) w $ userEndpoints sampleUniswap | w <- wallets]
 
 delay :: Int -> EmulatorTrace ()
 delay = void . waitNSlots . fromIntegral

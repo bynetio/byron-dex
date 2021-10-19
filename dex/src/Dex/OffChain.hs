@@ -102,8 +102,6 @@ getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..})
     (singleton expectedCoin expectedAmount)
   <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
-
-
 uuidToBBS :: UUID.UUID -> BuiltinByteString
 uuidToBBS = stringToBuiltinByteString . UUID.toString
 
@@ -242,18 +240,10 @@ getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
 getOrderDatum _ = throwError "no datum for a txout of a public key address"
 
 
-dexEndpoints :: Promise DexState DexSchema Void ()
+
+dexEndpoints :: Contract DexState DexSchema Void ()
 dexEndpoints =
-  stop
-    `select` ( ( f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
-                  `select` f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
-                  `select` f (Proxy @"perform") historyId (const Performed) (const perform)
-                  `select` f (Proxy @"orders") historyId MyOrders (const orders)
-                  `select` f (Proxy @"funds") historyId Funds (const funds)
-                  `select` f (Proxy @"cancel") historyId (const Cancel) (\Request {..} -> cancel content)
-               )
-                 <> dexEndpoints
-             )
+  selectList [stop', createSellOrder', createLiquidityOrder', perform', orders', funds', cancel'] >> dexEndpoints
   where
     f ::
       forall l a p.
@@ -263,21 +253,28 @@ dexEndpoints =
       (a -> DexContractState) ->
       (p -> Contract DexState DexSchema Text a) ->
       Promise DexState DexSchema Void ()
-    f _ getGuid g c = handleEndpoint @l $ \p -> do
-      let guid = either (const "ERROR") getGuid p
+    f _ getHistoryId g c = handleEndpoint @l $ \p -> do
+      let hid = either (const "ERROR") getHistoryId p
       e <- either (pure . Left) (runError @_ @_ @Text . c) p
 
       case e of
         Left err -> do
           logInfo @Text ("Error during calling endpoint: " <> err)
-          tell $ WH.append guid . Left $ err
+          tell $ WH.append hid . Left $ err
         Right a
           | symbolVal (Proxy @l) GHC.Classes./= "clearState" ->
-            tell $ WH.append guid . Right . g $ a
+            tell $ WH.append hid . Right . g $ a
         _ -> return ()
 
-    stop :: Promise (History (Either Text DexContractState)) DexSchema Void ()
-    stop = handleEndpoint @"stop" $ \e -> do
+    stop' :: Promise DexState DexSchema Void ()
+    stop' = handleEndpoint @"stop" $ \e -> do
       tell $ case e of
         Left err                -> WH.append "ERROR" $ Left err
         Right (Request hId _ _) -> WH.append hId $ Right Stopped
+
+    createLiquidityOrder' = f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
+    createSellOrder'    = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
+    perform' = f (Proxy @"perform") historyId (const Performed) (const perform)
+    orders'  = f (Proxy @"orders") historyId MyOrders (const orders)
+    funds'   = f (Proxy @"funds") historyId Funds (const funds)
+    cancel'  = f (Proxy @"cancel") historyId (const Cancel) (\Request {..} -> cancel content)
