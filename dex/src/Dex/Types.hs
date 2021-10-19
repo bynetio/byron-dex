@@ -28,6 +28,7 @@ import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
 import           Data.Text           (Text)
 import           Dex.WalletHistory
 import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
+import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
 import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
@@ -74,6 +75,9 @@ instance FromJSON Nat where
         return $ Nat integer
 
 
+singleton :: AssetClass -> Nat -> Value
+singleton assetClass amount = assetClassValue assetClass (fromNat amount)
+
 data DexAction
   = Swap
   | CancelOrder
@@ -107,6 +111,7 @@ data LiquidityOrderParams
       , expectedCoin   :: AssetClass
       , lockedAmount   :: Nat
       , expectedAmount :: Nat
+      , swapFee        :: (Nat, Nat)
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
@@ -226,7 +231,7 @@ data OrderInfo
 
 data DexContractState
   = Orders [(SellOrderInfo, TxOutRef)]
-  | Sold
+  | OrderCreated
   | Performed
   | Stopped
   | Funds [(AssetClass, Integer)]
