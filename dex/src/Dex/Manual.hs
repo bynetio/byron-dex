@@ -72,3 +72,5 @@ dexTrace = do
   void $ waitNSlots 10
   void $ callEndpoint @"perform" h2 (Request "c" 4 ())
   void $ waitNSlots 10
+  void $ callEndpoint @"collectFunds" h1 (Request "d" 5 ())
+  void $ waitNSlots 10

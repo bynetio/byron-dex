@@ -27,6 +27,7 @@ import           Control.Lens.Getter     (view)
 import           Control.Monad           hiding (fmap, mapM, mapM_)
 import           Data.List               (foldl')
 import qualified Data.Map                as Map
+import           Data.Maybe              (catMaybes)
 import           Data.Proxy              (Proxy (..))
 import           Data.Text               (Text)
 import           Data.UUID               as UUID
@@ -80,6 +81,7 @@ type DexSchema =
   .\/ Endpoint "findOrders" (Request ())
   .\/ Endpoint "orders" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
+  .\/ Endpoint "collectFunds" (Request ())
 
 
 
@@ -168,20 +170,23 @@ orders = do
   pkh <- pubKeyHash <$> ownPubKey
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
-  mapped <- mapM toOrderInfo utxos
+  mapped <- catMaybes <$> mapM toOrderInfo utxos
   return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
   where
     toOrderInfo (orderHash, o) = do
-      order <- getOrderDatum o
-      case order of
-        LiquidityOrder LiquidityOrderInfo {..} ->
-          let orderType = "Liquidity"
-              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-          in return OrderInfo {..}
-        SellOrder      SellOrderInfo      {..} ->
-          let orderType = "Sell"
-              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-          in return OrderInfo {..}
+      datum <- getDexDatum o
+      case datum of
+        Payout _ -> return Nothing
+        Order order ->
+          case order of
+            LiquidityOrder LiquidityOrderInfo {..} ->
+              let orderType = "Liquidity"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
+            SellOrder      SellOrderInfo      {..} ->
+              let orderType = "Sell"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
@@ -209,6 +214,29 @@ cancel CancelOrderParams {..} = do
       case order of
         SellOrder SellOrderInfo {..}           -> return ownerHash
         LiquidityOrder LiquidityOrderInfo {..} -> return ownerHash
+
+collectFunds :: Contract DexState DexSchema Text ()
+collectFunds = do
+  pkh <- pubKeyHash <$> ownPubKey
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  payouts <- catMaybes <$> mapM toPayoutInfo utxos
+  let ownedPayouts = filter (\(_, PayoutInfo{..}) -> ownerHash == pkh) payouts
+  let lookups =
+        Constraints.typedValidatorLookups dexInstance
+        <> Constraints.ownPubKeyHash pkh
+        <> Constraints.otherScript (Scripts.validatorScript dexInstance)
+        <> Constraints.unspentOutputs (Map.fromList $ filter (\(txOutRef, _) -> any ((txOutRef ==) . fst) ownedPayouts) utxos)
+  let tx = mconcat $ map (\(txOutRef, _) ->
+                            Constraints.mustSpendScriptOutput txOutRef $ Redeemer $ PlutusTx.toBuiltinData CollectCoins) ownedPayouts
+  void $ submitTxConstraintsWith lookups tx
+  where
+  toPayoutInfo (txOutRef, txOut) = do
+    datum <- getDexDatum txOut
+    case datum of
+      Order _           -> return Nothing
+      Payout payoutInfo -> return $ Just (txOutRef, payoutInfo)
+
 
 getDexDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
 getDexDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
@@ -243,7 +271,16 @@ getOrderDatum _ = throwError "no datum for a txout of a public key address"
 
 dexEndpoints :: Contract DexState DexSchema Void ()
 dexEndpoints =
-  selectList [stop', createSellOrder', createLiquidityOrder', perform', orders', funds', cancel'] >> dexEndpoints
+  selectList
+  [ stop'
+  , createSellOrder'
+  , createLiquidityOrder'
+  , perform'
+  , orders'
+  , funds'
+  , cancel'
+  , collectFunds'
+  ] >> dexEndpoints
   where
     f ::
       forall l a p.
@@ -277,4 +314,5 @@ dexEndpoints =
     perform' = f (Proxy @"perform") historyId (const Performed) (const perform)
     orders'  = f (Proxy @"orders") historyId MyOrders (const orders)
     funds'   = f (Proxy @"funds") historyId Funds (const funds)
-    cancel'  = f (Proxy @"cancel") historyId (const Cancel) (\Request {..} -> cancel content)
+    cancel'  = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
+    collectFunds' = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
