@@ -236,5 +236,6 @@ data DexContractState
   | Stopped
   | Funds [(AssetClass, Integer)]
   | MyOrders [OrderInfo]
-  | Cancel
+  | Canceled
+  | Collected
   deriving (FromJSON, Generic, Show, ToJSON)
