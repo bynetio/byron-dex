@@ -54,6 +54,15 @@ image: "plutus4binarapps/dex-plutus-dev:v1.2"
         - /builds/plutus/dex/dist-newstyle
       policy: pull-push
 
+.middleware-cache:
+  <<: *base_cache
+  cache:
+    - <<: *cabal_cache
+    - key: middleware-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/dex/dist-newstyle
+      policy: pull-push
+
 stages:
   - lint
   - prebuild
@@ -133,3 +142,21 @@ uniswap_specs:
     - build_uniswap
   script:
     - cabal run uniswap-tests
+
+# middleware
+lint_middleware:
+  stage: lint
+  extends: .automatic
+  script: "hlint middleware"
+
+build_middleware:
+  stage: build
+  extends:
+    - .automatic
+    - .uniswap-cache
+  needs:
+    - prebuild
+    - lint_middleware
+  script:
+    - ls -la /builds/plutus/dex/prebuild-cache/
+    - cabal build middleware
