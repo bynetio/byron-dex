@@ -36,20 +36,11 @@ image: "plutus4binarapps/dex-plutus-dev:v1.2"
     - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
     - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
 
-.uniswap-cache:
+.dex-cache:
   <<: *base_cache
   cache:
     - <<: *cabal_cache
-    - key: uniswap-cache-$CI_COMMIT_REF_SLUG
-      paths:
-        - /builds/plutus/dex/dist-newstyle
-      policy: pull-push
-
-.uniswap-json-api-cache:
-  <<: *base_cache
-  cache:
-    - <<: *cabal_cache
-    - key: uniswap-json-api-cache-$CI_COMMIT_REF_SLUG
+    - key: dex-cache-$CI_COMMIT_REF_SLUG
       paths:
         - /builds/plutus/dex/dist-newstyle
       policy: pull-push
@@ -86,62 +77,22 @@ prebuild:
        echo "Using cache.. ."
       fi
 
-# uniswap-uswap-json-api
-lint_uniswap-json-api:
+# dex
+lint_dex:
   stage: lint
   extends: .automatic
-  script: "hlint uniswap-json-api"
+  script: "hlint dex"
 
-build_uniswap-json-api:
+build_dex:
   stage: build
   extends:
     - .automatic
-    - .uniswap-json-api-cache
+    - .dex-cache
   needs:
     - prebuild
-    - lint_uniswap-json-api
+    - lint_dex
   script:
-    - cabal build uniswap-json-api
-
-uniswap-json-api_specs:
-  stage: test
-  extends:
-    - .automatic
-    - .uniswap-json-api-cache
-  needs:
-    - prebuild
-    - build_uniswap-json-api
-  script:
-    - cabal run uniswap-json-api-specs
-
-# uniswap
-lint_uniswap:
-  stage: lint
-  extends: .automatic
-  script: "hlint uniswap"
-
-build_uniswap:
-  stage: build
-  extends:
-    - .automatic
-    - .uniswap-cache
-  needs:
-    - prebuild
-    - lint_uniswap
-  script:
-    - ls -la /builds/plutus/dex/prebuild-cache/
-    - cabal build uniswap-pab
-
-uniswap_specs:
-  stage: test
-  extends:
-    - .automatic
-    - .uniswap-cache
-  needs:
-    - prebuild
-    - build_uniswap
-  script:
-    - cabal run uniswap-tests
+    - cabal build dex
 
 # middleware
 lint_middleware:
@@ -153,7 +104,7 @@ build_middleware:
   stage: build
   extends:
     - .automatic
-    - .uniswap-cache
+    - .middleware-cache
   needs:
     - prebuild
     - lint_middleware
