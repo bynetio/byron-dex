@@ -30,7 +30,7 @@ import           Dex.Types                           (DexContractState)
 import qualified Dex.Types                           as Dex
 import qualified Dex.WalletHistory                   as WH
 import           GHC.Generics                        (Generic)
-import           Plutus.Contract                     (Empty, awaitPromise)
+import           Plutus.Contract                     (Empty)
 import qualified Plutus.Contracts.Currency           as Currency
 import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..))
 import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin

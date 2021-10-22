@@ -39,52 +39,53 @@ library
                      , uuid
                      , cardano-api
   default-language:    Haskell2010
-  ghc-options:       -Wall -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
+  ghc-options:       -Wall -Werror -fobject-code -fno-ignore-interface-pragmas -fno-omit-interface-pragmas -fno-strictness -fno-spec-constr -fno-specialise
 
 executable dex-pab
   main-is: Main.hs
   hs-source-dirs: pab
   ghc-options:
     -threaded -Werror -Wall
-  build-depends:
-    base >= 4.9 && < 5,
-    plutus-contract -any,
-    plutus-pab -any,
-    dex -any,
-    aeson -any,
-    freer-simple -any,
-    prettyprinter -any,
-    filemanip -any,
-    freer-extras -any,
-    plutus-ledger -any,
-    aeson -any,
-    containers -any,
-    text -any,
-    plutus-use-cases -any,
-    plutus-ledger-api -any,
-    bytestring,
-    data-default,
-    openapi3
+  build-depends: base >= 4.9 && < 5
+               , plutus-contract -any
+               , plutus-pab -any
+               , dex -any
+               , aeson -any
+               , freer-simple -any
+               , prettyprinter -any
+               , filemanip -any
+               , freer-extras -any
+               , plutus-ledger -any
+               , aeson -any
+               , containers -any
+               , text -any
+               , plutus-use-cases -any
+               , plutus-ledger-api -any
+               , bytestring
+               , data-default
+               , openapi3
 
 executable profiling
-  main-is: Manual.hs
-  hs-source-dirs: src/Dex
+  main-is: Main.hs
+  hs-source-dirs: profiling
   ghc-options:
     -fplugin-opt PlutusTx.Plugin:profile-all -threaded -Werror -Wall
 
-  build-depends:
-    base >= 4.9 && < 5,
-    plutus-contract -any,
-    plutus-pab -any,
-    dex -any,
-    aeson -any,
-    freer-simple -any,
-    prettyprinter -any,
-    filemanip -any,
-    freer-extras -any,
-    plutus-ledger -any,
-    aeson -any,
-    containers -any,
-    text -any,
-    plutus-use-cases -any,
-    pluI
+  build-depends: base >= 4.9 && < 5
+               , plutus-contract -any
+               , plutus-pab -any
+               , dex -any
+               , aeson -any
+               , freer-simple -any
+               , prettyprinter -any
+               , filemanip -any
+               , freer-extras -any
+               , plutus-ledger -any
+               , aeson -any
+               , containers -any
+               , text -any
+               , plutus-ledger-api -any
+               , cardano-api -any
+               , bytestring
+               , data-default
+               , openapi3

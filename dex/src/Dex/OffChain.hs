@@ -125,6 +125,22 @@ createSellOrder smgen SellOrderParams {..} = do
   void $ submitTxConstraints dexInstance tx
   return uuid
 
+createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
+createLiquidityOrder smgen LiquidityOrderParams {..} = do
+  ownerHash <- ownPubKeyHash
+  let uuid = head $ randoms @UUID.UUID smgen
+  let orderInfo =
+        LiquidityOrderInfo
+          { expectedCoin = expectedCoin
+          , lockedCoin = lockedCoin
+          , expectedAmount = expectedAmount
+          , swapFee = swapFee
+          , ownerHash = ownerHash
+          , orderId = uuidToBBS uuid
+          }
+  let tx = Constraints.mustPayToTheScript (Order $ LiquidityOrder orderInfo) (singleton lockedCoin lockedAmount)
+  void $ submitTxConstraints dexInstance tx
+  return uuid
 
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
 createLiquidityPool smgen LiquidityPoolParams {..} = do
