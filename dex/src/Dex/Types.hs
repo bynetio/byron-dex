@@ -129,7 +129,6 @@ PlutusTx.makeIsDataIndexed ''PoolPartsParams [('PriceChangeParams, 0)]
 PlutusTx.makeLift ''PoolPartsParams
 
 
-
 data LiquidityPoolParams
   = LiquidityPoolParams
       { coinA           :: AssetClass
