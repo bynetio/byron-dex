@@ -13,6 +13,7 @@ library
                  , Dex.Manual
                  , Dex.Trace
                  , Dex.WalletHistory
+                 , Dex.LiquidityPool.PoolParts
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
