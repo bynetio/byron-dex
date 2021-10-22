@@ -34,9 +34,9 @@ import qualified PlutusTx
 import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
                                       AdditiveSemigroup, BuiltinByteString, Eq,
                                       Integer, MultiplicativeMonoid,
-                                      MultiplicativeSemigroup, return, ($),
+                                      MultiplicativeSemigroup, Ord, return, ($),
                                       (&&), (<), (==))
-import           Prelude             (Show)
+import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 newtype Nat
   = Nat Integer
@@ -53,6 +53,7 @@ newtype Nat
     , Prelude.Num
     , Prelude.Ord
     , Prelude.Real
+    , Ord
     , Show
     , ToJSON
     , ToSchema
@@ -73,6 +74,9 @@ instance FromJSON Nat where
         Prelude.fail "parsing Natural failed, unexpected negative number "
     else
         return $ Nat integer
+
+toDouble :: (Nat,Nat) -> Double
+toDouble (a,b) = fromIntegral a / fromIntegral b
 
 
 singleton :: AssetClass -> Nat -> Value
@@ -119,6 +123,21 @@ PlutusTx.makeIsDataIndexed ''LiquidityOrderParams [('LiquidityOrderParams,0)]
 PlutusTx.makeLift ''LiquidityOrderParams
 
 
+data LiquidityPoolParams
+  = LiquidityPoolParams
+      { coinA            :: AssetClass
+      , coinB            :: AssetClass
+      , amountA          :: Nat
+      , coinAPriceChange :: (Nat, Nat)
+      , coinBPriceChange :: (Nat, Nat)
+      , swapFee          :: (Nat, Nat)
+      , numberOfParts    :: Nat
+      , exchangeRate     :: (Nat,Nat)
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+
+PlutusTx.makeIsDataIndexed ''LiquidityPoolParams [('LiquidityPoolParams, 0)]
+PlutusTx.makeLift ''LiquidityPoolParams
 
 data SellOrderInfo
   = SellOrderInfo
@@ -232,6 +251,7 @@ data OrderInfo
 data DexContractState
   = Orders [(SellOrderInfo, TxOutRef)]
   | OrderCreated
+  | PoolCreated
   | Performed
   | Stopped
   | Funds [(AssetClass, Integer)]

@@ -25,6 +25,7 @@ module Dex.OffChain
 
 import           Control.Lens.Getter     (view)
 import           Control.Monad           hiding (fmap, mapM, mapM_)
+import           Data.Bifunctor          (bimap)
 import           Data.List               (foldl')
 import qualified Data.Map                as Map
 import           Data.Maybe              (catMaybes)
@@ -47,9 +48,11 @@ import           Plutus.Contract
 import qualified PlutusTx
 import qualified PlutusTx.AssocMap       as AssocMap
 import           PlutusTx.Builtins.Class (stringToBuiltinByteString)
-import           PlutusTx.Prelude        hiding (Semigroup (..), unless)
+import           PlutusTx.Prelude        hiding (Semigroup (..), round, sum,
+                                          unless, (*), (+), (-))
 import           Prelude                 (Double, Semigroup (..), ceiling,
-                                          fromIntegral, (/))
+                                          fromIntegral, round, sum, (*), (+),
+                                          (-), (/))
 import qualified Prelude
 import           System.Random
 import           System.Random.SplitMix
@@ -75,6 +78,7 @@ dexInstance =
 type DexSchema =
   Endpoint "createSellOrder" (Request SellOrderParams)
   .\/ Endpoint "createLiquidityOrder" (Request LiquidityOrderParams)
+  .\/ Endpoint "createLiquidityPool" (Request LiquidityPoolParams)
   .\/ Endpoint "perform" (Request ())
   .\/ Endpoint "stop" (Request ())
   .\/ Endpoint "funds" (Request ())
@@ -140,6 +144,58 @@ createLiquidityOrder smgen LiquidityOrderParams {..} = do
   void $ submitTxConstraints dexInstance tx
   return uuid
 
+createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
+createLiquidityPool smgen LiquidityPoolParams {..} = do
+  when (numberOfParts < 2) $ throwError "Number of parts must be at least 2"
+
+  let coinAPriceChangeDouble = toDouble coinAPriceChange
+  let normalizedPartsA = [1 / (1 - (coinAPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [0..fromIntegral numberOfParts-1]]
+  let normalizedVirtualPartsA = [1 / (1 + (coinAPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [1..fromIntegral numberOfParts-1]]
+  let (coreA:partsA) = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedPartsA
+  let virtualPartsA = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedVirtualPartsA
+
+  let coinBPriceChangeDouble = toDouble coinBPriceChange
+  let normalizedPartsB = [1 / (1 - (coinBPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [0..fromIntegral numberOfParts-1]]
+  let normalizedVirtualPartsB = [1 / (1 + (coinBPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [1..fromIntegral numberOfParts-1]]
+  let (coreB:partsB) = map (* ((coreA / toDouble exchangeRate) / head normalizedPartsB)) normalizedPartsB
+  logInfo @Prelude.String (Prelude.show exchangeRate)
+
+  let virtualPartsB = map (* ((coreA / toDouble exchangeRate) / head normalizedPartsB)) normalizedVirtualPartsB
+
+  let lpPartsA = map (bimap round round) ((coreA / 2, coreB / 2) : zip partsA virtualPartsB)
+  let lpPartsB = map (bimap round round) ((coreB / 2, coreA / 2) : zip partsB virtualPartsA)
+
+  ownerHash <- pubKeyHash <$> ownPubKey
+  let (smgenA, smgenB) = splitSMGen smgen
+
+  let uuidsA = randoms @UUID.UUID smgenA
+  let liquidityOrdersA = flip map (zip uuidsA lpPartsA)
+        $ \(uuid, (a,b)) -> ( (a, coinA)
+                            , LiquidityOrderInfo
+                              { expectedCoin   = coinB
+                              , lockedCoin     = coinA
+                              , expectedAmount = Nat b
+                              , swapFee        = swapFee
+                              , ownerHash      = ownerHash
+                              , orderId        = uuidToBBS uuid
+                              }
+                            )
+  let uuidsB = randoms @UUID.UUID smgenB
+  let liquidityOrdersB = flip map (zip uuidsB lpPartsB)
+        $ \(uuid, (b,a)) -> ( (b, coinB)
+                            , LiquidityOrderInfo
+                              { expectedCoin   = coinA
+                              , lockedCoin     = coinB
+                              , expectedAmount = Nat a
+                              , swapFee        = swapFee
+                              , ownerHash      = ownerHash
+                              , orderId        = uuidToBBS uuid
+                              }
+                            )
+  let constraints = flip map (liquidityOrdersA ++ liquidityOrdersB)
+        $ \((amount, coin), order) -> Constraints.mustPayToTheScript (Order $ LiquidityOrder order) (singleton coin amount)
+
+  void $ submitTxConstraints dexInstance (mconcat constraints)
 
 perform :: Contract DexState DexSchema Text ()
 perform = do
@@ -275,6 +331,7 @@ dexEndpoints =
   [ stop'
   , createSellOrder'
   , createLiquidityOrder'
+  , createLiquidityPool'
   , perform'
   , orders'
   , funds'
@@ -311,6 +368,7 @@ dexEndpoints =
 
     createLiquidityOrder' = f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
     createSellOrder'    = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
+    createLiquidityPool' = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
     perform' = f (Proxy @"perform") historyId (const Performed) (const perform)
     orders'  = f (Proxy @"orders") historyId MyOrders (const orders)
     funds'   = f (Proxy @"funds") historyId Funds (const funds)

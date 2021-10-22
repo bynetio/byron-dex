@@ -57,7 +57,7 @@ dexTrace :: EmulatorTrace ()
 dexTrace = do
   h1 <- activateContractWallet (knownWallet 1) dexEndpoints
   h2 <- activateContractWallet (knownWallet 2) dexEndpoints
-  void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 0 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 100 200 (1,100)))
+  void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (5,100) (10,100) (3,100) 5 (1,2)))
   void $ waitNSlots 10
   -- void $ callEndpoint @"sell" h1 (Request "b" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))
   -- void $ waitNSlots 10
