@@ -12,16 +12,15 @@ module Dex.Trace
 import           Control.Monad                           (forM_, when)
 import qualified Data.Semigroup                          as Semigroup
 import           Ledger
-import           Ledger.Constraints
+import           Ledger.Constraints                      hiding (ownPubKeyHash)
 import           Ledger.Value                            as Value
 import           Plutus.Contract                         hiding (throwError)
 import qualified Plutus.Contracts.Currency               as Currency
 import           Plutus.Trace.Emulator.Types             (ContractInstanceLog (..),
                                                           ContractInstanceMsg (..))
-import           Wallet.Emulator.Types                   (Wallet, knownWallet,
-                                                          walletPubKey)
-
 import           Wallet.Emulator.MultiAgent              (EmulatorEvent' (..))
+import           Wallet.Emulator.Types                   (Wallet, knownWallet,
+                                                          walletPubKeyHash)
 
 import qualified Data.Aeson                              as A
 import           Data.Text.Prettyprint.Doc               (Pretty,
@@ -36,12 +35,12 @@ import           System.IO                               (stdout)
 --   the emulated wallets
 setupTokens :: Contract (Maybe (Semigroup.Last Currency.OneShotCurrency)) Currency.CurrencySchema Currency.CurrencyError ()
 setupTokens = do
-    ownPK <- pubKeyHash <$> ownPubKey
+    ownPK <- ownPubKeyHash
     cur   <- Currency.mintContract ownPK [(tn, fromIntegral (length wallets) * amount) | tn <- tokenNames]
     let cs = Currency.currencySymbol cur
         v  = mconcat [Value.singleton cs tn amount | tn <- tokenNames]
     forM_ wallets $ \w -> do
-        let pkh = pubKeyHash $ walletPubKey w
+        let pkh = walletPubKeyHash w
         when (pkh /= ownPK) $ do
             tx <- submitTx $ mustPayToPubKey pkh v
             awaitTxConfirmed $ txId tx

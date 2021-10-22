@@ -10,6 +10,8 @@ let
     inherit compiler-nix-name;
 
     sha256map = {
+      "https://github.com/input-output-hk/plutus.git"."45f6d4e6e17c9044462063e22678fa95238874d4" =
+        "024jp109jkxsl3wg8ix2fcpkf0bhb42v02varkkf5n8mr2586b5k";
       "https://github.com/input-output-hk/plutus.git"."plutus-pab/v0.0.2" =
         "0aicyg6skqhpfciakwn68b9ppkpm95j1x3d4sj3xmc542sr6932g";
       "https://github.com/Quid2/flat.git"."ee59880f47ab835dbd73bea0847dab7869fc20d8" =

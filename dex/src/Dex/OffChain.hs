@@ -114,7 +114,7 @@ uuidToBBS = stringToBuiltinByteString . UUID.toString
 
 createSellOrder :: SMGen -> SellOrderParams -> Contract DexState DexSchema Text UUID
 createSellOrder smgen SellOrderParams {..} = do
-  ownerHash <- pubKeyHash <$> ownPubKey
+  ownerHash <- Plutus.Contract.ownPubKeyHash
   let uuid = head $ randoms @UUID.UUID smgen
   let orderInfo = SellOrderInfo
                     { expectedCoin = expectedCoin
@@ -130,7 +130,7 @@ createSellOrder smgen SellOrderParams {..} = do
 
 createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
 createLiquidityOrder smgen LiquidityOrderParams {..} = do
-  ownerHash <- pubKeyHash <$> ownPubKey
+  ownerHash <- Plutus.Contract.ownPubKeyHash
   let uuid = head $ randoms @UUID.UUID smgen
   let orderInfo =
         LiquidityOrderInfo
@@ -160,7 +160,7 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
   let lpPartsA = zipWith (curry $ bimap round round) partsA (coreB:virtualPartsB)
   let lpPartsB = zipWith (curry $ bimap round round) partsB (coreA:virtualPartsA)
 
-  ownerHash <- pubKeyHash <$> ownPubKey
+  ownerHash <- Plutus.Contract.ownPubKeyHash
   let (smgenA, smgenB) = splitSMGen smgen
 
   let uuidsA = randoms @UUID.UUID smgenA
@@ -194,7 +194,7 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
 
 perform :: Contract DexState DexSchema Text ()
 perform = do
-  pkh <- pubKeyHash <$> ownPubKey
+  pkh <- Plutus.Contract.ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
@@ -210,7 +210,7 @@ perform = do
 
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
-  pkh <- pubKeyHash <$> ownPubKey
+  pkh <- Plutus.Contract.ownPubKeyHash
   os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
@@ -218,7 +218,7 @@ funds = do
 
 orders :: Contract DexState DexSchema Text [OrderInfo]
 orders = do
-  pkh <- pubKeyHash <$> ownPubKey
+  pkh <- Plutus.Contract.ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
@@ -241,7 +241,7 @@ orders = do
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
-  pkh <- pubKeyHash <$> ownPubKey
+  pkh <- Plutus.Contract.ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos  <- Map.toList . Map.filterWithKey (\oref' _ -> oref' == orderHash) <$> utxosAt address
   hashes <- mapM (toOwnerHash . snd) utxos
@@ -268,7 +268,7 @@ cancel CancelOrderParams {..} = do
 
 collectFunds :: Contract DexState DexSchema Text ()
 collectFunds = do
-  pkh <- pubKeyHash <$> ownPubKey
+  pkh <- Plutus.Contract.ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   payouts <- catMaybes <$> mapM toPayoutInfo utxos
