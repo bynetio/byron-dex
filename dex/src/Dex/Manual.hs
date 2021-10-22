@@ -56,8 +56,8 @@ runTrace = runEmulatorTraceIO' customTraceConfig (emulatorCfg def def)
 dexTrace :: EmulatorTrace ()
 dexTrace = do
   h1 <- activateContractWallet (knownWallet 1) dexEndpoints
-  h2 <- activateContractWallet (knownWallet 2) dexEndpoints
-  void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (5,100) (10,100) (3,100) 5 (1,2)))
+  --h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+  void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (PriceChangeParams (5,100) (10,100) 5) (3,100) (1,2)))
   void $ waitNSlots 10
   -- void $ callEndpoint @"sell" h1 (Request "b" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))
   -- void $ waitNSlots 10
@@ -66,11 +66,11 @@ dexTrace = do
   -- void $ callEndpoint @"sell" h2 (Request "d" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
   -- void $ waitNSlots 10
 
-  void $ callEndpoint @"perform" h2 (Request "c" 4 ())
-  void $ waitNSlots 10
-  void $ callEndpoint @"perform" h2 (Request "c" 4 ())
-  void $ waitNSlots 10
-  void $ callEndpoint @"perform" h2 (Request "c" 4 ())
-  void $ waitNSlots 10
-  void $ callEndpoint @"collectFunds" h1 (Request "d" 5 ())
-  void $ waitNSlots 10
+  -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  -- void $ waitNSlots 10
+  -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  -- void $ waitNSlots 10
+  -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  -- void $ waitNSlots 10
+  -- void $ callEndpoint @"collectFunds" h1 (Request "d" 5 ())
+  -- void $ waitNSlots 10

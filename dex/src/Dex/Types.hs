@@ -38,6 +38,7 @@ import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
                                       (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
+
 newtype Nat
   = Nat Integer
   deriving stock (Generic)
@@ -123,16 +124,26 @@ PlutusTx.makeIsDataIndexed ''LiquidityOrderParams [('LiquidityOrderParams,0)]
 PlutusTx.makeLift ''LiquidityOrderParams
 
 
+data PoolPartsParams
+  = PriceChangeParams
+      { coinAPriceChange :: (Nat, Nat)
+      , coinBPriceChange :: (Nat, Nat)
+      , numberOfParts    :: Nat
+      }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
+PlutusTx.makeIsDataIndexed ''PoolPartsParams [('PriceChangeParams, 0)]
+PlutusTx.makeLift ''PoolPartsParams
+
+
+
 data LiquidityPoolParams
   = LiquidityPoolParams
-      { coinA            :: AssetClass
-      , coinB            :: AssetClass
-      , amountA          :: Nat
-      , coinAPriceChange :: (Nat, Nat)
-      , coinBPriceChange :: (Nat, Nat)
-      , swapFee          :: (Nat, Nat)
-      , numberOfParts    :: Nat
-      , exchangeRate     :: (Nat,Nat)
+      { coinA           :: AssetClass
+      , coinB           :: AssetClass
+      , amountA         :: Nat
+      , poolPartsParams :: PoolPartsParams
+      , swapFee         :: (Nat, Nat)
+      , exchangeRate    :: (Nat,Nat)
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 

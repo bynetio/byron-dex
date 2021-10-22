@@ -23,36 +23,37 @@
 module Dex.OffChain
   where
 
-import           Control.Lens.Getter     (view)
-import           Control.Monad           hiding (fmap, mapM, mapM_)
-import           Data.Bifunctor          (bimap)
-import           Data.List               (foldl')
-import qualified Data.Map                as Map
-import           Data.Maybe              (catMaybes)
-import           Data.Proxy              (Proxy (..))
-import           Data.Text               (Text)
-import           Data.UUID               as UUID
-import           Data.Void               (Void)
-import           Dex.OnChain             (mkDexValidator)
+import           Control.Lens.Getter         (view)
+import           Control.Monad               hiding (fmap, mapM, mapM_)
+import           Data.Bifunctor              (bimap)
+import           Data.List                   (foldl')
+import qualified Data.Map                    as Map
+import           Data.Maybe                  (catMaybes)
+import           Data.Proxy                  (Proxy (..))
+import           Data.Text                   (Text)
+import           Data.UUID                   as UUID
+import           Data.Void                   (Void)
+import           Dex.LiquidityPool.PoolParts
+import           Dex.OnChain                 (mkDexValidator)
 import           Dex.Types
-import           Dex.WalletHistory       as WH
+import           Dex.WalletHistory           as WH
 import qualified GHC.Classes
-import           GHC.TypeLits            (symbolVal)
-import           Ledger                  hiding (fee, singleton)
-import           Ledger.Constraints      as Constraints
-import qualified Ledger.Typed.Scripts    as Scripts
-import           Ledger.Value            (AssetClass (..), assetClassValue,
-                                          assetClassValueOf, getValue)
+import           GHC.TypeLits                (symbolVal)
+import           Ledger                      hiding (fee, singleton)
+import           Ledger.Constraints          as Constraints
+import qualified Ledger.Typed.Scripts        as Scripts
+import           Ledger.Value                (AssetClass (..), assetClassValue,
+                                              assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
-import qualified PlutusTx.AssocMap       as AssocMap
-import           PlutusTx.Builtins.Class (stringToBuiltinByteString)
-import           PlutusTx.Prelude        hiding (Semigroup (..), round, sum,
-                                          unless, (*), (+), (-))
-import           Prelude                 (Double, Semigroup (..), ceiling,
-                                          fromIntegral, round, sum, (*), (+),
-                                          (-), (/))
+import qualified PlutusTx.AssocMap           as AssocMap
+import           PlutusTx.Builtins.Class     (stringToBuiltinByteString)
+import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum,
+                                              unless, (*), (+), (-))
+import           Prelude                     (Double, Semigroup (..), ceiling,
+                                              fromIntegral, round, sum, (*),
+                                              (/))
 import qualified Prelude
 import           System.Random
 import           System.Random.SplitMix
@@ -146,24 +147,18 @@ createLiquidityOrder smgen LiquidityOrderParams {..} = do
 
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
 createLiquidityPool smgen LiquidityPoolParams {..} = do
-  when (numberOfParts < 2) $ throwError "Number of parts must be at least 2"
+  NormalizedParts {..} <- case generateNormalizedParts poolPartsParams of
+    Right p   -> return p
+    Left  err -> throwError err
 
-  let coinAPriceChangeDouble = toDouble coinAPriceChange
-  let normalizedPartsA = [1 / (1 - (coinAPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [0..fromIntegral numberOfParts-1]]
-  let normalizedVirtualPartsA = [1 / (1 + (coinAPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [1..fromIntegral numberOfParts-1]]
-  let (coreA:partsA) = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedPartsA
+  let partsA@(coreA:_) = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedPartsA
   let virtualPartsA = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedVirtualPartsA
 
-  let coinBPriceChangeDouble = toDouble coinBPriceChange
-  let normalizedPartsB = [1 / (1 - (coinBPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [0..fromIntegral numberOfParts-1]]
-  let normalizedVirtualPartsB = [1 / (1 + (coinBPriceChangeDouble * x / (fromIntegral numberOfParts-1))) | x <- [1..fromIntegral numberOfParts-1]]
-  let (coreB:partsB) = map (* ((coreA / toDouble exchangeRate) / head normalizedPartsB)) normalizedPartsB
-  logInfo @Prelude.String (Prelude.show exchangeRate)
-
+  let partsB@(coreB:_) = map (* ((coreA / toDouble exchangeRate) / head normalizedPartsB)) normalizedPartsB
   let virtualPartsB = map (* ((coreA / toDouble exchangeRate) / head normalizedPartsB)) normalizedVirtualPartsB
 
-  let lpPartsA = map (bimap round round) ((coreA / 2, coreB / 2) : zip partsA virtualPartsB)
-  let lpPartsB = map (bimap round round) ((coreB / 2, coreA / 2) : zip partsB virtualPartsA)
+  let lpPartsA = zipWith (curry $ bimap round round) partsA (coreB:virtualPartsB)
+  let lpPartsB = zipWith (curry $ bimap round round) partsB (coreA:virtualPartsA)
 
   ownerHash <- pubKeyHash <$> ownPubKey
   let (smgenA, smgenB) = splitSMGen smgen
