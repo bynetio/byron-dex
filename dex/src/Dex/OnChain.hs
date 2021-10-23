@@ -26,6 +26,9 @@ findOwnInput' :: ScriptContext -> TxInInfo
 findOwnInput' ctx = fromMaybe (error ()) (findOwnInput ctx)
 
 {-# INLINEABLE mkDexValidator #-}
+-- removing all validation and returning True removes all mkDexValidator memory usage
+-- see: mem-no-validation.svg
+-- mkDexValidator _ _ _ = True
 mkDexValidator ::
   DexDatum ->
   DexAction ->

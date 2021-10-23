@@ -198,8 +198,14 @@ perform :: Contract DexState DexSchema Text ()
 perform = do
   pkh <- ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  -- this cuts memory usage in the mkDexValidator
+  -- see: mem-perform1.svg
+  -- utxos <- (: []) . head . Map.toList <$> utxosAt address
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
+  -- this cuts memory usage in the mkDexValidator
+  -- see: mem-perform2.svg (which is similar to mem-perform1.svg)
+  --let filtered = (: []) . head $ [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let filtered = [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
