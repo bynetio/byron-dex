@@ -20,7 +20,7 @@
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-strictness #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 module Dex.Types
   where
 
@@ -32,9 +32,11 @@ import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, BuiltinByteString, Eq,
-                                      Integer, MultiplicativeMonoid, MultiplicativeSemigroup, Ord, return,
-                                      ($), (&&), (<), (==))
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
+                                      AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid,
+                                      MultiplicativeSemigroup, Ord, return, ($),
+                                      (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 

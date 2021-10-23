@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-strictness #-}
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 
 module Dex.OnChain
   ( mkDexValidator
