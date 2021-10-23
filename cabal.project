@@ -1,8 +1,6 @@
 index-state: 2021-08-14T00:00:00Z
 
-packages: uniswap
-        , uniswap-json-api
-        , dex
+packages: dex
         , middleware
 
 -- You never, ever, want this.
