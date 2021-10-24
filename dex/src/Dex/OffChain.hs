@@ -45,36 +45,32 @@ import           Ledger                      hiding (fee, singleton)
 import           Ledger.Constraints          (TxConstraints (..))
 import qualified Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
-import           Ledger.Value                (AssetClass (..), assetClassValue,
-                                              assetClassValueOf, getValue)
+import           Ledger.Value                (AssetClass (..), assetClassValue, assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
 import qualified PlutusTx.AssocMap           as AssocMap
 import           PlutusTx.Builtins.Class     (stringToBuiltinByteString)
-import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum,
-                                              unless, (*), (+), (-))
-import           Prelude                     (Double, Semigroup (..), ceiling,
-                                              fromIntegral, round, sum, (*),
+import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum, unless, (*), (+), (-))
+import           Prelude                     (Double, Semigroup (..), ceiling, fromIntegral, round, sum, (*),
                                               (/))
 import qualified Prelude
 import           System.Random
 import           System.Random.SplitMix
-data Dex
 
 
 type DexState = History (Either Text DexContractState)
 
+data Dex
 instance Scripts.ValidatorTypes Dex where
   type RedeemerType Dex = DexAction
   type DatumType Dex = DexDatum
 
-
 dexInstance :: Scripts.TypedValidator Dex
 dexInstance =
   Scripts.mkTypedValidator @Dex
-    $$(PlutusTx.compile [||mkDexValidator||])
-    $$(PlutusTx.compile [||wrap||])
+    $$(PlutusTx.compile [|| mkDexValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @DexDatum @DexAction
 

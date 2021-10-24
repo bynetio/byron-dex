@@ -63,7 +63,7 @@ scriptsConfig3 = ScriptsConfig "./" (Transactions (C.Testnet $ C.NetworkMagic 0)
 
 main :: IO ()
 main = do
-  r <- writeScriptsTo scriptsConfig1 "liquidity-order" dexTrace emulatorCfg
+  r <- writeScriptsTo scriptsConfig1 "sell-order" dexTrace emulatorCfg
   print r
   return ()
 
@@ -85,7 +85,7 @@ dexTrace = do
   void $ callEndpoint @"createSellOrder" h2 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
   void $ waitNSlots 2
 
-  void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  void $ callEndpoint @"perform" h2 (Request "c" 5 ())
   void $ waitNSlots 2
   -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
   -- void $ waitNSlots 10

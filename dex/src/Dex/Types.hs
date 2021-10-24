@@ -11,7 +11,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
-{-# LANGUAGE StrictData                 #-}
+-- {-# LANGUAGE StrictData                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -32,11 +32,9 @@ import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, BuiltinByteString, Eq,
-                                      Integer, MultiplicativeMonoid,
-                                      MultiplicativeSemigroup, Ord, return, ($),
-                                      (&&), (<), (==))
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid, MultiplicativeSemigroup, Ord, return,
+                                      ($), (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 
@@ -96,14 +94,14 @@ PlutusTx.makeLift ''DexAction
 
 data SellOrderParams
   = SellOrderParams
-      { lockedCoin     :: AssetClass
-      , expectedCoin   :: AssetClass
-      , lockedAmount   :: Nat
-      , expectedAmount :: Nat
+      { lockedCoin     :: !AssetClass
+      , expectedCoin   :: !AssetClass
+      , lockedAmount   :: !Nat
+      , expectedAmount :: !Nat
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''SellOrderParams [('SellOrderParams,0)]
+PlutusTx.unstableMakeIsData ''SellOrderParams
 PlutusTx.makeLift ''SellOrderParams
 
 data LiquidityOrderParams
@@ -116,7 +114,7 @@ data LiquidityOrderParams
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''LiquidityOrderParams [('LiquidityOrderParams,0)]
+PlutusTx.unstableMakeIsData ''LiquidityOrderParams
 PlutusTx.makeLift ''LiquidityOrderParams
 
 
@@ -127,7 +125,7 @@ data PoolPartsParams
       , numberOfParts    :: Nat
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
-PlutusTx.makeIsDataIndexed ''PoolPartsParams [('PriceChangeParams, 0)]
+PlutusTx.unstableMakeIsData ''PoolPartsParams
 PlutusTx.makeLift ''PoolPartsParams
 
 
@@ -142,7 +140,7 @@ data LiquidityPoolParams
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''LiquidityPoolParams [('LiquidityPoolParams, 0)]
+PlutusTx.unstableMakeIsData ''LiquidityPoolParams
 PlutusTx.makeLift ''LiquidityPoolParams
 
 data SellOrderInfo
@@ -202,7 +200,7 @@ reversedLiquidityOrder liquidity LiquidityOrderInfo {..} =
   , orderId = orderId
   }
 
-PlutusTx.makeIsDataIndexed ''LiquidityOrderInfo [('LiquidityOrderInfo,0)]
+PlutusTx.unstableMakeIsData ''LiquidityOrderInfo
 PlutusTx.makeLift ''LiquidityOrderInfo
 
 
