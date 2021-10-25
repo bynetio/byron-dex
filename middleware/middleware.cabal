@@ -4,6 +4,16 @@ version:            0.1.0.0
 author:             BinarApps
 maintainer:         BinarApps
 
+library
+    hs-source-dirs:   src
+    exposed-modules:  Middleware.Config
+    build-depends:    base
+                    , conferer
+                    , conferer-warp
+                    , conferer-dhall
+                    , text
+                    , warp
+
 executable middleware-manual
     main-is:          Main.hs
     build-depends:    base ^>=4.14.1.0
