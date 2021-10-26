@@ -45,14 +45,17 @@ import           Ledger                      hiding (fee, singleton)
 import           Ledger.Constraints          (TxConstraints (..))
 import qualified Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
-import           Ledger.Value                (AssetClass (..), assetClassValue, assetClassValueOf, getValue)
+import           Ledger.Value                (AssetClass (..),
+                                              assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
 import qualified PlutusTx
 import qualified PlutusTx.AssocMap           as AssocMap
 import           PlutusTx.Builtins.Class     (stringToBuiltinByteString)
-import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum, unless, (*), (+), (-))
-import           Prelude                     (Double, Semigroup (..), ceiling, fromIntegral, round, sum, (*),
+import           PlutusTx.Prelude            hiding (Semigroup (..), round, sum,
+                                              unless, (*), (+), (-))
+import           Prelude                     (Double, Semigroup (..), ceiling,
+                                              fromIntegral, round, sum, (*),
                                               (/))
 import qualified Prelude
 import           System.Random
@@ -101,11 +104,8 @@ getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..})
       fee = fromIntegral expectedAmount Prelude.* fromIntegral numerator Prelude./ fromIntegral denominator
       integerFee = ceiling @Double @Integer fee
   in Constraints.mustPayToTheScript
-    (Payout PayoutInfo {..})
-    (assetClassValue expectedCoin integerFee)
-  <> Constraints.mustPayToTheScript
     (Order (LiquidityOrder (reversedLiquidityOrder (assetClassValueOf (view ciTxOutValue txOut) lockedCoin) lo)))
-    (singleton expectedCoin expectedAmount)
+    (singleton expectedCoin (expectedAmount Prelude.+ Nat integerFee))
   <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
 uuidToBBS :: UUID.UUID -> BuiltinByteString
@@ -146,7 +146,7 @@ createLiquidityOrder smgen LiquidityOrderParams {..} = do
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
 createLiquidityPool smgen LiquidityPoolParams {..} = do
   NormalizedParts {..} <- case generateNormalizedParts poolPartsParams of
-    Right p   -> return p
+    Right p   -> logInfo @Prelude.String (Prelude.show p) >> return p
     Left  err -> throwError err
 
   let partsA@(coreA:_) = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedPartsA
@@ -157,7 +157,6 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
 
   let lpPartsA = zipWith (curry $ bimap round round) partsA (coreB:virtualPartsB)
   let lpPartsB = zipWith (curry $ bimap round round) partsB (coreA:virtualPartsA)
-
   ownerHash <- ownPubKeyHash
   let (smgenA, smgenB) = splitSMGen smgen
 

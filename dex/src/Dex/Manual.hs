@@ -16,7 +16,9 @@ import           Dex.Trace                     (customTraceConfig)
 import           Dex.Types
 import           Ledger.Index                  (ValidatorMode (..))
 import           Plutus.Trace.Emulator         as Emulator
-import           Plutus.Trace.Emulator.Extract (Command (..), ScriptsConfig (..), writeScriptsTo)
+import           Plutus.Trace.Emulator.Extract (Command (..),
+                                                ScriptsConfig (..),
+                                                writeScriptsTo)
 import qualified Plutus.V1.Ledger.Ada          as Ada
 import qualified Plutus.V1.Ledger.Value        as Value
 import           Wallet.Emulator.Wallet        as Wallet
@@ -79,15 +81,15 @@ dexTrace = do
   h2 <- activateContractWallet (knownWallet 2) dexEndpoints
   void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (PriceChangeParams (5,100) (10,100) 5) (3,100) (1,2)))
   void $ waitNSlots 10
-  void $ callEndpoint @"createSellOrder" h1 (Request "b" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))
-  void $ waitNSlots 10
-  void $ callEndpoint @"createSellOrder" h1 (Request "c" 2 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
-  void $ waitNSlots 10
-  void $ callEndpoint @"createSellOrder" h2 (Request "d" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
-  void $ waitNSlots 10
-
-  -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  -- void $ callEndpoint @"createSellOrder" h1 (Request "b" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))
   -- void $ waitNSlots 10
+  -- void $ callEndpoint @"createSellOrder" h1 (Request "c" 2 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
+  -- void $ waitNSlots 10
+  -- void $ callEndpoint @"createSellOrder" h2 (Request "d" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
+  -- void $ waitNSlots 10
+
+  void $ callEndpoint @"perform" h2 (Request "c" 4 ())
+  void $ waitNSlots 10
   -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())
   -- void $ waitNSlots 10
   -- void $ callEndpoint @"perform" h2 (Request "c" 4 ())

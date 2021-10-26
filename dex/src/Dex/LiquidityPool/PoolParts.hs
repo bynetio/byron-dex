@@ -26,7 +26,7 @@ data NormalizedParts
       , normalizedVirtualPartsA :: [Double]
       , normalizedPartsB        :: [Double]
       , normalizedVirtualPartsB :: [Double]
-      }
+      } deriving (Show)
 
 
 generateNormalizedParts :: PoolPartsParams -> Either Text NormalizedParts
@@ -35,21 +35,21 @@ generateNormalizedParts PriceChangeParams {..} = do
 
     let coinAPriceChangeDouble = toDouble coinAPriceChange
     let (normalizedCoreA : normalizedPartsA) =
-          [ 1 / (1 - (coinAPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
+          [ 1 / (1 + (coinAPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
           | x <- [0..fromIntegral numberOfParts- 1 ]
           ]
     let normalizedVirtualPartsA =
-          [ 1 / (1 + (coinAPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
+          [ 1 / (1 - (coinAPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
           | x <- [1..fromIntegral numberOfParts - 1]
           ]
 
     let coinBPriceChangeDouble = toDouble coinBPriceChange
     let (normalizedCoreB : normalizedPartsB) =
-          [ 1 / (1 - (coinBPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
+          [ 1 / (1 + (coinBPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
           | x <- [0..fromIntegral numberOfParts - 1]
           ]
     let normalizedVirtualPartsB =
-          [ 1 / (1 + (coinBPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
+          [ 1 / (1 - (coinBPriceChangeDouble * x / (fromIntegral numberOfParts - 1)))
           | x <- [1..fromIntegral numberOfParts - 1]
           ]
 
