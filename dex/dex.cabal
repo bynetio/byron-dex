@@ -89,3 +89,27 @@ executable profiling
                , bytestring
                , data-default
                , openapi3
+
+executable dex-examples
+  main-is: Main.hs
+  hs-source-dirs: examples
+  ghc-options:
+    -threaded -Werror -Wall
+  build-depends: base >= 4.9 && < 5
+               , plutus-contract -any
+               , plutus-pab -any
+               , dex -any
+               , aeson -any
+               , freer-simple -any
+               , prettyprinter -any
+               , filemanip -any
+               , freer-extras -any
+               , plutus-ledger -any
+               , aeson -any
+               , containers -any
+               , text -any
+               , plutus-use-cases -any
+               , plutus-ledger-api -any
+               , bytestring
+               , data-default
+               , openapi3

@@ -61,7 +61,6 @@ import qualified Prelude
 import           System.Random
 import           System.Random.SplitMix
 
-
 type DexState = History (Either Text DexContractState)
 
 data Dex
@@ -77,7 +76,6 @@ dexInstance =
   where
     wrap = Scripts.wrapValidator @DexDatum @DexAction
 
-
 type DexSchema =
   Endpoint "createSellOrder" (Request SellOrderParams)
   .\/ Endpoint "createLiquidityOrder" (Request LiquidityOrderParams)
@@ -89,8 +87,6 @@ type DexSchema =
   .\/ Endpoint "orders" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
-
-
 
 getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints DexAction DexDatum
 getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
@@ -210,14 +206,12 @@ perform = do
         ) mempty filtered
   void $ submitTxConstraintsWith lookups tx
 
-
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- ownPubKeyHash
   os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
-
 
 orders :: Contract DexState DexSchema Text [OrderInfo]
 orders = do
@@ -291,7 +285,6 @@ collectFunds = do
       Order _           -> return Nothing
       Payout payoutInfo -> return $ Just (txOutRef, payoutInfo)
 
-
 getDexDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
 getDexDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
         (Datum e) <- either getDatum pure _ciTxOutDatum
@@ -320,8 +313,6 @@ getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
       \case Nothing -> throwError "datum not found"
             Just d  -> pure d
 getOrderDatum _ = throwError "no datum for a txout of a public key address"
-
-
 
 dexEndpoints :: Contract DexState DexSchema Void ()
 dexEndpoints =
