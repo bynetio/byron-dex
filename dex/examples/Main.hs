@@ -47,11 +47,6 @@ data UseCase = UseCase { description :: String
                        , trace       :: EmulatorTrace ()
                        }
 
-runUseCase :: UseCase -> IO ()
-runUseCase useCase = do
-  putStrLn (description useCase)
-  runEmulatorTraceIO' customTraceConfig emulatorCfg $ trace useCase
-
 simpleSwapCase :: UseCase
 simpleSwapCase = UseCase "Swap offers: W1 200ff -> 600ee, W2 650ee -> 200ff" $ do
   h1 <- activateContractWallet (knownWallet 1) dexEndpoints
@@ -70,15 +65,31 @@ simpleSwapCase = UseCase "Swap offers: W1 200ff -> 600ee, W2 650ee -> 200ff" $ d
   void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
   void $ waitNSlots 2
 
-  -- void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
-  -- void $ waitNSlots 2
-  -- void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
-  -- void $ waitNSlots 2
+simpleLiquidityOrderSwapCase :: UseCase
+simpleLiquidityOrderSwapCase = UseCase "Liquidity Orders: W1 200ff -> 400ee (1,100), Swap offers: W2 650ee -> 200ff" $ do
+  h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+  h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+
+  void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+  void $ waitNSlots 2
+  void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
+  void $ waitNSlots 2
+
+  void $ callEndpoint @"perform" h1 (Request "c" 3 ())
+  void $ waitNSlots 2
+
+  void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+  void $ waitNSlots 2
 
 useCases :: [UseCase]
 useCases = [ simpleSwapCase
-             -- more use cases go here
+           , simpleLiquidityOrderSwapCase
            ]
+
+runUseCase :: UseCase -> IO ()
+runUseCase useCase = do
+  putStrLn (description useCase)
+  runEmulatorTraceIO' customTraceConfig emulatorCfg $ trace useCase
 
 main :: IO ()
 main = mapM_ runUseCase useCases
