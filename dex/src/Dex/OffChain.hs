@@ -43,7 +43,7 @@ import           Ledger                      hiding (fee, singleton)
 import           Ledger.Constraints          (TxConstraints (..))
 import qualified Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
-import           Ledger.Value                (AssetClass (..), assetClassValue,
+import           Ledger.Value                (AssetClass (..),
                                               assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
@@ -103,11 +103,8 @@ getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..})
       fee = fromIntegral expectedAmount Prelude.* fromIntegral numerator Prelude./ fromIntegral denominator
       integerFee = ceiling @Double @Integer fee
   in Constraints.mustPayToTheScript
-    (Payout PayoutInfo {..})
-    (assetClassValue expectedCoin integerFee)
-  <> Constraints.mustPayToTheScript
     (Order (LiquidityOrder (reversedLiquidityOrder (assetClassValueOf (view ciTxOutValue txOut) lockedCoin) lo)))
-    (singleton expectedCoin expectedAmount)
+    (singleton expectedCoin (expectedAmount Prelude.+ Nat integerFee))
   <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
 uuidToBBS :: UUID.UUID -> BuiltinByteString

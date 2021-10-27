@@ -45,32 +45,20 @@ mkDexValidator (Order (SellOrder SellOrderInfo {..})) Swap ctx =
       ]
 
 mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..})) Swap ctx =
-  traceIfFalse "correct payout utxo not found" (isJust payoutOutput) &&
   traceIfFalse "correct reversed liquidity order utxo not found" (isJust liquidityOrderOutput)
   where
     (numerator, denominator) = swapFee
     txInfo = scriptContextTxInfo ctx
     txOutputs = txInfoOutputs txInfo
-    payoutOutput = listToMaybe
-      [ (txOut, PayoutInfo {..})
-      | txOut <- txOutputs
-      , Just (Payout (PayoutInfo ownerHash' orderId')) <- return $ do
-              datumHash' <- txOutDatumHash txOut
-              (Datum datum) <- findDatum datumHash' txInfo
-              PlutusTx.fromBuiltinData datum
-      , ownerHash == ownerHash'
-      , orderId == orderId'
-      , assetClassValueOf (txOutValue txOut) expectedCoin * fromNat denominator >= fromNat (expectedAmount * numerator)
-      ]
     liquidityOrderOutput = listToMaybe
-      [ (txOut, PayoutInfo {..})
+      [ txOut
       | txOut <- txOutputs
       , Just (Order (LiquidityOrder liquidityOrderInfo')) <- return $ do
               datumHash' <- txOutDatumHash txOut
               (Datum datum) <- findDatum datumHash' txInfo
               PlutusTx.fromBuiltinData datum
       , liquidityOrderInfo == reversedLiquidityOrder (fromNat expectedAmount) liquidityOrderInfo'
-      , assetClassValueOf (txOutValue txOut) expectedCoin >= fromNat expectedAmount
+      , assetClassValueOf (txOutValue txOut) expectedCoin * fromNat denominator >= fromNat (expectedAmount * (denominator + numerator))
       ]
 
 mkDexValidator (Order o) CancelOrder ctx =
