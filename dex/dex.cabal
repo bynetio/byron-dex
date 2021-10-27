@@ -94,7 +94,8 @@ executable dex-examples
   main-is: Main.hs
   hs-source-dirs: examples
   ghc-options:
-    -threaded -Werror -Wall
+    -fplugin-opt PlutusTx.Plugin:profile-all -threaded -Werror -Wall
+
   build-depends: base >= 4.9 && < 5
                , plutus-contract -any
                , plutus-pab -any
@@ -108,8 +109,8 @@ executable dex-examples
                , aeson -any
                , containers -any
                , text -any
-               , plutus-use-cases -any
                , plutus-ledger-api -any
+               , cardano-api -any
                , bytestring
                , data-default
                , openapi3

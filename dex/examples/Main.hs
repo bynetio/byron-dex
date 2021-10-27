@@ -1,122 +1,78 @@
 {-# LANGUAGE DataKinds          #-}
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts   #-}
-{-# LANGUAGE LambdaCase         #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE OverloadedStrings  #-}
-{-# LANGUAGE RankNTypes         #-}
 {-# LANGUAGE TypeApplications   #-}
-{-# LANGUAGE TypeFamilies       #-}
-{-# LANGUAGE ViewPatterns       #-}
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 
-module Main (main) where
+module Main where
 
-import           Control.Monad                       (forM, void)
-import           Control.Monad.Freer                 (interpret)
-import           Data.Aeson                          (FromJSON (..),
-                                                      ToJSON (..), Value)
-import           Data.Aeson.Types                    (parseMaybe)
-import           Data.Default                        (Default (def))
-import qualified Data.Map                            as Map
-import           Data.OpenApi.Internal.Schema        (ToSchema)
-import qualified Data.Semigroup                      as Semigroup
-import           Data.Text                           (Text)
-import           Data.Text.Prettyprint.Doc           (Pretty (..), viaShow)
-import qualified Dex.OffChain                        as Dex
-import qualified Dex.Trace                           as Trace
-import           Dex.Types                           (DexContractState)
-import qualified Dex.Types                           as Dex
-import qualified Dex.WalletHistory                   as WH
-import           GHC.Generics                        (Generic)
-import           Plutus.Contract                     (Empty)
-import qualified Plutus.Contracts.Currency           as Currency
-import           Plutus.PAB.Effects.Contract.Builtin (Builtin, SomeBuiltin (..))
-import qualified Plutus.PAB.Effects.Contract.Builtin as Builtin
-import           Plutus.PAB.Simulator                (Simulation,
-                                                      SimulatorEffectHandlers,
-                                                      logString)
-import qualified Plutus.PAB.Simulator                as Simulator
-import qualified Plutus.V1.Ledger.Value              as Value
-import           Wallet.Emulator.Types               (knownWallet)
-import           Wallet.Types                        (ContractInstanceId)
+import           Data.Default
+import           Data.Functor           (void)
+import qualified Data.Map               as Map
+import           Dex.OffChain
+import           Dex.Trace              (customTraceConfig)
+import           Dex.Types
+import           Plutus.Trace.Emulator  as Emulator
+import qualified Plutus.V1.Ledger.Ada   as Ada
+import qualified Plutus.V1.Ledger.Value as Value
+import           Wallet.Emulator.Wallet as Wallet
 
-type ContractHistory = WH.History (Either Text Dex.DexContractState)
+customSymbol :: [Char]
+customSymbol = "ff"
 
-data DexContracts = DexContract | DexInit deriving (Eq, Generic, Ord, Show)
-  deriving anyclass (FromJSON, ToJSON, ToSchema)
+customToken :: [Char]
+customToken = "PLN"
 
-instance Pretty DexContracts where
-  pretty = viaShow
+customSymbolsAndTokens :: [(Value.CurrencySymbol, Value.TokenName)]
+customSymbolsAndTokens = [("ff", "coin1"), ("ee", "coin2"), ("dd", "coin3"), ("cc", "coin4"), ("bb", "coin5")]
 
-instance Builtin.HasDefinitions DexContracts where
-  getDefinitions = [DexContract]
-  getSchema = \case
-    DexContract -> Builtin.endpointsToSchemas @Dex.DexSchema
-    DexInit     -> Builtin.endpointsToSchemas @Empty
-  getContract = \case
-    DexContract -> SomeBuiltin Dex.dexEndpoints
-    DexInit     -> SomeBuiltin Trace.setupTokens
+customSymbol2 :: [Char]
+customSymbol2 = "ee"
 
-handlers :: SimulatorEffectHandlers (Builtin DexContracts)
-handlers = Simulator.mkSimulatorHandlers def def $
-  interpret (Builtin.contractHandler (Builtin.handleBuiltin @DexContracts))
+customToken2 :: [Char]
+customToken2 = "BTC"
+
+customSymbol3 :: [Char]
+customSymbol3 = "dd"
+
+customToken3 :: [Char]
+customToken3 = "ETH"
+
+emulatorCfg :: EmulatorConfig
+emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])) def def
+  where
+    v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
+
+runTrace :: EmulatorTrace () -> IO ()
+runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg
+
+simpleSwapTrace :: EmulatorTrace ()
+simpleSwapTrace = do
+  h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+  h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+
+  void $ callEndpoint @"createSellOrder" h1 (Request "a" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
+  void $ waitNSlots 2
+  void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
+  void $ waitNSlots 2
+
+  void $ callEndpoint @"perform" h1 (Request "c" 3 ())
+  void $ waitNSlots 2
+
+  void $ callEndpoint @"collectFunds" h1 (Request "d" 4 ())
+  void $ waitNSlots 2
+  void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+  void $ waitNSlots 2
+
+  -- void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+  -- void $ waitNSlots 2
+  -- void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+  -- void $ waitNSlots 2
+
+dexTrace :: EmulatorTrace ()
+dexTrace = do
+  simpleSwapTrace
+  -- more traces go here
 
 main :: IO ()
-main = void $
-  Simulator.runSimulationWith handlers $ do
-    cidInit <- Simulator.activateContract (knownWallet 1) DexInit
-    cs <- getState (Currency.currencySymbol . Semigroup.getLast) cidInit
-
-    void $ Simulator.waitUntilFinished cidInit
-
-    logString @(Builtin DexContracts) $ "Initialization finished. Minted: " ++ show cs
-
-    void $ fmap Map.fromList $
-      forM Trace.wallets $ \w -> do
-        cid <- Simulator.activateContract w DexContract
-        logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
-        Simulator.waitForEndpoint cid "funds"
-        void $ Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
-        v <- getState (contractState "FundsId") cid
-        logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
-        return (w, cid)
-
-    let coins = fmap (Value.assetClass cs) Trace.tokenNames
-    let w1 = head Trace.wallets
-    let w2 = Trace.wallets !! 1
-    let a  = head coins
-    let b  = coins !! 1
-
-    logString @(Builtin DexContracts) $ ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SWAPS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-    logString @(Builtin DexContracts) $ "Use case Nº1: Simple swap"
-    w1cid <- Simulator.activateContract w1 DexContract
-    w2cid <- Simulator.activateContract w2 DexContract
-
-    launchEndpoint w1cid "createSellOrder" (Dex.Request "firstOrder"   1 $ Dex.SellOrderParams a b 100 100) $ "* 100A <-> 100B sell order from wallet " ++ show w1
-    launchEndpoint w2cid "createSellOrder" (Dex.Request "secondOrder"  2 $ Dex.SellOrderParams b a 100 100) $ "* 100B <-> 100A sell order from wallet " ++ show w2
-    launchEndpoint w1cid "perform"         (Dex.Request "perform"      3 ())                                  "* perform"
-    launchEndpoint w1cid "collectFunds"    (Dex.Request "collectFunds" 3 ())                                  "* collect funds"
-    launchEndpoint w1cid "funds"           (Dex.Request "funds"        4 ())                                $ "* funds of " ++ show w1
-    launchEndpoint w2cid "funds"           (Dex.Request "funds"        5 ())                                $ "* funds of " ++ show w2
-
-    logString @(Builtin DexContracts) $ ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DONE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
-
-  where
-    launchEndpoint cid endpointName endpointParams description = do
-      logString @(Builtin DexContracts) description
-      Simulator.waitForEndpoint cid endpointName
-      void $ Simulator.callEndpointOnInstance cid endpointName endpointParams
-      let paramsId = Dex.historyId endpointParams
-      result <- getState (contractState paramsId) cid
-      logString @(Builtin DexContracts) $ "  result: " ++ show result
-
-    fromJSONValue :: FromJSON a => Value -> Maybe a
-    fromJSONValue = parseMaybe parseJSON
-
-    getState :: (FromJSON a) => (a -> b) -> ContractInstanceId -> Simulation t b
-    getState f = Simulator.waitForState (fmap f . fromJSONValue)
-
-    contractState :: Text -> ContractHistory -> Maybe DexContractState
-    contractState historyId (WH.lookup historyId -> Just (Right v)) = Just v
-    contractState _ _                                               = Nothing
+main = runTrace dexTrace
