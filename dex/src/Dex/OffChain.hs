@@ -43,7 +43,7 @@ import           Ledger                      hiding (fee, singleton)
 import           Ledger.Constraints          (TxConstraints (..))
 import qualified Ledger.Constraints          as Constraints
 import qualified Ledger.Typed.Scripts        as Scripts
-import           Ledger.Value                (AssetClass (..), assetClassValue,
+import           Ledger.Value                (AssetClass (..),
                                               assetClassValueOf, getValue)
 import           Playground.Contract
 import           Plutus.Contract
