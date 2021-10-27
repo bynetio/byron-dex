@@ -43,15 +43,21 @@ emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1
   where
     v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
-runTrace :: EmulatorTrace () -> IO ()
-runTrace = runEmulatorTraceIO' customTraceConfig emulatorCfg
+data UseCase = UseCase { description :: String
+                       , trace       :: EmulatorTrace ()
+                       }
 
-simpleSwapTrace :: EmulatorTrace ()
-simpleSwapTrace = do
+runUseCase :: UseCase -> IO ()
+runUseCase useCase = do
+  putStrLn (description useCase)
+  runEmulatorTraceIO' customTraceConfig emulatorCfg $ trace useCase
+
+simpleSwapCase :: UseCase
+simpleSwapCase = UseCase "Swap offers: W1 200ff -> 600ee, W2 650ee -> 200ff" $ do
   h1 <- activateContractWallet (knownWallet 1) dexEndpoints
   h2 <- activateContractWallet (knownWallet 2) dexEndpoints
 
-  void $ callEndpoint @"createSellOrder" h1 (Request "a" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
+  void $ callEndpoint @"createSellOrder" h1 (Request "a" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 600))
   void $ waitNSlots 2
   void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
   void $ waitNSlots 2
@@ -69,10 +75,10 @@ simpleSwapTrace = do
   -- void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
   -- void $ waitNSlots 2
 
-dexTrace :: EmulatorTrace ()
-dexTrace = do
-  simpleSwapTrace
-  -- more traces go here
+useCases :: [UseCase]
+useCases = [ simpleSwapCase
+             -- more use cases go here
+           ]
 
 main :: IO ()
-main = runTrace dexTrace
+main = mapM_ runUseCase useCases
