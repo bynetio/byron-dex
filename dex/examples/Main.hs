@@ -82,44 +82,35 @@ main = void $
         logString @(Builtin DexContracts) $ "initial funds in wallet " ++ show w ++ ": " ++ show v
         return (w, cid)
 
-    let w1 = Trace.wallets !! 0
-    let w2 = Trace.wallets !! 1
     let coins = fmap (Value.assetClass cs) Trace.tokenNames
-    let a  = coins !! 0
+    let w1 = head Trace.wallets
+    let w2 = Trace.wallets !! 1
+    let a  = head coins
     let b  = coins !! 1
 
     logString @(Builtin DexContracts) $ ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> SWAPS <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
     logString @(Builtin DexContracts) $ "Use case Nº1: Simple swap"
     w1cid <- Simulator.activateContract w1 DexContract
     w2cid <- Simulator.activateContract w2 DexContract
-    Simulator.waitForEndpoint w1cid "createSellOrder"
-    Simulator.waitForEndpoint w2cid "createSellOrder"
 
-    logString @(Builtin DexContracts) $ "* 100A <-> 100B sell order from wallet " ++ show w1
-    void $ Simulator.callEndpointOnInstance w1cid "createSellOrder" (Dex.Request "firstOrder" 1 $ Dex.SellOrderParams a b 100 100)
-    v1 <- getState (contractState "firstOrder") w1cid
-    logString @(Builtin DexContracts) $ "  result: " ++ show v1
+    launchEndpoint w1cid "createSellOrder" (Dex.Request "firstOrder"   1 $ Dex.SellOrderParams a b 100 100) $ "* 100A <-> 100B sell order from wallet " ++ show w1
+    launchEndpoint w2cid "createSellOrder" (Dex.Request "secondOrder"  2 $ Dex.SellOrderParams b a 100 100) $ "* 100B <-> 100A sell order from wallet " ++ show w2
+    launchEndpoint w1cid "perform"         (Dex.Request "perform"      3 ())                                  "* perform"
+    launchEndpoint w1cid "collectFunds"    (Dex.Request "collectFunds" 3 ())                                  "* collect funds"
+    launchEndpoint w1cid "funds"           (Dex.Request "funds"        4 ())                                $ "* funds of " ++ show w1
+    launchEndpoint w2cid "funds"           (Dex.Request "funds"        5 ())                                $ "* funds of " ++ show w2
 
-    logString @(Builtin DexContracts) $ "* 100B <-> 100A sell order from wallet " ++ show w2
-    void $ Simulator.callEndpointOnInstance w2cid "createSellOrder" (Dex.Request "secondOrder" 2 $ Dex.SellOrderParams b a 100 100)
-    v2 <- getState (contractState "secondOrder") w2cid
-    logString @(Builtin DexContracts) $ "  result: " ++ show v2
+    logString @(Builtin DexContracts) $ ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> DONE <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
 
-    Simulator.waitForEndpoint w2cid "perform"
-    void $ Simulator.callEndpointOnInstance w2cid "perform" (Dex.Request "w2perform" 5 ())
-    p2 <- getState (contractState "w2perform") w2cid
-    logString @(Builtin DexContracts) $ "  perform by " ++ show w2 ++ ": " ++ show p2
-
-    logString @(Builtin DexContracts) $ "  funds:"
-    Simulator.waitForEndpoint w1cid "funds"
-    void $ Simulator.callEndpointOnInstance w1cid "funds" (Dex.Request "w1funds" 3 ())
-    f1 <- getState (contractState "w1funds") w1cid
-    logString @(Builtin DexContracts) $ "    " ++ show w1 ++ ": " ++ show f1
-    Simulator.waitForEndpoint w2cid "funds"
-    void $ Simulator.callEndpointOnInstance w2cid "funds" (Dex.Request "w2funds" 4 ())
-    f2 <- getState (contractState "w2funds") w2cid
-    logString @(Builtin DexContracts) $ "    " ++ show w2 ++ ": " ++ show f2
   where
+    launchEndpoint cid endpointName endpointParams description = do
+      logString @(Builtin DexContracts) description
+      Simulator.waitForEndpoint cid endpointName
+      void $ Simulator.callEndpointOnInstance cid endpointName endpointParams
+      let paramsId = Dex.historyId endpointParams
+      result <- getState (contractState paramsId) cid
+      logString @(Builtin DexContracts) $ "  result: " ++ show result
+
     fromJSONValue :: FromJSON a => Value -> Maybe a
     fromJSONValue = parseMaybe parseJSON
 
