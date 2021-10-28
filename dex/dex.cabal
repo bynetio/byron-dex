@@ -90,27 +90,31 @@ executable profiling
                , data-default
                , openapi3
 
-executable dex-examples
-  main-is: Main.hs
-  hs-source-dirs: examples
-  ghc-options:
-    -fplugin-opt PlutusTx.Plugin:profile-all -threaded -Werror -Wall
+test-suite dex-test
+  type:           exitcode-stdio-1.0
+  main-is:        Spec.hs
+  hs-source-dirs: test
+  other-modules:  Spec.UseCases
+  ghc-options:    -fplugin-opt PlutusTx.Plugin:profile-all -threaded -Werror -Wall
 
-  build-depends: base >= 4.9 && < 5
-               , plutus-contract -any
-               , plutus-pab -any
-               , dex -any
-               , aeson -any
-               , freer-simple -any
-               , prettyprinter -any
-               , filemanip -any
-               , freer-extras -any
-               , plutus-ledger -any
-               , aeson -any
-               , containers -any
-               , text -any
-               , plutus-ledger-api -any
-               , cardano-api -any
-               , bytestring
-               , data-default
-               , openapi3
+  build-depends:  base >= 4.9 && < 5
+                , aeson -any
+                , aeson -any
+                , bytestring
+                , cardano-api -any
+                , containers -any
+                , data-default
+                , dex -any
+                , filemanip -any
+                , freer-extras -any
+                , freer-simple -any
+                , openapi3
+                , plutus-contract -any
+                , plutus-ledger -any
+                , plutus-ledger-api -any
+                , plutus-pab -any
+                , prettyprinter -any
+                , tasty
+                , tasty-hunit
+                , tasty-quickcheck
+                , text -any
