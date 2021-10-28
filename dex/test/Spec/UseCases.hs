@@ -24,7 +24,7 @@ customSymbolsAndTokens :: [(Value.CurrencySymbol, Value.TokenName)]
 customSymbolsAndTokens = [("ff", "coin1"), ("ee", "coin2"), ("dd", "coin3"), ("cc", "coin4"), ("bb", "coin5")]
 
 emulatorCfg :: EmulatorConfig
-emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 4]])) def def
+emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 5]])) def def
   where
     v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
@@ -343,7 +343,7 @@ swapRaceW3Performs = testCase "Swap offers: W1 200ff -> 600ee, W2 600ee -> 200ff
     void $ callEndpoint @"collectFunds" h3 (Request "g" 7 ())
     void $ waitNSlots 2
 
--- wallet W1 sets liquidity of 200ff and 600ee
+-- wallet W1 sets liquidity of 200ff and 600ee with fee 1/100
 -- wallet W2 wants to exchange 606ee for 200ff
 -- W2 meets fitting offer from W1
 -- W3 is a performer
@@ -365,12 +365,12 @@ liquidityOrderSwap = testCase "Liquidity Orders: W1 200ff -> 600ee fee 1/100 | S
     void $ callEndpoint @"perform" h3 (Request "c" 3 ())
     void $ waitNSlots 2
 
-    void $ callEndpoint @"collectFunds" h1 (Request "e" 5 ())
+    void $ callEndpoint @"collectFunds" h1 (Request "d" 4 ())
     void $ waitNSlots 2
-    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
     void $ waitNSlots 2
 
--- wallet W1 sets liquidity of 200ff and 600ee
+-- wallet W1 sets liquidity of 200ff and 600ee with fee 1/100
 -- wallet W2 wants to exchange 606ee for 200ff
 -- W2 meets fitting offer from W1
 -- W1 is a performer
@@ -391,12 +391,12 @@ liquidityOrderSwapW1Performs = testCase "Liquidity Orders: W1 200ff -> 600ee fee
     void $ callEndpoint @"perform" h1 (Request "c" 3 ())
     void $ waitNSlots 2
 
-    void $ callEndpoint @"collectFunds" h1 (Request "e" 5 ())
+    void $ callEndpoint @"collectFunds" h1 (Request "d" 4 ())
     void $ waitNSlots 2
-    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
     void $ waitNSlots 2
 
--- wallet W1 sets liquidity of 200ff and 600ee
+-- wallet W1 sets liquidity of 200ff and 600ee with fee 1/100
 -- wallet W2 wants to exchange 606ee for 200ff
 -- W2 meets fitting offer from W1
 -- W2 is a performer
@@ -417,35 +417,24 @@ liquidityOrderSwapW2Performs = testCase "Liquidity Orders: W1 200ff -> 600ee fee
     void $ callEndpoint @"perform" h2 (Request "c" 3 ())
     void $ waitNSlots 2
 
-    void $ callEndpoint @"collectFunds" h1 (Request "e" 5 ())
+    void $ callEndpoint @"collectFunds" h1 (Request "d" 4 ())
     void $ waitNSlots 2
-    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
-    void $ waitNSlots 2
-
-simpleLiquidityOrderSwapRace :: TestTree
-simpleLiquidityOrderSwapRace = testCase "Liquidity Orders: W1 200ff -> 400ee 1/100 | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff" $ do
-  performTest $ do
-    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
-    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
-    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
-
-    void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
-    void $ waitNSlots 2
-    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
-    void $ waitNSlots 2
-    void $ callEndpoint @"createSellOrder" h3 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
-    void $ waitNSlots 2
-
-    void $ callEndpoint @"perform" h1 (Request "c" 3 ())
-    void $ waitNSlots 2
-
     void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
     void $ waitNSlots 2
-    void $ callEndpoint @"collectFunds" h3 (Request "e" 5 ())
-    void $ waitNSlots 2
 
-simpleLiquidityOrderSwapRaceWithSimpleSwap :: TestTree
-simpleLiquidityOrderSwapRaceWithSimpleSwap = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 650ee -> 200ff, W3 650ee -> 200ff, W4 200ff -> 650ee" $ do
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W4 is a performer
+-- W1 pays 200ff
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ff and gets 404ee
+-- script holds 404ee
+liquidityOrderSwapRace :: TestTree
+liquidityOrderSwapRace = testCase "Liquidity Orders: W1 200ff -> 400ee 1/100 | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff" $ do
   performTest $ do
     h1 <- activateContractWallet (knownWallet 1) dexEndpoints
     h2 <- activateContractWallet (knownWallet 2) dexEndpoints
@@ -454,14 +443,311 @@ simpleLiquidityOrderSwapRaceWithSimpleSwap = testCase "Liquidity Orders: W1 200f
 
     void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
     void $ waitNSlots 2
-    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
     void $ waitNSlots 2
-    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
     void $ waitNSlots 2
-    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 650))
+
+    void $ callEndpoint @"perform" h4 (Request "d" 4 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "f" 6 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W1 is a performer
+-- W1 pays 400ee and gets 404ff
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- script holds 404ee
+liquidityOrderSwapRaceW1Performs :: TestTree
+liquidityOrderSwapRaceW1Performs = testCase "Liquidity Orders: W1 200ff -> 400ee 1/100 | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h1 (Request "d" 4 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "f" 6 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 is a performer
+-- W1 pays 200ee
+-- W3 pays 404ee and gets 200ff
+-- script holds 404ee
+liquidityOrderSwapRaceW2Performs :: TestTree
+liquidityOrderSwapRaceW2Performs = testCase "Liquidity Orders: W1 200ff -> 400ee 1/100 | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h2 (Request "d" 4 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "f" 6 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W3 is a performer
+-- W1 pays 200ee
+-- W2 pays 404ee and gets 200ff
+-- script holds 404ee
+liquidityOrderSwapRaceW3Performs :: TestTree
+liquidityOrderSwapRaceW3Performs = testCase "Liquidity Orders: W1 200ff -> 400ee 1/100 | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h3 (Request "d" 4 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "e" 5 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "f" 6 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 200ff for 404ee
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 meets fitting offer from W4
+-- W3 meets fitting offer from W4
+-- W5 is a performer
+-- W1 pays 200ee
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ee and gets 404ff
+-- W5 pays 604ff and gets 604ee
+-- script holds 404ee
+liquidityOrderSwapRaceWithSimpleSwap :: TestTree
+liquidityOrderSwapRaceWithSimpleSwap = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff, W4 200ff -> 404ee" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+    h4 <- activateContractWallet (knownWallet 4) dexEndpoints
+    h5 <- activateContractWallet (knownWallet 5) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 404))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h5 (Request "e" 5 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "g" 7 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h4 (Request "h" 8 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 200ff for 404ee
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 meets fitting offer from W4
+-- W3 meets fitting offer from W4
+-- W1 is a performer
+-- W1 pays 804ee and gets 604ee
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ee and gets 404ff
+-- script holds 404ee
+liquidityOrderSwapRaceWithSimpleSwapW1Performs :: TestTree
+liquidityOrderSwapRaceWithSimpleSwapW1Performs = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff, W4 200ff -> 404ee" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+    h4 <- activateContractWallet (knownWallet 4) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 404))
     void $ waitNSlots 2
 
     void $ callEndpoint @"perform" h1 (Request "e" 5 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "g" 7 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h4 (Request "h" 8 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 200ff for 404ee
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 meets fitting offer from W4
+-- W3 meets fitting offer from W4
+-- W2 is a performer
+-- W1 pays 200ee
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ee and gets 404ff
+-- script holds 404ee
+liquidityOrderSwapRaceWithSimpleSwapW2Performs :: TestTree
+liquidityOrderSwapRaceWithSimpleSwapW2Performs = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff, W4 200ff -> 404ee" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+    h4 <- activateContractWallet (knownWallet 4) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 404))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h2 (Request "e" 5 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "g" 7 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h4 (Request "h" 8 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 200ff for 404ee
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 meets fitting offer from W4
+-- W3 meets fitting offer from W4
+-- W3 is a performer
+-- W1 pays 200ee
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ee and gets 404ff
+-- script holds 404ee
+liquidityOrderSwapRaceWithSimpleSwapW3Performs :: TestTree
+liquidityOrderSwapRaceWithSimpleSwapW3Performs = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff, W4 200ff -> 404ee" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+    h4 <- activateContractWallet (knownWallet 4) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 404))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h3 (Request "e" 5 ())
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h3 (Request "g" 7 ())
+    void $ waitNSlots 2
+    void $ callEndpoint @"collectFunds" h4 (Request "h" 8 ())
+    void $ waitNSlots 2
+
+-- wallet W1 sets liquidity of 200ff and 400ee with fee 1/100
+-- wallet W2 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 404ee for 200ff
+-- wallet W3 wants to exchange 200ff for 404ee
+-- W2 meets fitting offer from W1
+-- W3 meets fitting offer from W1
+-- W2 meets fitting offer from W4
+-- W3 meets fitting offer from W4
+-- W4 is a performer
+-- W1 pays 200ee
+-- W2 pays 404ee and gets 200ff
+-- W3 pays 404ee and gets 200ff
+-- W4 pays 200ff and gets 404ee
+-- script holds 404ee
+liquidityOrderSwapRaceWithSimpleSwapW4Performs :: TestTree
+liquidityOrderSwapRaceWithSimpleSwapW4Performs = testCase "Liquidity Orders: W1 200ff -> 400ee (1,100) | Swap offers: W2 404ee -> 200ff, W3 404ee -> 200ff, W4 200ff -> 404ee" $ do
+  performTest $ do
+    h1 <- activateContractWallet (knownWallet 1) dexEndpoints
+    h2 <- activateContractWallet (knownWallet 2) dexEndpoints
+    h3 <- activateContractWallet (knownWallet 3) dexEndpoints
+    h4 <- activateContractWallet (knownWallet 4) dexEndpoints
+
+    void $ callEndpoint @"createLiquidityOrder" h1 (Request "a" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h2 (Request "b" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h3 (Request "c" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 404 200))
+    void $ waitNSlots 2
+    void $ callEndpoint @"createSellOrder" h4 (Request "d" 4 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 200 404))
+    void $ waitNSlots 2
+
+    void $ callEndpoint @"perform" h4 (Request "e" 5 ())
     void $ waitNSlots 2
 
     void $ callEndpoint @"collectFunds" h2 (Request "f" 6 ())
@@ -491,9 +777,16 @@ tests = testGroup "Use cases" [ simpleSwap
                               , liquidityOrderSwapW1Performs
                               , liquidityOrderSwapW2Performs
 
-                              , simpleLiquidityOrderSwapRaceWithSimpleSwap
-                              , simpleLiquidityOrderSwapRace
+                              , liquidityOrderSwapRace
+                              , liquidityOrderSwapRaceW1Performs
+                              , liquidityOrderSwapRaceW2Performs
+                              , liquidityOrderSwapRaceW3Performs
 
+                              , liquidityOrderSwapRaceWithSimpleSwap
+                              , liquidityOrderSwapRaceWithSimpleSwapW1Performs
+                              , liquidityOrderSwapRaceWithSimpleSwapW2Performs
+                              , liquidityOrderSwapRaceWithSimpleSwapW3Performs
+                              , liquidityOrderSwapRaceWithSimpleSwapW4Performs
                               ]
 
 main :: IO ()
