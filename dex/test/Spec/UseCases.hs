@@ -6,25 +6,27 @@
 
 module Spec.UseCases (main, tests) where
 
+import           Control.Monad.Freer.Extras as Extras
 import           Data.Default
-import           Data.Functor           (void)
-import qualified Data.Map               as Map
-import           Plutus.Trace.Emulator  as Emulator
-import qualified Plutus.V1.Ledger.Ada   as Ada
-import qualified Plutus.V1.Ledger.Value as Value
-import           Wallet.Emulator.Wallet as Wallet
+import qualified Data.Map                   as Map
+import           Plutus.Trace.Emulator      as Emulator
+import qualified Plutus.V1.Ledger.Ada       as Ada
+import qualified Plutus.V1.Ledger.Value     as Value
 import           Test.Tasty
 import           Test.Tasty.HUnit
+import           Wallet.Emulator.Wallet     as Wallet
 
+import           Control.Monad
 import           Dex.OffChain
-import           Dex.Trace              (customTraceConfig)
+import           Dex.Trace                  (customTraceConfig)
 import           Dex.Types
+import qualified Dex.WalletHistory          as WH
 
 customSymbolsAndTokens :: [(Value.CurrencySymbol, Value.TokenName)]
 customSymbolsAndTokens = [("ff", "coin1"), ("ee", "coin2"), ("dd", "coin3"), ("cc", "coin4"), ("bb", "coin5")]
 
 emulatorCfg :: EmulatorConfig
-emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 5]])) def def
+emulatorCfg = EmulatorConfig (Left $ Map.fromList ([(knownWallet i, v) | i <- [1 .. 10]])) def def
   where
     v = Ada.lovelaceValueOf 100_000_000 <> mconcat (map (\(symbol,tokenName) -> Value.singleton symbol tokenName 100_000_000) customSymbolsAndTokens)
 
@@ -757,6 +759,60 @@ liquidityOrderSwapRaceWithSimpleSwapW4Performs = testCase "Liquidity Orders: W1 
     void $ callEndpoint @"collectFunds" h4 (Request "h" 8 ())
     void $ waitNSlots 2
 
+
+performerRaceWith3UTxOPerPerform :: TestTree
+performerRaceWith3UTxOPerPerform = testCase "" $ do
+  performTest $ do
+    swappers <- mapM (\i -> activateContractWallet (knownWallet i) dexEndpoints) [1..3]
+    liquidityProviders <- mapM (\i -> activateContractWallet (knownWallet i) dexEndpoints) [4..6]
+    performers <- mapM (\i -> activateContractWallet (knownWallet i) dexEndpoints) [7..9]
+    wFinal <- activateContractWallet (knownWallet 10) dexEndpoints
+    zipWithM_ (\w f -> f w) (join $ replicate 10 swappers) $ join $ repeat
+      [ \w -> do
+          void $ callEndpoint @"createSellOrder" w (Request "" 2 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 400 200))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createSellOrder" w (Request "" 2 (SellOrderParams (Value.AssetClass ("dd", "coin3")) (Value.AssetClass ("cc", "coin4")) 800 200))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createSellOrder" w (Request "" 2 (SellOrderParams (Value.AssetClass ("cc", "coin4")) (Value.AssetClass ("ee", "coin2")) 200 800))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createSellOrder" w (Request "" 2 (SellOrderParams (Value.AssetClass ("dd", "coin3")) (Value.AssetClass ("ee", "coin2")) 100 100))
+          void $ waitNSlots 2
+      ]
+    zipWithM_ (\w f -> f w) (join $ replicate 10 liquidityProviders) $ join $ repeat
+      [ \w -> do
+          void $ callEndpoint @"createLiquidityOrder" w (Request "" 2 (LiquidityOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 400 200 (1,100)))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createLiquidityOrder" w (Request "" 2 (LiquidityOrderParams (Value.AssetClass ("dd", "coin3")) (Value.AssetClass ("cc", "coin4")) 800 200 (2,100)))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createLiquidityOrder" w (Request "" 2 (LiquidityOrderParams (Value.AssetClass ("cc", "coin4")) (Value.AssetClass ("ee", "coin2")) 200 800 (3,100)))
+          void $ waitNSlots 2
+      , \w -> do
+          void $ callEndpoint @"createLiquidityOrder" w (Request "" 2 (LiquidityOrderParams (Value.AssetClass ("dd", "coin3")) (Value.AssetClass ("ee", "coin2")) 100 100 (5,100)))
+          void $ waitNSlots 2
+      ]
+    void $ waitNSlots 1000
+    sequence_ $ zipWith3 (\w i f -> f i w) (join $ replicate 10 performers) [1..] $ repeat $
+      \i w -> do
+        void $ callEndpoint @"performNRandom" w (Request "" i 3)
+        void $ waitNSlots 1
+
+    void $ waitNSlots 2
+    void $ callEndpoint @"allOrders" wFinal (Request "orders" 2 ())
+    void $ waitNSlots 2
+    maybePool <- WH.lookup "orders" <$> observableState wFinal
+    case maybePool of
+      Just (Right (AllOrders orders)) -> logInfo $ show $ length orders
+      _                               -> return ()
+
+
+    return ()
+
+
 tests :: TestTree
 tests = testGroup "Use cases" [ simpleSwap
 
@@ -787,6 +843,8 @@ tests = testGroup "Use cases" [ simpleSwap
                               , liquidityOrderSwapRaceWithSimpleSwapW2Performs
                               , liquidityOrderSwapRaceWithSimpleSwapW3Performs
                               , liquidityOrderSwapRaceWithSimpleSwapW4Performs
+
+                              , performerRaceWith3UTxOPerPerform
                               ]
 
 main :: IO ()

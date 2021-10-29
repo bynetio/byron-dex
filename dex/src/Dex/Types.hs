@@ -32,9 +32,11 @@ import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, BuiltinByteString, Eq,
-                                      Integer, MultiplicativeMonoid, MultiplicativeSemigroup, Ord, return,
-                                      ($), (&&), (<), (==))
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
+                                      AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid,
+                                      MultiplicativeSemigroup, Ord, return, ($),
+                                      (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 
@@ -253,7 +255,7 @@ data OrderInfo
 
 
 data DexContractState
-  = Orders [(SellOrderInfo, TxOutRef)]
+  = AllOrders [OrderInfo]
   | OrderCreated
   | PoolCreated
   | Performed
