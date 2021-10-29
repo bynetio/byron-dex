@@ -28,7 +28,7 @@ module Dex.OffChain
 import           Control.Lens.Getter         (view)
 import           Control.Monad               hiding (fmap, mapM, mapM_)
 import           Data.Bifunctor              (bimap)
-import           Data.List                   (foldl')
+import           Data.List                   (foldl', sortOn)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes)
 import           Data.Proxy                  (Proxy (..))
@@ -83,10 +83,11 @@ type DexSchema =
   .\/ Endpoint "perform" (Request ())
   .\/ Endpoint "stop" (Request ())
   .\/ Endpoint "funds" (Request ())
-  .\/ Endpoint "findOrders" (Request ())
-  .\/ Endpoint "orders" (Request ())
+  .\/ Endpoint "allOrders" (Request ())
+  .\/ Endpoint "myOrders" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
+  .\/ Endpoint "performNRandom" (Request Integer)
 
 getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints DexAction DexDatum
 getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
@@ -206,6 +207,31 @@ perform = do
         ) mempty filtered
   void $ submitTxConstraintsWith lookups tx
 
+-- function for testing only
+performNRandom :: SMGen -> Integer -> Contract DexState DexSchema Text ()
+performNRandom smgen n = do
+  pkh <- ownPubKeyHash
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
+  let filtered = [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
+  let sorted = flip sortOn filtered $ \(_,_,o) ->
+                  case o of
+                    LiquidityOrder LiquidityOrderInfo {..} -> orderId
+                    SellOrder SellOrderInfo {..}           -> orderId
+  logInfo @Integer (length sorted)
+  unless (Prelude.null sorted) $ do
+    let indices = take n $ map (`Prelude.mod` length sorted) $ nub $ randoms @Integer smgen
+    let selected = map (sorted!!) indices
+    let lookups = Constraints.typedValidatorLookups dexInstance
+            <> Constraints.ownPubKeyHash pkh
+            <> Constraints.otherScript (Scripts.validatorScript dexInstance)
+            <> Constraints.unspentOutputs (Map.fromList $ map (\(o,oref,_) -> (oref,o)) selected)
+        tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
+          ) mempty selected
+    void $ submitTxConstraintsWith lookups tx
+
+
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- ownPubKeyHash
@@ -213,13 +239,34 @@ funds = do
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
-orders :: Contract DexState DexSchema Text [OrderInfo]
-orders = do
+myOrders :: Contract DexState DexSchema Text [OrderInfo]
+myOrders = do
   pkh <- ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
   return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
+  where
+    toOrderInfo (orderHash, o) = do
+      datum <- getDexDatum o
+      case datum of
+        Payout _ -> return Nothing
+        Order order ->
+          case order of
+            LiquidityOrder LiquidityOrderInfo {..} ->
+              let orderType = "Liquidity"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
+            SellOrder      SellOrderInfo      {..} ->
+              let orderType = "Sell"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
+
+allOrders :: Contract DexState DexSchema Text [OrderInfo]
+allOrders = do
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  catMaybes <$> mapM toOrderInfo utxos
   where
     toOrderInfo (orderHash, o) = do
       datum <- getDexDatum o
@@ -322,10 +369,12 @@ dexEndpoints =
   , createLiquidityOrder'
   , createLiquidityPool'
   , perform'
-  , orders'
+  , myOrders'
+  , allOrders'
   , funds'
   , cancel'
   , collectFunds'
+  , performNRandom'
   ] >> dexEndpoints
   where
     f ::
@@ -359,7 +408,9 @@ dexEndpoints =
     createSellOrder'      = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
     createLiquidityPool'  = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
     perform'              = f (Proxy @"perform") historyId (const Performed) (const perform)
-    orders'               = f (Proxy @"orders") historyId MyOrders (const orders)
+    myOrders'             = f (Proxy @"myOrders") historyId MyOrders (const myOrders)
+    allOrders'            = f (Proxy @"allOrders") historyId AllOrders (const allOrders)
     funds'                = f (Proxy @"funds") historyId Funds (const funds)
     cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
     collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
+    performNRandom'       = f (Proxy @"performNRandom") historyId (const Performed) (\Request {..} -> performNRandom (mkSMGen $ fromIntegral randomSeed) content)
