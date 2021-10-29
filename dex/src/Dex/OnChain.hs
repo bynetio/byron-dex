@@ -62,7 +62,7 @@ mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..}
               (Datum datum) <- findDatum datumHash' txInfo
               PlutusTx.fromBuiltinData datum
       , liquidityOrderInfo == reversedLiquidityOrder (fromNat expectedAmount) liquidityOrderInfo'
-      , assetClassValueOf (txOutValue txOut) expectedCoin * fromNat denominator >= fromNat (expectedAmount * (numerator + denominator))
+      , assetClassValueOf (txOutValue txOut) expectedCoin * fromNat denominator >= fromNat (expectedAmount * (denominator + numerator))
       ]
 
 mkDexValidator (Order o) CancelOrder ctx =

@@ -79,11 +79,11 @@ dexTrace :: EmulatorTrace ()
 dexTrace = do
   h1 <- activateContractWallet (knownWallet 1) dexEndpoints
   h2 <- activateContractWallet (knownWallet 2) dexEndpoints
-  void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (PriceChangeParams (5,100) (10,100) 5) (3,100) (1,2)))
+  --void $ callEndpoint @"createLiquidityPool" h1 (Request "a" 0 (LiquidityPoolParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 1000 (PriceChangeParams (5,100) (10,100) 5) (3,100) (1,2)))
+  --void $ waitNSlots 10
+  void $ callEndpoint @"createLiquidityOrder" h1 (Request "b" 1 (LiquidityOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400 (1,100)))
   void $ waitNSlots 10
-  -- void $ callEndpoint @"createSellOrder" h1 (Request "b" 1 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 200 400))
-  -- void $ waitNSlots 10
-  -- void $ callEndpoint @"createSellOrder" h1 (Request "c" 2 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
+  -- void $ callEndpoint @"sell" h1 (Request "c" 2 (SellOrderParams (Value.AssetClass ("ff", "coin1")) (Value.AssetClass ("ee", "coin2")) 5 600))
   -- void $ waitNSlots 10
   -- void $ callEndpoint @"createSellOrder" h2 (Request "d" 3 (SellOrderParams (Value.AssetClass ("ee", "coin2")) (Value.AssetClass ("ff", "coin1")) 650 200))
   -- void $ waitNSlots 10
