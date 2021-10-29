@@ -26,7 +26,7 @@ data NormalizedParts
       , normalizedVirtualPartsA :: [Double]
       , normalizedPartsB        :: [Double]
       , normalizedVirtualPartsB :: [Double]
-      }
+      } deriving (Show)
 
 
 generateNormalizedParts :: PoolPartsParams -> Either Text NormalizedParts

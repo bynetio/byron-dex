@@ -9,17 +9,19 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase                 #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NamedFieldPuns             #-}
 {-# LANGUAGE NoImplicitPrelude          #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
+{-# LANGUAGE Strict                     #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TupleSections              #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
 {-# LANGUAGE TypeOperators              #-}
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 
-{-# LANGUAGE NamedFieldPuns             #-}
 module Dex.OffChain
   where
 
@@ -58,24 +60,21 @@ import           Prelude                     (Double, Semigroup (..), ceiling,
 import qualified Prelude
 import           System.Random
 import           System.Random.SplitMix
-data Dex
-
 
 type DexState = History (Either Text DexContractState)
 
+data Dex
 instance Scripts.ValidatorTypes Dex where
   type RedeemerType Dex = DexAction
   type DatumType Dex = DexDatum
 
-
 dexInstance :: Scripts.TypedValidator Dex
 dexInstance =
   Scripts.mkTypedValidator @Dex
-    $$(PlutusTx.compile [||mkDexValidator||])
-    $$(PlutusTx.compile [||wrap||])
+    $$(PlutusTx.compile [|| mkDexValidator ||])
+    $$(PlutusTx.compile [|| wrap ||])
   where
     wrap = Scripts.wrapValidator @DexDatum @DexAction
-
 
 type DexSchema =
   Endpoint "createSellOrder" (Request SellOrderParams)
@@ -88,8 +87,6 @@ type DexSchema =
   .\/ Endpoint "orders" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
-
-
 
 getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints DexAction DexDatum
 getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
@@ -125,7 +122,6 @@ createSellOrder smgen SellOrderParams {..} = do
   void $ submitTxConstraints dexInstance tx
   return uuid
 
-
 createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
 createLiquidityOrder smgen LiquidityOrderParams {..} = do
   ownerHash <- ownPubKeyHash
@@ -146,7 +142,7 @@ createLiquidityOrder smgen LiquidityOrderParams {..} = do
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
 createLiquidityPool smgen LiquidityPoolParams {..} = do
   NormalizedParts {..} <- case generateNormalizedParts poolPartsParams of
-    Right p   -> return p
+    Right p   -> logInfo @Prelude.String (Prelude.show p) >> return p
     Left  err -> throwError err
 
   let partsA@(coreA:_) = map (* (fromIntegral amountA / sum normalizedPartsA)) normalizedPartsA
@@ -157,7 +153,6 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
 
   let lpPartsA = zipWith (curry $ bimap round round) partsA (coreB:virtualPartsB)
   let lpPartsB = zipWith (curry $ bimap round round) partsB (coreA:virtualPartsA)
-
   ownerHash <- ownPubKeyHash
   let (smgenA, smgenB) = splitSMGen smgen
 
@@ -194,8 +189,14 @@ perform :: Contract DexState DexSchema Text ()
 perform = do
   pkh <- ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  -- this cuts memory usage in the mkDexValidator
+  -- see: mem-perform1.svg
+  -- utxos <- (: []) . head . Map.toList <$> utxosAt address
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
+  -- this cuts memory usage in the mkDexValidator
+  -- see: mem-perform2.svg (which is similar to mem-perform1.svg)
+  --let filtered = (: []) . head $ [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let filtered = [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
@@ -205,14 +206,12 @@ perform = do
         ) mempty filtered
   void $ submitTxConstraintsWith lookups tx
 
-
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
   pkh <- ownPubKeyHash
   os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
-
 
 orders :: Contract DexState DexSchema Text [OrderInfo]
 orders = do
@@ -286,7 +285,6 @@ collectFunds = do
       Order _           -> return Nothing
       Payout payoutInfo -> return $ Just (txOutRef, payoutInfo)
 
-
 getDexDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
 getDexDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
         (Datum e) <- either getDatum pure _ciTxOutDatum
@@ -315,8 +313,6 @@ getOrderDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
       \case Nothing -> throwError "datum not found"
             Just d  -> pure d
 getOrderDatum _ = throwError "no datum for a txout of a public key address"
-
-
 
 dexEndpoints :: Contract DexState DexSchema Void ()
 dexEndpoints =
@@ -360,10 +356,10 @@ dexEndpoints =
         Right (Request hId _ _) -> WH.append hId $ Right Stopped
 
     createLiquidityOrder' = f (Proxy @"createLiquidityOrder") historyId (const OrderCreated) (\Request {..} -> createLiquidityOrder (mkSMGen $ fromIntegral randomSeed) content)
-    createSellOrder'    = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
-    createLiquidityPool' = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
-    perform' = f (Proxy @"perform") historyId (const Performed) (const perform)
-    orders'  = f (Proxy @"orders") historyId MyOrders (const orders)
-    funds'   = f (Proxy @"funds") historyId Funds (const funds)
-    cancel'  = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
-    collectFunds' = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
+    createSellOrder'      = f (Proxy @"createSellOrder") historyId (const OrderCreated) (\Request {..} -> createSellOrder (mkSMGen $ fromIntegral randomSeed) content)
+    createLiquidityPool'  = f (Proxy @"createLiquidityPool") historyId (const PoolCreated) (\Request {..} -> createLiquidityPool (mkSMGen $ fromIntegral randomSeed) content)
+    perform'              = f (Proxy @"perform") historyId (const Performed) (const perform)
+    orders'               = f (Proxy @"orders") historyId MyOrders (const orders)
+    funds'                = f (Proxy @"funds") historyId Funds (const funds)
+    cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
+    collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)

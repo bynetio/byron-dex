@@ -8,6 +8,7 @@
 {-# LANGUAGE TypeFamilies          #-}
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-strictness #-}
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 
 module Dex.OnChain
   ( mkDexValidator
@@ -22,6 +23,9 @@ import           PlutusTx.Prelude
 
 
 {-# INLINEABLE mkDexValidator #-}
+-- removing all validation and returning True removes all mkDexValidator memory usage
+-- see: mem-no-validation.svg
+-- mkDexValidator _ _ _ = True
 mkDexValidator ::
   DexDatum ->
   DexAction ->
@@ -33,7 +37,7 @@ mkDexValidator (Order (SellOrder SellOrderInfo {..})) Swap ctx =
     txInfo = scriptContextTxInfo ctx
     txOutputs = txInfoOutputs txInfo
     payoutOutput = listToMaybe
-      [ (txOut, PayoutInfo {..})
+      [ txOut
       | txOut <- txOutputs
       , Just (Payout (PayoutInfo ownerHash' orderId')) <- return $ do
               datumHash' <- txOutDatumHash txOut
@@ -78,6 +82,5 @@ mkDexValidator (Payout PayoutInfo {..}) CollectCoins ctx =
     txInfo = scriptContextTxInfo ctx
     signs = txInfoSignatories txInfo
     checkSignatories = ownerHash `elem` signs
-
 
 mkDexValidator _ _ _ = False

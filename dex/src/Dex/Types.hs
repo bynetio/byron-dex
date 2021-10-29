@@ -11,6 +11,7 @@
 {-# LANGUAGE RecordWildCards            #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
 {-# LANGUAGE StandaloneDeriving         #-}
+-- {-# LANGUAGE StrictData                 #-}
 {-# LANGUAGE TemplateHaskell            #-}
 {-# LANGUAGE TypeApplications           #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -19,7 +20,7 @@
 {-# OPTIONS_GHC -fno-specialise #-}
 {-# OPTIONS_GHC -fno-strictness #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-
+{-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
 module Dex.Types
   where
 
@@ -31,11 +32,9 @@ import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
-import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid,
-                                      AdditiveSemigroup, BuiltinByteString, Eq,
-                                      Integer, MultiplicativeMonoid,
-                                      MultiplicativeSemigroup, Ord, return, ($),
-                                      (&&), (<), (==))
+import           PlutusTx.Prelude    (AdditiveGroup, AdditiveMonoid, AdditiveSemigroup, BuiltinByteString, Eq,
+                                      Integer, MultiplicativeMonoid, MultiplicativeSemigroup, Ord, return,
+                                      ($), (&&), (<), (==))
 import           Prelude             (Double, Show, fromIntegral, (/))
 import qualified Prelude
 
@@ -46,19 +45,19 @@ newtype Nat
     ( AdditiveGroup
     , AdditiveMonoid
     , AdditiveSemigroup
+    , Eq
     , MultiplicativeMonoid
     , MultiplicativeSemigroup
+    , Ord
     , Prelude.Enum
     , Prelude.Eq
     , Prelude.Integral
     , Prelude.Num
     , Prelude.Ord
     , Prelude.Real
-    , Ord
     , Show
     , ToJSON
     , ToSchema
-    , Eq
     )
 
 fromNat :: Nat -> Integer
@@ -79,15 +78,10 @@ instance FromJSON Nat where
 toDouble :: (Nat,Nat) -> Double
 toDouble (a,b) = fromIntegral a / fromIntegral b
 
-
 singleton :: AssetClass -> Nat -> Value
 singleton assetClass amount = assetClassValue assetClass (fromNat amount)
 
-data DexAction
-  = Swap
-  | CancelOrder
-  | CollectCoins
-  deriving (Show)
+data DexAction = Swap | CancelOrder | CollectCoins deriving (Show)
 
 PlutusTx.makeIsDataIndexed
   ''DexAction
@@ -100,14 +94,14 @@ PlutusTx.makeLift ''DexAction
 
 data SellOrderParams
   = SellOrderParams
-      { lockedCoin     :: AssetClass
-      , expectedCoin   :: AssetClass
-      , lockedAmount   :: Nat
-      , expectedAmount :: Nat
+      { lockedCoin     :: !AssetClass
+      , expectedCoin   :: !AssetClass
+      , lockedAmount   :: !Nat
+      , expectedAmount :: !Nat
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''SellOrderParams [('SellOrderParams,0)]
+PlutusTx.unstableMakeIsData ''SellOrderParams
 PlutusTx.makeLift ''SellOrderParams
 
 data LiquidityOrderParams
@@ -120,7 +114,7 @@ data LiquidityOrderParams
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''LiquidityOrderParams [('LiquidityOrderParams,0)]
+PlutusTx.unstableMakeIsData ''LiquidityOrderParams
 PlutusTx.makeLift ''LiquidityOrderParams
 
 
@@ -131,9 +125,8 @@ data PoolPartsParams
       , numberOfParts    :: Nat
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
-PlutusTx.makeIsDataIndexed ''PoolPartsParams [('PriceChangeParams, 0)]
+PlutusTx.unstableMakeIsData ''PoolPartsParams
 PlutusTx.makeLift ''PoolPartsParams
-
 
 
 data LiquidityPoolParams
@@ -143,11 +136,11 @@ data LiquidityPoolParams
       , amountA         :: Nat
       , poolPartsParams :: PoolPartsParams
       , swapFee         :: (Nat, Nat)
-      , exchangeRate    :: (Nat,Nat)
+      , exchangeRate    :: (Nat, Nat)
       }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-PlutusTx.makeIsDataIndexed ''LiquidityPoolParams [('LiquidityPoolParams, 0)]
+PlutusTx.unstableMakeIsData ''LiquidityPoolParams
 PlutusTx.makeLift ''LiquidityPoolParams
 
 data SellOrderInfo
@@ -207,14 +200,14 @@ reversedLiquidityOrder liquidity LiquidityOrderInfo {..} =
   , orderId = orderId
   }
 
-PlutusTx.makeIsDataIndexed ''LiquidityOrderInfo [('LiquidityOrderInfo,0)]
+PlutusTx.unstableMakeIsData ''LiquidityOrderInfo
 PlutusTx.makeLift ''LiquidityOrderInfo
 
 
 data Order
   = SellOrder SellOrderInfo
   | LiquidityOrder LiquidityOrderInfo
-  deriving (Generic, Show, FromJSON, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON)
 
 PlutusTx.makeIsDataIndexed
  ''Order
@@ -226,7 +219,7 @@ PlutusTx.makeLift ''Order
 data DexDatum
   = Order Order
   | Payout PayoutInfo
-  deriving (Generic, Show, FromJSON, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON)
 
 
 PlutusTx.makeIsDataIndexed
