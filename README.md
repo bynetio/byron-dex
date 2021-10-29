@@ -67,10 +67,10 @@ All contract endpoints are defined in `uniswap/src/Uniswap/OffChain.hs`.
 - `createLiquidityOrder` -- creates a script, called _Liquidity Order_, that allocates some funds that can be used in exchange by other users. User can set up how much funds of two different tokens they wish to put in such pool and setup a fee.
 - `createLiquidityPool`
 - `perform` -- matches _Swap Orders_ with other _Swap Orders_ and/or _Liquidity Orders_ in order to perform an exchange between them. The performer pays for the transaction, but can also gain some surplus of tokens, when there is some.
-- `stop`
+- `stop` -- stops connection between wallet and PAB.
 - `funds` -- provides information about funds belonging to the user.
-- `findOrders`
-- `orders`
+- `allOrders` - provides information about all orders on the script.
+- `myOrders` - provides information about all orders on the script that belong to the wallet calling this endpoint.
 - `cancel` -- closes the _Liquidity Order_ by getting remaining allocated funds back to _Liquidity Order_ founder.
 - `collectFunds` -- a transaction that withdraws the tokens to their new owners after a properly performed swap.
 
