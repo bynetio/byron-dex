@@ -88,6 +88,7 @@ type DexSchema =
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
   .\/ Endpoint "performNRandom" (Request Integer)
+  .\/ Endpoint "myPayouts" (Request ())
 
 getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints DexAction DexDatum
 getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
@@ -332,6 +333,26 @@ collectFunds = do
       Order _           -> return Nothing
       Payout payoutInfo -> return $ Just (txOutRef, payoutInfo)
 
+myPayouts :: Contract DexState DexSchema Text PayoutSummary
+myPayouts = do
+  pkh <- ownPubKeyHash
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  mapped <- catMaybes <$> mapM toPayoutInfo utxos
+  let filtered = filter (\(_,PayoutInfo {..}) -> ownerHash == pkh) mapped
+  let totalValue = valueToList $ mconcat $ map fst filtered
+  return $ PayoutSummary {payoutValue=totalValue}
+  where
+
+    valueToList :: Value -> [(AssetClass, Integer)]
+    valueToList = concatMap (\(k,v) -> map (\(k',v') -> (AssetClass (k,k'), v')) $ AssocMap.toList v) . AssocMap.toList . getValue
+
+    toPayoutInfo (_, o) = do
+      datum <- getDexDatum o
+      case datum of
+        Payout p -> return $ Just (view ciTxOutValue o,p)
+        _        -> return Nothing
+
 getDexDatum :: ChainIndexTxOut -> Contract w s Text DexDatum
 getDexDatum ScriptChainIndexTxOut { _ciTxOutDatum } = do
         (Datum e) <- either getDatum pure _ciTxOutDatum
@@ -375,6 +396,7 @@ dexEndpoints =
   , cancel'
   , collectFunds'
   , performNRandom'
+  , myPayouts'
   ] >> dexEndpoints
   where
     f ::
@@ -414,3 +436,4 @@ dexEndpoints =
     cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
     collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
     performNRandom'       = f (Proxy @"performNRandom") historyId (const Performed) (\Request {..} -> performNRandom (mkSMGen $ fromIntegral randomSeed) content)
+    myPayouts'            = f (Proxy @"myPayouts") historyId MyPayouts (const myPayouts)
