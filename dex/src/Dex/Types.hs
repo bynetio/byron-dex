@@ -253,6 +253,12 @@ data OrderInfo
       }
   deriving (FromJSON, Generic, Show, ToJSON)
 
+newtype PayoutSummary
+  = PayoutSummary
+      { payoutValue :: [(AssetClass, Integer)]
+      }
+  deriving newtype (FromJSON, ToJSON)
+  deriving stock (Generic, Show)
 
 data DexContractState
   = AllOrders [OrderInfo]
@@ -264,4 +270,5 @@ data DexContractState
   | MyOrders [OrderInfo]
   | Canceled
   | Collected
+  | MyPayouts PayoutSummary
   deriving (FromJSON, Generic, Show, ToJSON)

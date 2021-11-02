@@ -5,6 +5,6 @@ let
 
 in
 haskell.project.shellFor {
-  packages = ps: [ ps.uniswap ];
+  packages = ps: [ ps.dex ];
   withHoogle = true;
 }
