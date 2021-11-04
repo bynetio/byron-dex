@@ -1,5 +1,27 @@
 # dex
 
+## Nix setup
+
+Before entering `nix-shell`, make sure that you have binary cache set up so that your builds would not take longer that it is needed.
+
+#### If using non-NixOS system, edit `/etc/nix/nix.conf` file and add below:
+
+```
+substituters        = https://hydra.iohk.io https://iohk.cachix.org https://cache.nixos.org/
+trusted-public-keys = hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ= iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo= cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=
+```
+
+Note: after changing `/etc/nix/nix.conf`, restart nix-daemon otherwise changes won’t take effect.
+
+#### If using NixOS, add below options:
+
+```nix
+nix = {
+  binaryCaches          = [ "https://hydra.iohk.io" "https://iohk.cachix.org" ];
+  binaryCachePublicKeys = [ "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=" "iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo=" ];
+};
+```
+
 ## Development setup
 
 After cloning the repository, `cd` into the project and do the following:
