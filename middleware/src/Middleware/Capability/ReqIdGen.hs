@@ -12,7 +12,7 @@ import Data.UUID              (toText)
 import Data.UUID.V4           as UUID (nextRandom)
 
 
-data ReqIdGen a where
+data ReqIdGen m where
   NextReqId :: ReqIdGen Text -- todo: change text to ???
 
 Eff.makeEffect ''ReqIdGen

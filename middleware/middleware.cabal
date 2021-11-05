@@ -6,21 +6,34 @@ maintainer:             BinarApps
 
 library
     hs-source-dirs:     src
-    exposed-modules:    Middleware.Config
+    exposed-modules:    Middleware.App
+                      , Middleware.Capability.Config
                       , Middleware.Capability.ReqIdGen
                       , Middleware.Capability.Logger
+                      , Middleware.Capability.Error
     build-depends:      base
+                      , aeson
                       , conferer
                       , conferer-dhall
                       , conferer-warp
                       , co-log
+                      , dex
+                      , deepseq
+                      , either
+                      , exceptions
+                      , servant
+                      , servant-server
+                      , servant-client
                       , retry
                       , freer-simple
                       , text
                       , uuid
                       , warp
+                      , wai
+                      , wai-cors
+
     default-language:   Haskell2010
-    ghc-options:        -Werror -Wall
+  --  ghc-options:        -Werror -Wall -- temporary disabled
 
     default-extensions: ScopedTypeVariables
                       , FlexibleContexts
@@ -37,5 +50,6 @@ library
 executable middleware-manual
     main-is:            Main.hs
     build-depends:      base ^>=4.14.1.0
+                      , middleware
     hs-source-dirs:     app
     default-language:   Haskell2010
