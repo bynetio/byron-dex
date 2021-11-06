@@ -2,18 +2,17 @@ module Middleware.Capability.Time where
 
 
 import Control.Concurrent     (threadDelay)
-import Control.Monad.Freer    (Eff, LastMember, interpret, sendM, type (~>))
-import Control.Monad.Freer.TH (makeEffect)
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Polysemy
 
-data Time r where
-  Sleep :: Integer -> Time ()
+data Time m r where
+  Sleep :: Integer -> Time m ()
 
 makeEffect ''Time
 
 runTime
   :: forall effs m. (MonadIO m, LastMember m effs)
-  => Eff (Time ': effs)
-  ~> Eff effs
+  => Sem (Time ': effs)
+  ~> Sem effs
 runTime =
-  interpret $ \(Sleep us) -> sendM (liftIO $ threadDelay (fromIntegral us))
+  interpret $ \case (Sleep us) -> liftIO $ threadDelay (fromIntegral us)

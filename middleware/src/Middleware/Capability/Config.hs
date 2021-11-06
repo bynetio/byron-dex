@@ -7,11 +7,11 @@ import           Conferer.FromConfig.Warp    ()
 import qualified Conferer.Source.CLIArgs     as Cli
 import qualified Conferer.Source.Dhall       as Dhall
 import qualified Conferer.Source.Env         as Env
-import           Control.Monad.Freer         (Eff, Members, interpret, send)
-import           Control.Monad.Freer.TH      as Eff (makeEffect)
 import           GHC.Generics
 import           Middleware.Capability.Error
 import qualified Network.Wai.Handler.Warp    as Warp
+import           Polysemy
+import qualified Polysemy.Internal           as P
 
 newtype AppConfig = AppConfig
   { appConfigServer :: Warp.Settings
@@ -24,15 +24,15 @@ instance DefaultConfig AppConfig where
     { appConfigServer = Warp.setPort 8080 configDef
     }
 
-data ConfigLoader a where
-  Load :: ConfigLoader AppConfig
+data ConfigLoader m a where
+  Load :: ConfigLoader m AppConfig
 
-Eff.makeEffect ''ConfigLoader
+makeSem ''ConfigLoader
 
 -- | Run "ConfigLoader" using IO
-runConfigLoader :: Members [IO, Error AppError] r
-  => Eff (ConfigLoader ': r) a
-  -> Eff r a
+runConfigLoader :: Members [Embed IO, Error AppError] r
+  => Sem (ConfigLoader ': r) a
+  -> Sem r a
 runConfigLoader = interpret $ \case
   Load -> do
     cfg <- sendOrThrow mkAppConfig
@@ -45,10 +45,7 @@ mkAppConfig = mkConfig' []
   , Dhall.fromFilePath "config.dhall"
   ]
 
-sendOrThrow :: forall r a . Members [IO, Error AppError] r
+sendOrThrow :: forall r a . Members [Embed IO, Error AppError] r
             => IO a
-            -> Eff r a
-sendOrThrow io = send (try io) >>= either onFail pure
-  where
-    onFail :: IOException -> Eff r a
-    onFail = throwError . ConfigLoaderError
+            -> Sem r a
+sendOrThrow = fromExceptionVia ConfigLoaderError

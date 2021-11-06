@@ -5,9 +5,9 @@ module Middleware.Capability.Error
   , module E
   ) where
 
-import Control.Exception         as E
-import Control.Monad.Freer.Error as E
-import Data.Text                 (Text)
+import Control.Exception as E hiding (catch, catchJust, fromException, throw, try, tryJust)
+import Data.Text         (Text)
+import Polysemy.Error    as E
 
 data AppError
   = PabError Text

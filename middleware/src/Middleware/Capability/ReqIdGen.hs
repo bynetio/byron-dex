@@ -4,22 +4,22 @@ module Middleware.Capability.ReqIdGen
   , runReqIdGen
   ) where
 
-import Control.Monad.Freer    as Eff (Eff, LastMember, interpret, type (~>))
-import Control.Monad.Freer.TH as Eff (makeEffect)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Text              (Text)
 import Data.UUID              (toText)
 import Data.UUID.V4           as UUID (nextRandom)
+import Polysemy
 
 
-data ReqIdGen m where
-  NextReqId :: ReqIdGen Text -- todo: change text to ???
+data ReqIdGen m a where
+  NextReqId :: ReqIdGen m Text -- todo: change text to ???
 
-Eff.makeEffect ''ReqIdGen
+makeSem ''ReqIdGen
 
 runReqIdGen
-  :: forall effs m. (MonadIO m, LastMember m effs)
-  => Eff (ReqIdGen ': effs)
-  ~> Eff effs
-runReqIdGen = Eff.interpret $ \case
-  NextReqId -> liftIO $ toText <$> UUID.nextRandom
+  :: Member (Embed IO) r
+  => Sem (ReqIdGen ': r) a
+  -> Sem r a
+runReqIdGen = interpret $ \case
+  NextReqId -> embed $ toText <$> UUID.nextRandom
+
