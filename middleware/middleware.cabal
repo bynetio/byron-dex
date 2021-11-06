@@ -12,32 +12,34 @@ library
                       , Middleware.Capability.ReqIdGen
                       , Middleware.Capability.Logger
                       , Middleware.Capability.Error
-    build-depends:      base
-                      , aeson
+    build-depends:      aeson
+                      , base
+                      , co-log
+                      , co-log-core
+                      , co-log-polysemy
+                      , co-log-polysemy-formatting
                       , conferer
                       , conferer-dhall
                       , conferer-warp
-                      , co-log
-                      , dex
                       , deepseq
+                      , dex
                       , either
                       , errors
                       , exceptions
+                      , formatting >= 7.1.3
                       , mtl
-                      , servant
-                      , servant-server
-                      , servant-client
-                      , retry
                       , polysemy
                       , polysemy-plugin
+                      , retry
+                      , servant
+                      , servant-client
                       , servant-polysemy
-                      , co-log-polysemy
-                      , co-log-core
+                      , servant-server
                       , text
                       , uuid
-                      , warp
                       , wai
                       , wai-cors
+                      , warp
 
     default-language:   Haskell2010
     ghc-options:        -O2 -flate-specialise -fspecialise-aggressively

@@ -6,9 +6,16 @@ module Middleware.App where
 
 import           Colog.Core.IO                (logStringStdout)
 import           Colog.Polysemy               (Log, log, runLogAction)
+import           Colog.Polysemy.Formatting    (WithLog, addThreadAndTimeToLog,
+                                               cmap, logInfo, logTextStderr,
+                                               logTextStdout, newLogEnv,
+                                               renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Function                ((&))
-import           Middleware.Capability.Config (ConfigLoader, appConfigServer, load, runConfigLoader)
+import           Formatting
+import           GHC.Stack                    (HasCallStack)
+import           Middleware.Capability.Config (ConfigLoader, appConfigServer,
+                                               load, runConfigLoader)
 import           Middleware.Capability.Error  hiding (Handler, throwError)
 import           Middleware.Capability.Logger (showText)
 import           Middleware.DummyAPI
@@ -20,7 +27,7 @@ import           Polysemy.Reader              (runReader)
 import           Prelude                      hiding (log)
 import           Servant
 import           Servant.Polysemy.Server
-
+import           System.IO                    (stdout)
 
 
 ---------------------------------------------------------------------------
@@ -35,25 +42,24 @@ dummyServer :: Members '[ Dummy, Error AppError] r => ServerT API (Sem r)
 dummyServer  = fetchUsers
 ---------------------------------------------------------------------------
 
-runApp :: IO (Either AppError ())
+runApp :: HasCallStack => IO (Either AppError ())
 runApp = do
-  runServer createApp
-
-  where
-    runServer sem = sem
+  logEnv <- newLogEnv stdout
+  createApp
       & runConfigLoader
       & runError @AppError
-      & runLogAction @IO logStringStdout
+      & addThreadAndTimeToLog
+      & runLogAction @IO (logTextStderr & cmap (renderThreadTimeMessage logEnv))
       & runM
 
 
-createApp :: (Members [Embed IO, Log String, ConfigLoader, Error AppError] r) => Sem r ()
+createApp :: (WithLog r, Members '[Embed IO, ConfigLoader, Error AppError] r) => Sem r ()
 createApp = do
   appConfig <- load
   -- void $ runReader appConfig -- pab config in reader
   let serverCfg = appConfigServer appConfig
-  log @String $ "Running on port: " ++ show (Warp.getPort serverCfg)
-  log @String $ "Bind to: " ++ show (Warp.getHost serverCfg)
+  logInfo (string % shown) "Running on port: " (Warp.getPort serverCfg)
+  logInfo (string % shown) "Bind to: "         (Warp.getHost serverCfg)
   let server = hoistServerIntoSem @API (runServer dummyServer)
   runWarpServerSettings @API serverCfg server
   where
