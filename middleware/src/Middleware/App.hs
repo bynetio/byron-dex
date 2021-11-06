@@ -3,7 +3,6 @@
 
 module Middleware.App where
 
-
 import           Colog.Core.IO                (logStringStdout)
 import           Colog.Polysemy               (Log, log, runLogAction)
 import           Colog.Polysemy.Formatting    (WithLog, addThreadAndTimeToLog,
@@ -17,7 +16,6 @@ import           GHC.Stack                    (HasCallStack)
 import           Middleware.Capability.Config (ConfigLoader, appConfigServer,
                                                load, runConfigLoader)
 import           Middleware.Capability.Error  hiding (Handler, throwError)
-import           Middleware.Capability.Logger (showText)
 import           Middleware.DummyAPI
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp     as Warp
@@ -28,7 +26,6 @@ import           Prelude                      hiding (log)
 import           Servant
 import           Servant.Polysemy.Server
 import           System.IO                    (stdout)
-
 
 ---------------------------------------------------------------------------
 -- | for test only
@@ -58,8 +55,8 @@ createApp = do
   appConfig <- load
   -- void $ runReader appConfig -- pab config in reader
   let serverCfg = appConfigServer appConfig
-  logInfo (string % shown) "Running on port: " (Warp.getPort serverCfg)
-  logInfo (string % shown) "Bind to: "         (Warp.getHost serverCfg)
+  logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
+  logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
   let server = hoistServerIntoSem @API (runServer dummyServer)
   runWarpServerSettings @API serverCfg server
   where

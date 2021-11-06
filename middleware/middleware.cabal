@@ -10,7 +10,6 @@ library
                       , Middleware.DummyAPI
                       , Middleware.Capability.Config
                       , Middleware.Capability.ReqIdGen
-                      , Middleware.Capability.Logger
                       , Middleware.Capability.Error
     build-depends:      aeson
                       , base
