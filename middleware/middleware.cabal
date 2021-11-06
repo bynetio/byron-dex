@@ -10,8 +10,11 @@ library
                       , Middleware.DummyAPI
                       , Middleware.Capability.Config
                       , Middleware.Capability.ReqIdGen
-                      , Middleware.Capability.Logger
                       , Middleware.Capability.Error
+                      , Middleware.PabClient
+                      , Middleware.PabClient.API
+                      , Middleware.PabClient.Types
+
     build-depends:      aeson
                       , base
                       , co-log
@@ -30,6 +33,8 @@ library
                       , mtl
                       , polysemy
                       , polysemy-plugin
+                      , plutus-pab -any
+                      , plutus-ledger -any
                       , retry
                       , servant
                       , servant-client

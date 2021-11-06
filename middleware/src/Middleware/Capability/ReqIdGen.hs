@@ -22,4 +22,3 @@ runReqIdGen
   -> Sem r a
 runReqIdGen = interpret $ \case
   NextReqId -> embed $ toText <$> UUID.nextRandom
-

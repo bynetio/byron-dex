@@ -8,9 +8,11 @@ module Middleware.Capability.Error
 import Control.Exception as E hiding (catch, catchJust, fromException, throw, try, tryJust)
 import Data.Text         (Text)
 import Polysemy.Error    as E
+import Servant.Client    (ClientError)
 
 data AppError
   = PabError Text
   | ConfigLoaderError IOException
+  | HttpError ClientError
   | OtherError Text
   deriving Show
