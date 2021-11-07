@@ -5,18 +5,15 @@ module Middleware.App where
 
 import           Colog.Core.IO                (logStringStdout)
 import           Colog.Polysemy               (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting    (WithLog, addThreadAndTimeToLog,
-                                               cmap, logInfo, logTextStderr,
-                                               logTextStdout, newLogEnv,
-                                               renderThreadTimeMessage)
+import           Colog.Polysemy.Formatting    (WithLog, addThreadAndTimeToLog, cmap, logInfo, logTextStderr,
+                                               logTextStdout, newLogEnv, renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Function                ((&))
 import           Formatting
 import           GHC.Stack                    (HasCallStack)
-import           Middleware.Capability.Config (ConfigLoader, appConfigServer,
-                                               load, runConfigLoader)
+import           Middleware.API
+import           Middleware.Capability.Config (ConfigLoader, appConfigServer, load, runConfigLoader)
 import           Middleware.Capability.Error  hiding (Handler, throwError)
-import           Middleware.DummyAPI
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp     as Warp
 import           Network.Wai.Middleware.Cors
@@ -27,17 +24,6 @@ import           Servant
 import           Servant.Polysemy.Server
 import           System.IO                    (stdout)
 
----------------------------------------------------------------------------
--- | for test only
-type API = DummyAPI
-
-api :: Proxy DummyAPI
-api = Proxy
-
-
-dummyServer :: Members '[ Dummy, Error AppError] r => ServerT API (Sem r)
-dummyServer  = fetchUsers
----------------------------------------------------------------------------
 
 runApp :: HasCallStack => IO (Either AppError ())
 runApp = do
@@ -57,9 +43,10 @@ createApp = do
   let serverCfg = appConfigServer appConfig
   logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
   logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
-  let server = hoistServerIntoSem @API (runServer dummyServer)
-  runWarpServerSettings @API serverCfg server
+  let srv = hoistServerIntoSem @API (runServer dexServer)
+  runWarpServerSettings @API serverCfg srv
   where
+    -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
     handleErrors (Left (ConfigLoaderError id)) = Left err404 { errBody = "Cannot load configuration file" }
     handleErrors (Left err)    = Left err500 { errBody = "Internal Server Error" }
     handleErrors (Right value) = Right value
@@ -68,12 +55,13 @@ createApp = do
 
     runServer sem = sem
       & runError @AppError
-      & runDummy
+      & runDex
       & runM
       & liftHandler
 
 -- | CORS config
 -- | FIXME: Add corsPolicy to wai...
+-- | you can do that via customize `runWarpServerSettings` function
 corsPolicy :: CorsResourcePolicy
 corsPolicy =
   CorsResourcePolicy {
