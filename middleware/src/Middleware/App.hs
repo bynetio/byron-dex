@@ -3,26 +3,31 @@
 
 module Middleware.App where
 
-import           Colog.Core.IO                (logStringStdout)
-import           Colog.Polysemy               (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting    (WithLog, addThreadAndTimeToLog, cmap, logInfo, logTextStderr,
-                                               logTextStdout, newLogEnv, renderThreadTimeMessage)
+import           Colog.Core.IO                  (logStringStdout)
+import           Colog.Polysemy                 (Log, log, runLogAction)
+import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog,
+                                                 cmap, logInfo, logTextStderr,
+                                                 logTextStdout, newLogEnv,
+                                                 renderThreadTimeMessage)
 import           Control.Monad.Except
-import           Data.Function                ((&))
+import           Data.Function                  ((&))
 import           Formatting
-import           GHC.Stack                    (HasCallStack)
+import           GHC.Stack                      (HasCallStack)
 import           Middleware.API
-import           Middleware.Capability.Config (ConfigLoader, appConfigServer, load, runConfigLoader)
-import           Middleware.Capability.Error  hiding (Handler, throwError)
+import           Middleware.Capability.Config   (ConfigLoader, appConfigServer,
+                                                 load, runConfigLoader)
+import           Middleware.Capability.Error    hiding (Handler, throwError)
+import           Middleware.Capability.ReqIdGen (runReqIdGen)
+import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
-import qualified Network.Wai.Handler.Warp     as Warp
+import qualified Network.Wai.Handler.Warp       as Warp
 import           Network.Wai.Middleware.Cors
 import           Polysemy
-import           Polysemy.Reader              (runReader)
-import           Prelude                      hiding (log)
+import           Polysemy.Reader                (runReader)
+import           Prelude                        hiding (log)
 import           Servant
 import           Servant.Polysemy.Server
-import           System.IO                    (stdout)
+import           System.IO                      (stdout)
 
 
 runApp :: HasCallStack => IO (Either AppError ())
@@ -54,8 +59,10 @@ createApp = do
     liftHandler = Handler . ExceptT . fmap handleErrors
 
     runServer sem = sem
-      & runError @AppError
       & runDex
+      & runPabClient
+      & runError @AppError
+      & runReqIdGen
       & runM
       & liftHandler
 
