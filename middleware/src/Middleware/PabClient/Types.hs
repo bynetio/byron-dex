@@ -24,7 +24,7 @@ import Servant.API
 -- | Unique ID for contract instance
 newtype ContractInstanceId = ContractInstanceId { unContractInstanceId :: UUID }
     deriving (Eq, Ord, Show, Generic)
-    deriving newtype (FromJSONKey, ToJSONKey, ToHttpApiData)
+    deriving newtype (FromJSONKey, ToJSONKey, ToHttpApiData, FromHttpApiData)
     deriving anyclass (FromJSON, ToJSON)
 
 type ContractState = ContractInstanceClientState String

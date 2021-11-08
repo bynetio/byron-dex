@@ -58,7 +58,7 @@ pabClient = PabClient{..}
             ) = toInstanceClient cid
 
 
-runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
+runPabClient :: ( Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
              => Sem (ManagePabClient ': r) a
              -> Sem r a
 runPabClient =
@@ -88,9 +88,9 @@ runPabClient =
     )
 
     where
-      mapAppError ::  (WithLog r, Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
+      mapAppError ::  ( Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
       mapAppError (Left err) = do
-        logError (text % shown) "Cannot fetch status from PAB, cause: " err
+        -- logError (text % shown) "Cannot fetch status from PAB, cause: " err
         throw $ HttpError err
       mapAppError (Right v) = pure v
 

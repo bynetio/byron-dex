@@ -4,16 +4,16 @@
 
 module Middleware.API where
 
-import           Data.Aeson
-import           GHC.Generics
-import           Ledger                      (AssetClass)
-import           Middleware.Capability.Error
-import           Middleware.PabClient
-import           Middleware.PabClient.Types
-import           Polysemy
-import           Servant
+import Data.Aeson
+import GHC.Generics
+import Ledger                      (AssetClass)
+import Middleware.Capability.Error
+import Middleware.PabClient
+import Middleware.PabClient.Types
+import Polysemy
+import Servant
 
--- | Move 'FundView' Data Type to separate module
+-- | Data type to represent wallet founds. Move 'FundView' to separate module
 data FundView = FundView
   { coin   :: AssetClass
   , amount :: Integer
