@@ -10,6 +10,7 @@ library
                       , Middleware.API
                       , Middleware.DummyAPI
                       , Middleware.Capability.Config
+                      , Middleware.Capability.CORS
                       , Middleware.Capability.ReqIdGen
                       , Middleware.Capability.Error
                       , Middleware.PabClient

@@ -14,6 +14,7 @@ import           Data.Function                  ((&))
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
 import           Middleware.API
+import           Middleware.Capability.CORS     (corsConfig)
 import           Middleware.Capability.Config   (AppConfig (pabUrl), ConfigLoader, appConfigServer, load,
                                                  runConfigLoader)
 import           Middleware.Capability.Error    hiding (Handler, throwError)
@@ -21,7 +22,6 @@ import           Middleware.Capability.ReqIdGen (runReqIdGen)
 import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp       as Warp
-import           Network.Wai.Middleware.Cors
 import           Polysemy
 import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
@@ -68,27 +68,6 @@ createApp = do
       & runM
       & liftHandler
 
--- | CORS config
--- | FIXME: Add corsPolicy to wai...
-corsPolicy :: CorsResourcePolicy
-corsPolicy =
-  CorsResourcePolicy {
-    corsOrigins = Nothing,
-    corsMethods = methods,
-    corsRequestHeaders = ["Content-Type"],
-    corsExposedHeaders = Nothing,
-    corsMaxAge = Nothing,
-    corsVaryOrigin = True,
-    corsRequireOrigin = False,
-    corsIgnoreFailures = False
-  }
-  where
-    methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
-    cont = simpleContentTypes <> ["application/json"]
-
-corsConfig :: Middleware
-corsConfig = cors (const $ Just corsPolicy)
-
 -- | Run the given server with these Warp settings.
 runWarpServerSettings'
   :: forall api r
@@ -99,5 +78,5 @@ runWarpServerSettings'
   -> Application
   -> Sem r ()
 runWarpServerSettings' settings appServer = withLowerToIO $ \lowerToIO finished -> do
-  Warp.runSettings settings appServer
+  Warp.runSettings settings (corsConfig appServer)
   finished

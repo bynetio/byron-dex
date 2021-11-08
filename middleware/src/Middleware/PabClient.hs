@@ -58,7 +58,7 @@ pabClient = PabClient{..}
             ) = toInstanceClient cid
 
 
-runPabClient :: ( Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
+runPabClient :: (Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
              => Sem (ManagePabClient ': r) a
              -> Sem r a
 runPabClient =
