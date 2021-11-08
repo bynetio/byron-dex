@@ -1,1 +1,1 @@
-{ server = { port = 8080, host = "localhost" } }
+{ server = { port = 8080, host = "localhost" }, pabUrl = "http://localhost:8080" }
