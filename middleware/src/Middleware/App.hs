@@ -7,16 +7,19 @@ module Middleware.App where
 
 import           Colog.Core.IO                  (logStringStdout)
 import           Colog.Polysemy                 (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog, cmap, logInfo, logTextStderr,
-                                                 logTextStdout, newLogEnv, renderThreadTimeMessage)
+import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog,
+                                                 cmap, logInfo, logTextStderr,
+                                                 logTextStdout, newLogEnv,
+                                                 renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Function                  ((&))
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
 import           Middleware.API
 import           Middleware.Capability.CORS     (corsConfig)
-import           Middleware.Capability.Config   (AppConfig (pabUrl), ConfigLoader, appConfigServer, load,
-                                                 runConfigLoader)
+import           Middleware.Capability.Config   (AppConfig (pabUrl),
+                                                 ConfigLoader, appConfigServer,
+                                                 load, runConfigLoader)
 import           Middleware.Capability.Error    hiding (Handler, throwError)
 import           Middleware.Capability.ReqIdGen (runReqIdGen)
 import           Middleware.PabClient           (runPabClient)
@@ -26,7 +29,8 @@ import           Polysemy
 import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
 import           Servant
-import           Servant.Polysemy.Client        (runServantClient, runServantClientUrl)
+import           Servant.Polysemy.Client        (runServantClient,
+                                                 runServantClientUrl)
 import           Servant.Polysemy.Server
 import           System.IO                      (stdout)
 
@@ -44,12 +48,14 @@ runApp = do
 createApp :: (WithLog r, Members '[Embed IO, ConfigLoader, Error AppError] r) => Sem r ()
 createApp = do
   appConfig <- load
+  -- FIXME: Duplicated in runApp
+  logEnv <- embed $ newLogEnv stdout
   let pab = pabUrl appConfig
       serverCfg = appConfigServer appConfig
   logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
   logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
   let api = Proxy @API
-      app = serve api (hoistServer api (`runServer` pab) dexServer)
+      app = serve api (hoistServer api (runServer pab logEnv) dexServer)
   runWarpServerSettings' @API serverCfg app
   where
     -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
@@ -59,12 +65,15 @@ createApp = do
 
     liftHandler = Handler . ExceptT . fmap handleErrors
 
-    runServer sem pabUrl = sem
+    -- FIXME: We duplicate effect handling with 'runApp' function
+    runServer pabUrl logEnv sem = sem
       & runDex
       & runPabClient
       & runError @AppError
       & runReqIdGen
       & runServantClientUrl pabUrl
+      & addThreadAndTimeToLog
+      & runLogAction @IO (logTextStderr & cmap (renderThreadTimeMessage logEnv))
       & runM
       & liftHandler
 

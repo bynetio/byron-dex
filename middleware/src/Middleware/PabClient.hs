@@ -5,19 +5,22 @@
 
 module Middleware.PabClient where
 
-import Colog.Polysemy.Formatting      (WithLog, logError)
-import Data.Aeson                     (ToJSON)
-import Data.Aeson.Types               (Value, toJSON)
-import Dex.Types                      (Request (Request))
-import Formatting
-import Middleware.Capability.Error
-import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import Middleware.PabClient.API       (API)
-import Middleware.PabClient.Types
-import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
-import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
-import Servant.Client.Streaming       (ClientM, client)
-import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
+import           Colog.Polysemy.Formatting      (WithLog, logError)
+import           Data.Aeson                     (ToJSON)
+import           Data.Aeson.Types               (Value, toJSON)
+import           Dex.Types                      (Request (Request))
+import           Formatting
+import           Middleware.Capability.Error
+import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import           Middleware.PabClient.API       (API)
+import           Middleware.PabClient.Types
+import           Polysemy                       (Embed, Members, Sem, interpret,
+                                                 makeSem)
+import           Servant                        (Proxy (..),
+                                                 type (:<|>) ((:<|>)))
+import           Servant.Client.Streaming       (ClientM, client)
+import           Servant.Polysemy.Client        (ClientError, ServantClient,
+                                                 runClient, runClient')
 
 data ManagePabClient r a where
   Status :: ContractInstanceId -> ManagePabClient r ContractState
@@ -26,9 +29,9 @@ data ManagePabClient r a where
 makeSem ''ManagePabClient
 
 data PabClient = PabClient
-  { healthcheck      :: ClientM ()
+  { healthcheck    :: ClientM ()
       -- ^ call healthcheck method
-  , instanceClient   :: ContractInstanceId -> InstanceClient
+  , instanceClient :: ContractInstanceId -> InstanceClient
       -- ^ call methods for instance client.
   }
 
@@ -58,7 +61,7 @@ pabClient = PabClient{..}
             ) = toInstanceClient cid
 
 
-runPabClient :: (Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
+runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
              => Sem (ManagePabClient ': r) a
              -> Sem r a
 runPabClient =
@@ -88,9 +91,9 @@ runPabClient =
     )
 
     where
-      mapAppError ::  ( Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
+      mapAppError ::  (WithLog r, Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
       mapAppError (Left err) = do
-        -- logError (text % shown) "Cannot fetch status from PAB, cause: " err
+        logError (text % shown) "Cannot fetch status from PAB, cause: " err
         throw $ HttpError err
       mapAppError (Right v) = pure v
 
