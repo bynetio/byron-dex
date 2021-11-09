@@ -5,11 +5,12 @@
 
 module Middleware.App where
 
+import           Colog                          (Message)
 import           Colog.Core.IO                  (logStringStdout)
+import           Colog.Message                  (Message)
 import           Colog.Polysemy                 (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog,
-                                                 cmap, logInfo, logTextStderr,
-                                                 logTextStdout, newLogEnv,
+import           Colog.Polysemy.Formatting      (Msg, Severity, WithLog, addThreadAndTimeToLog, cmap, logInfo,
+                                                 logTextStderr, logTextStdout, newLogEnv,
                                                  renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Function                  ((&))
@@ -17,11 +18,11 @@ import           Formatting
 import           GHC.Stack                      (HasCallStack)
 import           Middleware.API
 import           Middleware.Capability.CORS     (corsConfig)
-import           Middleware.Capability.Config   (AppConfig (pabUrl),
-                                                 ConfigLoader, appConfigServer,
-                                                 load, runConfigLoader)
+import           Middleware.Capability.Config   (AppConfig (pabUrl), ConfigLoader, appConfigServer, load,
+                                                 runConfigLoader)
 import           Middleware.Capability.Error    hiding (Handler, throwError)
 import           Middleware.Capability.ReqIdGen (runReqIdGen)
+import           Middleware.Capability.Time     (runTime)
 import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp       as Warp
@@ -29,23 +30,24 @@ import           Polysemy
 import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
 import           Servant
-import           Servant.Polysemy.Client        (runServantClient,
-                                                 runServantClientUrl)
+import           Servant.Polysemy.Client        (runServantClient, runServantClientUrl)
 import           Servant.Polysemy.Server
 import           System.IO                      (stdout)
 
 
-runApp :: HasCallStack => IO (Either AppError ())
+runApp :: HasCallStack => IO ()
 runApp = do
   logEnv <- newLogEnv stdout
-  createApp
+  app <- createApp
       & runConfigLoader
       & runError @AppError
       & addThreadAndTimeToLog
       & runLogAction @IO (logTextStderr & cmap (renderThreadTimeMessage logEnv))
       & runM
+  print app
 
-createApp :: (WithLog r, Members '[Embed IO, ConfigLoader, Error AppError] r) => Sem r ()
+
+createApp :: (WithLog r, Members '[ConfigLoader, Error AppError, Embed IO] r) => Sem r ()
 createApp = do
   appConfig <- load
   -- FIXME: Duplicated in runApp
@@ -66,10 +68,12 @@ createApp = do
     liftHandler = Handler . ExceptT . fmap handleErrors
 
     -- FIXME: We duplicate effect handling with 'runApp' function
+
     runServer pabUrl logEnv sem = sem
       & runDex
       & runPabClient
       & runError @AppError
+      & runTime
       & runReqIdGen
       & runServantClientUrl pabUrl
       & addThreadAndTimeToLog
