@@ -12,6 +12,8 @@ library
                       , Middleware.Capability.Config
                       , Middleware.Capability.CORS
                       , Middleware.Capability.ReqIdGen
+                      , Middleware.Capability.Retry
+                      , Middleware.Capability.Time
                       , Middleware.Capability.Error
                       , Middleware.PabClient
                       , Middleware.PabClient.API

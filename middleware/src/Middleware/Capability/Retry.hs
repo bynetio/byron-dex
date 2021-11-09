@@ -1,65 +1,44 @@
-{-# LANGUAGE DeriveAnyClass     #-}
-{-# LANGUAGE DeriveGeneric      #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE OverloadedStrings  #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Middleware.Capability.Retry where
 
-import qualified Control.Concurrent           as Concurrent
-import           Control.Monad.IO.Class       (MonadIO)
-import           Data.Aeson                   (FromJSON)
-import           Data.Aeson.Types             ((.:))
-import qualified Data.Aeson.Types             as Aeson
-import           Data.Text                    (Text, pack)
-import           GHC.Generics                 (Generic)
-import           Middleware.Capability.Logger (Logger, logDebug, logError)
-import           Middleware.Capability.Time   (Time, sleep)
-import           Polysemy
-import           Servant.API
-import           Servant.Client
+import Colog.Polysemy.Formatting         (logError, logInfo)
+import Colog.Polysemy.Formatting.WithLog (WithLog)
+import Control.DeepSeq                   (NFData)
+import Data.Either.Combinators           (mapLeft)
+import Formatting
+import Middleware.Capability.Error       (AppError (HttpError, OtherError, RetriesExceeded), Error, catch,
+                                          throw)
+import Middleware.Capability.Time        (Time, sleep)
+import Middleware.PabClient.Types        (lookupResBody)
+import Polysemy                          (Members, Sem)
+import Servant.Client.Streaming          (ClientError, ClientM)
+import Servant.Polysemy.Client           (ClientError, ServantClient, runClient, runClient')
+import Text.ParserCombinators.ReadP      (satisfy)
 
-
-
-data PABError = PABError
-    { error   :: Text
-    , message :: Text
-    }
-  deriving stock (Show, Eq, Generic)
-  deriving anyclass (FromJSON)
-
-data PABRequestError
-    = HttpError BaseUrl ClientError
-    | ApiError BaseUrl PABError
-  deriving stock (Show)
-
-newtype RawPabResBody a = RawPabResBody
-    { unRawPabResBody :: Either PABRequestError a
-    }
-  deriving stock (Show, Eq)
-
-instance FromJSON a => FromJSON (RawPabResBody a) where
-    parseJSON = Aeson.withObject "RawPabResBody" $ \o -> do -- extract logic
-        success <- o .: "success"
-        RawPabResBody . Right <$> o .: "data"
-            -- if success
-            --     then Right <$> o .: "data"
-            --     else Left <$> Aeson.parseJSON (Aeson.Object o)
-
-type RawPabResponse a = ResponseF (RawPabResBody a)
-
-data PabResponse a =
-  PabResponse
-    { rawResponse    :: RawPabResponse a
-    , bodyOfResponse :: a
-    }
-
-data PabClientAPI a where
-    Status :: FromJSON a => PabClientAPI (PabResponse a)
-    Endpoint :: FromJSON a => PabClientAPI (PabResponse a)
-    Stop :: PabClientAPI (PabResponse ())
-
-runPabClient
-    :: Members '[Logger, Error PABRequestError] r
-    => Sem (PabClientAPI ': r) a
-    -> Sem r a
-runPabClient = undefined
+-- | retry servant request with custom response mapping
+retryRequest :: (NFData a, WithLog r, Members '[ServantClient, Error AppError, Time] r)
+             => Integer
+             -- ^ limit of retries
+             -> Integer
+             -- ^ interval seconds
+             -> (a -> Either AppError b)
+             -- ^ try to map response body
+             -> ClientM a
+             -- ^ retryable servant call
+             -> Sem r b
+retryRequest retriesLeft _ action _ | retriesLeft <= 0 = do
+  logError "Giving Up"
+  throw RetriesExceeded
+retryRequest retriesLeft interval f action = do
+  callRes <- runClient' action
+  let res = f =<< mapLeft HttpError callRes
+  case res of
+    Right o  -> pure o
+    Left err -> do
+      logError (text % shown) "An error occurred: " err
+      sleep (seconds interval)
+      logInfo ("An error occurred while performing request. Retries left: " % accessed id int) retriesLeft
+      retryRequest (retriesLeft - 1) interval f action
+  where
+    seconds = (*) 100000

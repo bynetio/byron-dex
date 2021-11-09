@@ -5,22 +5,24 @@
 
 module Middleware.PabClient where
 
-import           Colog.Polysemy.Formatting      (WithLog, logError)
-import           Data.Aeson                     (ToJSON)
-import           Data.Aeson.Types               (Value, toJSON)
-import           Dex.Types                      (Request (Request))
-import           Formatting
-import           Middleware.Capability.Error
-import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import           Middleware.PabClient.API       (API)
-import           Middleware.PabClient.Types
-import           Polysemy                       (Embed, Members, Sem, interpret,
-                                                 makeSem)
-import           Servant                        (Proxy (..),
-                                                 type (:<|>) ((:<|>)))
-import           Servant.Client.Streaming       (ClientM, client)
-import           Servant.Polysemy.Client        (ClientError, ServantClient,
-                                                 runClient, runClient')
+import Colog.Polysemy.Effect          (Log)
+import Colog.Polysemy.Formatting      (WithLog, logError)
+import Data.Aeson                     (FromJSON, ToJSON)
+import Data.Aeson.Types               (Value, toJSON)
+import Data.Either.Combinators        (mapLeft)
+import Dex.Types                      (Request (Request), historyId)
+import Formatting
+import GHC.Stack                      (HasCallStack)
+import Middleware.Capability.Error
+import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import Middleware.Capability.Retry    (retryRequest)
+import Middleware.Capability.Time     (Time)
+import Middleware.PabClient.API       (API)
+import Middleware.PabClient.Types
+import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
+import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
+import Servant.Client.Streaming       (ClientM, client)
+import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
 
 data ManagePabClient r a where
   Status :: ContractInstanceId -> ManagePabClient r ContractState
@@ -30,19 +32,19 @@ makeSem ''ManagePabClient
 
 data PabClient = PabClient
   { healthcheck    :: ClientM ()
-      -- ^ call healthcheck method
+  -- ^ call healthcheck method
   , instanceClient :: ContractInstanceId -> InstanceClient
-      -- ^ call methods for instance client.
+  -- ^ call methods for instance client.
   }
 
 -- | Contract instance endpoints
 data InstanceClient = InstanceClient
   { getInstanceStatus    :: ClientM ContractState
-      -- ^ get instance status
+  -- ^ get instance status
   , callInstanceEndpoint :: String -> Value -> ClientM ()
-      -- ^ call instance endpoint
+  -- ^ call instance endpoint
   , stopInstance         :: ClientM ()
-      -- ^ call stop instance method
+  -- ^ call stop instance method
   }
 
 -- | Init pab client
@@ -61,7 +63,7 @@ pabClient = PabClient{..}
             ) = toInstanceClient cid
 
 
-runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen , Error AppError, Embed IO] r)
+runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, Time] r)
              => Sem (ManagePabClient ': r) a
              -> Sem r a
 runPabClient =
@@ -73,30 +75,45 @@ runPabClient =
           callRes <- runClient' getStatus
           mapAppError callRes
 
-
-        GetFunds cid -> do
-          let PabClient{instanceClient} = pabClient
-              callEndpoint = callInstanceEndpoint . instanceClient $ cid
-          req <- wrapRequest ()
-
-          let body = toJSON req
-
-          callRes <- runClient' $ callEndpoint "funds" body
-          mapAppError callRes
-
-
-          -- fetch respones from api...
-          undefined
+        GetFunds cid ->
+          callEndpoint cid "funds" ()
 
     )
 
     where
-      mapAppError ::  (WithLog r, Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
+      mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
       mapAppError (Left err) = do
         logError (text % shown) "Cannot fetch status from PAB, cause: " err
         throw $ HttpError err
       mapAppError (Right v) = pure v
 
+
+callEndpoint :: forall r req res. (ToJSON req, FromJSON res, WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, Time] r)
+             => ContractInstanceId
+             -> String
+             -> req
+             -> Sem r res
+callEndpoint cid name a = do
+   let PabClient{instanceClient} = pabClient
+       callEndpoint' = callInstanceEndpoint . instanceClient $ cid
+       getStatus = getInstanceStatus . instanceClient $ cid
+   req <- wrapRequest a
+
+   let body = toJSON req
+       hid  = historyId req
+
+   callRes <- runClient' $ callEndpoint' name body
+   mapAppError callRes
+
+   -- Retry five times with two second inverval between.
+   retryRequest 5 2 (lookupResBody @res hid) getStatus
+
+
+mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
+mapAppError (Left err) = do
+  logError (text % shown) "Cannot fetch status from PAB, cause: " err
+  throw $ HttpError err
+mapAppError (Right v) = pure v
 
 wrapRequest :: (ToJSON a, Members '[ReqIdGen] r) => a -> Sem r (Request a)
 wrapRequest content = do
