@@ -5,22 +5,20 @@
 
 module Middleware.PabClient where
 
-import           Colog.Polysemy.Formatting      (WithLog, logError)
-import           Data.Aeson                     (ToJSON)
-import           Data.Aeson.Types               (Value, toJSON)
-import           Dex.Types                      (Request (Request))
-import           Formatting
-import           Middleware.Capability.Error
-import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import           Middleware.PabClient.API       (API)
-import           Middleware.PabClient.Types
-import           Polysemy                       (Embed, Members, Sem, interpret,
-                                                 makeSem)
-import           Servant                        (Proxy (..),
-                                                 type (:<|>) ((:<|>)))
-import           Servant.Client.Streaming       (ClientM, client)
-import           Servant.Polysemy.Client        (ClientError, ServantClient,
-                                                 runClient, runClient')
+import Colog.Polysemy.Formatting      (WithLog, logError)
+import Data.Aeson                     (ToJSON)
+import Data.Aeson.Types               (Value, toJSON)
+import Data.Either.Combinators        (mapLeft)
+import Dex.Types                      (Request (Request), historyId)
+import Formatting
+import Middleware.Capability.Error
+import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import Middleware.PabClient.API       (API)
+import Middleware.PabClient.Types
+import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
+import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
+import Servant.Client.Streaming       (ClientM, client)
+import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
 
 data ManagePabClient r a where
   Status :: ContractInstanceId -> ManagePabClient r ContractState
@@ -77,12 +75,20 @@ runPabClient =
         GetFunds cid -> do
           let PabClient{instanceClient} = pabClient
               callEndpoint = callInstanceEndpoint . instanceClient $ cid
+              getStatus = getInstanceStatus . instanceClient $ cid
+
           req <- wrapRequest ()
 
+
           let body = toJSON req
+              hid  = historyId req
 
           callRes <- runClient' $ callEndpoint "funds" body
           mapAppError callRes
+
+          callStatus <- runClient' getStatus
+          let body = lookupResBody @[Fund] hid =<< mapLeft show callStatus
+
 
 
           -- fetch respones from api...
@@ -91,7 +97,7 @@ runPabClient =
     )
 
     where
-      mapAppError ::  (WithLog r, Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
+      mapAppError :: (WithLog r, Members '[Error AppError, Embed IO] r) => Either ClientError a -> Sem r a
       mapAppError (Left err) = do
         logError (text % shown) "Cannot fetch status from PAB, cause: " err
         throw $ HttpError err
