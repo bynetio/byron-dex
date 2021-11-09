@@ -1,7 +1,7 @@
 module Main(main) where
 
 
-import Middleware.App
+import Middleware.App (runApp)
 
 main :: IO ()
-main = putStrLn "Hello!"
+main = runApp

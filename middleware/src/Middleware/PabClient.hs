@@ -102,18 +102,12 @@ callEndpoint cid name a = do
    let body = toJSON req
        hid  = historyId req
 
-   callRes <- runClient' $ callEndpoint' name body
-   mapAppError callRes
+   -- send request, Retry three times with one second interval between.
+   retryRequest 3 1 Right $ callEndpoint' name body
 
-   -- Retry five times with two second inverval between.
+   -- receive response, Retry five times with two second interval between.
    retryRequest 5 2 (lookupResBody @res hid) getStatus
 
-
-mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
-mapAppError (Left err) = do
-  logError (text % shown) "Cannot fetch status from PAB, cause: " err
-  throw $ HttpError err
-mapAppError (Right v) = pure v
 
 wrapRequest :: (ToJSON a, Members '[ReqIdGen] r) => a -> Sem r (Request a)
 wrapRequest content = do

@@ -8,7 +8,6 @@ library
     hs-source-dirs:     src
     exposed-modules:    Middleware.App
                       , Middleware.API
-                      , Middleware.DummyAPI
                       , Middleware.Capability.Config
                       , Middleware.Capability.CORS
                       , Middleware.Capability.ReqIdGen
