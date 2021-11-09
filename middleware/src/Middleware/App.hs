@@ -13,7 +13,9 @@ import           Colog.Polysemy.Formatting      (Msg, Severity, WithLog, addThre
                                                  logTextStderr, logTextStdout, newLogEnv,
                                                  renderThreadTimeMessage)
 import           Control.Monad.Except
+import           Data.Aeson                     (encode)
 import           Data.Function                  ((&))
+import           Data.Text                      (Text)
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
 import           Middleware.API
@@ -23,6 +25,8 @@ import           Middleware.Capability.Config   (AppConfig (pabUrl), ConfigLoade
 import           Middleware.Capability.Error    hiding (Handler, throwError)
 import           Middleware.Capability.ReqIdGen (runReqIdGen)
 import           Middleware.Capability.Time     (runTime)
+import           Middleware.Dex                 (dexServer, runDex)
+import qualified Middleware.Dex.Types           as DexTypes
 import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp       as Warp
@@ -61,9 +65,27 @@ createApp = do
   runWarpServerSettings' @API serverCfg app
   where
     -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
-    handleErrors (Left (ConfigLoaderError id)) = Left err404 { errBody = "Cannot load configuration file" }
-    handleErrors (Left err)    = Left err500 { errBody = "Internal Server Error" }
+    -- | move error mapper to separate package
+    handleErrors (Left (ConfigLoaderError id)) = Left $ notFound "Cannot load configuration file"
+    handleErrors (Left err)    = Left $ internalServerError "Internal Server Error"
     handleErrors (Right value) = Right value
+
+    notFound :: Text -> ServerError
+    notFound msg =
+      err404
+        { errBody = encode $ DexTypes.Error msg
+        , errHeaders = contentTypeJson
+        }
+
+    internalServerError :: Text -> ServerError
+    internalServerError msg =
+      err500
+        { errBody = encode $ DexTypes.Error msg
+        , errHeaders = contentTypeJson
+        }
+
+    contentTypeJson = [("Content-Type", "application/json")]
+
 
     liftHandler = Handler . ExceptT . fmap handleErrors
 

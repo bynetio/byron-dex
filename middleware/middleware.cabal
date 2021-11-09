@@ -14,6 +14,8 @@ library
                       , Middleware.Capability.Retry
                       , Middleware.Capability.Time
                       , Middleware.Capability.Error
+                      , Middleware.Dex
+                      , Middleware.Dex.Types
                       , Middleware.PabClient
                       , Middleware.PabClient.API
                       , Middleware.PabClient.Types
