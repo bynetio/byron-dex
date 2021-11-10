@@ -1,15 +1,17 @@
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric  #-}
+{-# LANGUAGE DeriveAnyClass        #-}
+{-# LANGUAGE DeriveGeneric         #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 -- |
 
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Encoding.Internal (tuple, (>*<))
 import           Data.Aeson.Types             (FromJSON, ToJSON, toJSON)
 import           Data.Text                    (Text)
+import           Dex.Types                    (OrderInfo (..), fromNat)
 import           GHC.Generics                 (Generic)
-import           Ledger                       (CurrencySymbol, TokenName)
-import           Ledger.Value                 (assetClass)
+import           Ledger                       (AssetClass, CurrencySymbol,
+                                               TokenName, TxOutRef)
+import           Ledger.Value                 (assetClass, unAssetClass)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -21,10 +23,16 @@ data FundView = FundView
   , amount :: Integer
   } deriving (Show, Generic, ToJSON)
 
+fundView :: AssetClass -> Integer -> FundView
+fundView = FundView . coinFromAssetClass
+
 data Coin = Coin
   { currencySymbol :: CurrencySymbol
   , tokenName      :: TokenName
   } deriving (Show, Generic, FromJSON)
+
+coinFromAssetClass :: AssetClass -> Coin
+coinFromAssetClass = uncurry Coin . unAssetClass
 
 data CreateLiquidityPoolParams
   = CreateLiquidityPoolParams
@@ -48,15 +56,22 @@ data PoolPartsParams
 instance ToJSON Coin where
   toJSON (Coin a b) = toJSON $ assetClass a b
 
+data DexOrder
+  = DexOrder
+      { orderHash    :: TxOutRef
+      , lockedCoin   :: FundView
+      , expectedCoin :: FundView
+      , orderType    :: Text
+      }
+  deriving (Generic, Show, ToJSON)
 
--- { "coinA": { "tokenName": { "unTokenName": "A" }, "currencySymbol": { "unCurrencySymbol": "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698" } },
---   "coinB": { "tokenName": { "unTokenName": "B" }, "currencySymbol": { "unCurrencySymbol": "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698" } },
---   "amountA": 1000,
---   "poolPartsParams": {
---     "coinAPriceChange": [100,101],
---     "coinBPriceChange": [100,101],
---     "numberOfParts": 3
---   },
---   "swapFee": [1,100],
---   "exchangeRate": [100,100]
--- }
+dexOrder :: OrderInfo -> DexOrder
+dexOrder OrderInfo { orderHash      = oh
+                   , lockedCoin     = lc
+                   , lockedAmount   = la
+                   , expectedCoin   = ec
+                   , expectedAmount = ea
+                   , orderType      = ot } =
+    DexOrder oh (fv lc la) (fv ec ea) ot
+  where
+    fv coin amount = fundView coin (fromNat amount)
