@@ -3,8 +3,8 @@
 
 module Middleware.Capability.CORS (corsConfig) where
 
-import Network.Wai                 (Middleware)
-import Network.Wai.Middleware.Cors
+import           Network.Wai                 (Middleware)
+import           Network.Wai.Middleware.Cors
 
 corsPolicy :: CorsResourcePolicy
 corsPolicy =

@@ -1,10 +1,10 @@
 module Middleware.Capability.Time where
 
 
-import Control.Concurrent     (threadDelay)
-import Control.Monad
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Polysemy
+import           Control.Concurrent     (threadDelay)
+import           Control.Monad
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Polysemy
 
 data Time m r where
   Sleep :: Integer -> Time m ()

@@ -4,11 +4,11 @@ module Middleware.Capability.ReqIdGen
   , runReqIdGen
   ) where
 
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Text              (Text)
-import Data.UUID              (toText)
-import Data.UUID.V4           as UUID (nextRandom)
-import Polysemy
+import           Control.Monad.IO.Class (MonadIO, liftIO)
+import           Data.Text              (Text)
+import           Data.UUID              (toText)
+import           Data.UUID.V4           as UUID (nextRandom)
+import           Polysemy
 
 
 data ReqIdGen m a where
