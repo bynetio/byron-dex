@@ -13,14 +13,11 @@ module Middleware.PabClient.Types
 
 import           Control.DeepSeq                         (NFData (rnf), rwhnf)
 import           Data.Aeson
-import           Data.Aeson.Types                        (parseEither,
-                                                          parseMaybe)
-import           Data.Either.Combinators                 (mapLeft, maybeToRight,
-                                                          rightToMaybe)
+import           Data.Aeson.Types                        (parseEither, parseMaybe)
+import           Data.Either.Combinators                 (mapLeft, maybeToRight, rightToMaybe)
 import           Data.Text
 import           Data.UUID                               (UUID)
-import           Dex.WalletHistory                       (History (History),
-                                                          HistoryId)
+import           Dex.WalletHistory                       (History (History), HistoryId)
 import qualified Dex.WalletHistory                       as WalletHistory
 import           GHC.Generics
 import           Ledger                                  (AssetClass)

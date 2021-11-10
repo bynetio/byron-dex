@@ -2,20 +2,19 @@
 
 module Middleware.Capability.Retry where
 
-import           Colog.Polysemy.Formatting         (logError, logInfo)
-import           Colog.Polysemy.Formatting.WithLog (WithLog)
-import           Control.DeepSeq                   (NFData)
-import           Data.Either.Combinators           (mapLeft)
-import           Formatting
-import           Middleware.Capability.Error       (AppError (HttpError, OtherError, RetriesExceeded),
-                                                    Error, catch, throw)
-import           Middleware.Capability.Time        (Time, sleep)
-import           Middleware.PabClient.Types        (lookupResBody)
-import           Polysemy                          (Members, Sem)
-import           Servant.Client.Streaming          (ClientError, ClientM)
-import           Servant.Polysemy.Client           (ClientError, ServantClient,
-                                                    runClient, runClient')
-import           Text.ParserCombinators.ReadP      (satisfy)
+import Colog.Polysemy.Formatting         (logError, logInfo)
+import Colog.Polysemy.Formatting.WithLog (WithLog)
+import Control.DeepSeq                   (NFData)
+import Data.Either.Combinators           (mapLeft)
+import Formatting
+import Middleware.Capability.Error       (AppError (HttpError, OtherError, RetriesExceeded), Error, catch,
+                                          throw)
+import Middleware.Capability.Time        (Time, sleep)
+import Middleware.PabClient.Types        (lookupResBody)
+import Polysemy                          (Members, Sem)
+import Servant.Client.Streaming          (ClientError, ClientM)
+import Servant.Polysemy.Client           (ClientError, ServantClient, runClient, runClient')
+import Text.ParserCombinators.ReadP      (satisfy)
 
 -- | retry servant request with custom response mapping
 retryRequest :: (NFData a, WithLog r, Members '[ServantClient, Error AppError, Time] r)

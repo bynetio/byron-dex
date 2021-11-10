@@ -5,14 +5,13 @@ module Middleware.Capability.Error
   , module E
   ) where
 
-import           Control.Exception as E hiding (catch, catchJust, fromException,
-                                         throw, try, tryJust)
-import           Data.Aeson.Types  (FromJSON)
-import           Data.Text         (Text)
-import           Dex.WalletHistory (HistoryId)
-import           GHC.Generics
-import           Polysemy.Error    as E
-import           Servant.Client    (ClientError)
+import Control.Exception as E hiding (catch, catchJust, fromException, throw, try, tryJust)
+import Data.Aeson.Types  (FromJSON)
+import Data.Text         (Text)
+import Dex.WalletHistory (HistoryId)
+import GHC.Generics
+import Polysemy.Error    as E
+import Servant.Client    (ClientError)
 
 data AppError
   = PabError Text

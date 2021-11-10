@@ -1,20 +1,18 @@
 
 module Middleware.Dex where
 
-import           Colog.Polysemy.Formatting.WithLog (WithLog)
-import           Ledger                            (AssetClass)
-import           Ledger.Value                      (assetClass, unAssetClass)
-import           Middleware.API                    (API)
-import           Middleware.Capability.Error
-import           Middleware.Dex.Types              hiding (Error)
-import           Middleware.PabClient              (ManagePabClient,
-                                                    createLiquidityPoolInPab,
-                                                    getFunds, getMyOrders)
-import           Middleware.PabClient.Types        hiding (Error)
-import           Polysemy
-import           Servant
-import           Servant.Polysemy.Server
-import           Servant.Server                    (ServerT)
+import Colog.Polysemy.Formatting.WithLog (WithLog)
+import Ledger                            (AssetClass)
+import Ledger.Value                      (assetClass, unAssetClass)
+import Middleware.API                    (API)
+import Middleware.Capability.Error
+import Middleware.Dex.Types              hiding (Error)
+import Middleware.PabClient              (ManagePabClient, createLiquidityPoolInPab, getFunds, getMyOrders)
+import Middleware.PabClient.Types        hiding (Error)
+import Polysemy
+import Servant
+import Servant.Polysemy.Server
+import Servant.Server                    (ServerT)
 
 data Dex r a where
   Funds :: ContractInstanceId -> Dex r [FundView]
