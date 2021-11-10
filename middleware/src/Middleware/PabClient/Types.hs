@@ -13,11 +13,15 @@ module Middleware.PabClient.Types
 
 import           Control.DeepSeq                         (NFData (rnf), rwhnf)
 import           Data.Aeson
-import           Data.Aeson.Types                        (parseEither, parseMaybe)
-import           Data.Either.Combinators                 (mapLeft, maybeToRight, rightToMaybe)
+import           Data.Aeson.Types                        (emptyArray,
+                                                          parseEither,
+                                                          parseMaybe)
+import           Data.Either.Combinators                 (mapLeft, maybeToRight,
+                                                          rightToMaybe)
 import           Data.Text
 import           Data.UUID                               (UUID)
-import           Dex.WalletHistory                       (History (History), HistoryId)
+import           Dex.WalletHistory                       (History (History),
+                                                          HistoryId)
 import qualified Dex.WalletHistory                       as WalletHistory
 import           GHC.Generics
 import           Ledger                                  (AssetClass)
@@ -42,17 +46,21 @@ type Fund = (AssetClass, Integer)
 type CallResult = Either Text SuccessCallResult
 
 data SuccessCallResult = SuccessCallResult
-  { contents :: Value,
+  { contents :: Maybe Value,
     tag      :: Text
   }
   deriving (Show, Generic, FromJSON, ToJSON)
 
-lookupResBody :: (FromJSON a) => HistoryId -> ContractState -> Either AppError a
+resolveEmptyContent :: SuccessCallResult -> Value
+resolveEmptyContent (SuccessCallResult Nothing _)  = emptyArray
+resolveEmptyContent (SuccessCallResult (Just a) _) = a
+
+lookupResBody :: forall a. (FromJSON a) => HistoryId -> ContractState -> Either AppError a
 lookupResBody hid state = do
   history   <- fromJSONValue . observableState . cicCurrentState $ state
   callRes   <- maybeToRight (CannotExtractHistoryId hid) (WalletHistory.lookup hid history)
   unCallRes <- EndpointCallError `mapLeft` callRes
-  fromJSONValue (contents unCallRes)
+  fromJSONValue $ resolveEmptyContent unCallRes
   where
-    fromJSONValue :: FromJSON a => Value -> Either AppError a
+    fromJSONValue :: forall a. FromJSON a => Value -> Either AppError a
     fromJSONValue = mapLeft BodyParseError . parseEither parseJSON
