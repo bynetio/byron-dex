@@ -5,32 +5,31 @@
 
 module Middleware.PabClient where
 
-import           Colog.Polysemy.Effect          (Log)
-import           Colog.Polysemy.Formatting      (WithLog, logError)
-import           Data.Aeson                     (FromJSON, ToJSON)
-import           Data.Aeson.Types               (Value, toJSON)
-import           Data.Either.Combinators        (mapLeft)
-import           Dex.Types                      (OrderInfo (OrderInfo),
-                                                 Request (Request), historyId)
-import           Formatting
-import           GHC.Stack                      (HasCallStack)
-import           Middleware.Capability.Error
-import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import           Middleware.Capability.Retry    (retryRequest)
-import           Middleware.Capability.Time     (Time)
-import           Middleware.PabClient.API       (API)
-import           Middleware.PabClient.Types
-import           Polysemy                       (Embed, Members, Sem, interpret,
-                                                 makeSem)
-import           Servant                        (Proxy (..),
-                                                 type (:<|>) ((:<|>)))
-import           Servant.Client.Streaming       (ClientM, client)
-import           Servant.Polysemy.Client        (ClientError, ServantClient,
-                                                 runClient, runClient')
+import Colog.Polysemy.Effect          (Log)
+import Colog.Polysemy.Formatting      (WithLog, logError)
+import Data.Aeson                     (FromJSON, ToJSON)
+import Data.Aeson.Types               (Value, toJSON)
+import Data.Either.Combinators        (mapLeft)
+import Dex.Types                      (OrderInfo (OrderInfo), Request (Request), historyId)
+import Formatting
+import GHC.Stack                      (HasCallStack)
+import Middleware.Capability.Error
+import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import Middleware.Capability.Retry    (retryRequest)
+import Middleware.Capability.Time     (Time)
+import Middleware.Dex.Types           (CreateLiquidityPoolParams (CreateLiquidityPoolParams))
+import Middleware.PabClient.API       (API)
+import Middleware.PabClient.Types
+import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
+import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
+import Servant.Client.Streaming       (ClientM, client)
+import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
+
 
 data ManagePabClient r a where
   Status :: ContractInstanceId -> ManagePabClient r ContractState
   GetFunds :: ContractInstanceId -> ManagePabClient r [Fund]
+  CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
   GetMyOrders :: ContractInstanceId -> ManagePabClient r [OrderInfo]
 
 makeSem ''ManagePabClient
@@ -82,6 +81,9 @@ runPabClient =
 
         GetFunds cid ->
           callEndpoint cid "funds" ()
+
+        CreateLiquidityPoolInPab cid params -> do
+          callEndpoint cid "createLiquidityPool" params
 
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()

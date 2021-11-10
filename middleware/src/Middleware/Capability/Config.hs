@@ -14,11 +14,12 @@ import           Middleware.Capability.Error
 import qualified Network.Wai.Handler.Warp    as Warp
 import           Polysemy
 import qualified Polysemy.Internal           as P
-import           Servant.Client              (BaseUrl (BaseUrl), Scheme (Http), parseBaseUrl)
+import           Servant.Client              (BaseUrl (BaseUrl), Scheme (Http),
+                                              parseBaseUrl)
 
 data AppConfig = AppConfig
   { appConfigServer :: Warp.Settings
-  , pabUrl :: BaseUrl
+  , pabUrl          :: BaseUrl
   } deriving (Generic)
 
 instance Conferer.FromConfig AppConfig

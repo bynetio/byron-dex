@@ -3,7 +3,8 @@ module Middleware.PabClient.API where
 import qualified Data.Aeson                 as JSON
 import           Data.Text                  (Text)
 import           Middleware.PabClient.Types
-import           Servant.API                (Capture, Description, Get, JSON, Post, Put, QueryParam, ReqBody,
+import           Servant.API                (Capture, Description, Get, JSON,
+                                             Post, Put, QueryParam, ReqBody,
                                              (:<|>), (:>))
 
 -- | PAB client API for contracts

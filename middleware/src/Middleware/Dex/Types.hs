@@ -5,13 +5,13 @@
 
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types (ToJSON)
-import           Data.Text        (Text)
-import           Dex.Types        (OrderInfo (..), fromNat)
-import           GHC.Generics     (Generic)
-import           Ledger           (AssetClass, CurrencySymbol, TokenName,
-                                   TxOutRef)
-import           Ledger.Value     (unAssetClass)
+import           Data.Aeson.Types             (FromJSON, ToJSON, toJSON)
+import           Data.Text                    (Text)
+import           Dex.Types                    (OrderInfo (..), fromNat)
+import           GHC.Generics                 (Generic)
+import           Ledger                       (AssetClass, CurrencySymbol,
+                                               TokenName, TxOutRef)
+import           Ledger.Value                 (assetClass, unAssetClass)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -29,10 +29,32 @@ fundView = FundView . coinFromAssetClass
 data Coin = Coin
   { currencySymbol :: CurrencySymbol
   , tokenName      :: TokenName
-  } deriving (Show, Generic, ToJSON)
+  } deriving (Show, Generic, FromJSON)
 
 coinFromAssetClass :: AssetClass -> Coin
 coinFromAssetClass = uncurry Coin . unAssetClass
+
+data CreateLiquidityPoolParams
+  = CreateLiquidityPoolParams
+      { coinA           :: Coin
+      , coinB           :: Coin
+      , amountA         :: Integer
+      , poolPartsParams :: PoolPartsParams
+      , swapFee         :: (Integer, Integer)
+      , exchangeRate    :: (Integer, Integer)
+      }
+  deriving (Generic, FromJSON, ToJSON, Show)
+
+data PoolPartsParams
+  = PriceChangeParams
+      { coinAPriceChange :: (Integer, Integer)
+      , coinBPriceChange :: (Integer, Integer)
+      , numberOfParts    :: Integer
+      }
+  deriving (FromJSON, Generic, Show, ToJSON)
+
+instance ToJSON Coin where
+  toJSON (Coin a b) = toJSON $ assetClass a b
 
 data DexOrder
   = DexOrder
