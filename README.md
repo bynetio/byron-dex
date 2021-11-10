@@ -150,6 +150,64 @@ Usage:
 }
 ```
 
+## Using PAB directly
+
+PAB operates on port `9080`.
+
+To run PAB, type:
+
+```shell
+cabal run dex-pab
+```
+
+PAB endpoints requires a contract instance ID to identify the operator. To get contract instance ID look for a line in PAB output log that looks like:
+
+```
+[INFO] Activated instance d336fd95-8b42-4a1e-9600-1631f433e1d8 on W872cb83
+```
+
+This is an information about a contract instance for wallet with ID starting with 872cb83.
+
+PAB has two major endpoints that are currently used in order to operate on DEX:
+
+### `/api/contract/instance/:instance_id/endpoint/:endpoint_name`
+
+Example:
+
+```shell
+curl -vXPOST -H "Content-Type: application/json" -d '{"historyId":"","randomSeed":1,"content":[]}' "http://localhost:9080/api/contract/instance/d336fd95-8b42-4a1e-9600-1631f433e1d8/endpoint/funds" | jq
+```
+
+`historyId` is an ID of the operation that can be utilized in history lookup in status endpoint response.
+
+`randomSeed` is the value required for creating a unique ID of the operation in the history.
+
+`content` is a part with serialized parameters for endpoint.
+
+### `/api/contract/instance/:instance_id/status`
+
+Example:
+
+```shell
+curl -v "http://localhost:9080/api/contract/instance/d336fd95-8b42-4a1e-9600-1631f433e1d8/status" | jq
+```
+
+## Using middleware
+
+Middleware operates on port `8080`.
+
+To run middleware, type:
+
+```shell
+cabal run middleware-manual
+```
+
+Example:
+
+```shell
+curl -v -XPOST -d '{ "coinA": { "tokenName": { "unTokenName": "A" }, "currencySymbol": { "unCurrencySymbol": "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698" } }, "coinB": { "tokenName": { "unTokenName": "B" }, "currencySymbol": { "unCurrencySymbol": "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698" } }, "amountA": 1000, "poolPartsParams": { "coinAPriceChange": [100,101], "coinBPriceChange": [100,101], "numberOfParts": 3 }, "swapFee": [1,100], "exchangeRate": [100,100] }' -H "Content-Type: application/json" "http://localhost:8080/d336fd95-8b42-4a1e-9600-1631f433e1d8/createLiquidityPool" | jq
+```
+
 ## Launching dApp
 
 ```bash
