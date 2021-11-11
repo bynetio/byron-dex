@@ -5,32 +5,39 @@
 
 module Middleware.PabClient where
 
-import Colog.Polysemy.Effect          (Log)
-import Colog.Polysemy.Formatting      (WithLog, logError)
-import Data.Aeson                     (FromJSON, ToJSON)
-import Data.Aeson.Types               (Value, toJSON)
-import Data.Either.Combinators        (mapLeft)
-import Dex.Types                      (OrderInfo (OrderInfo), Request (Request), historyId)
-import Formatting
-import GHC.Stack                      (HasCallStack)
-import Middleware.Capability.Error
-import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import Middleware.Capability.Retry    (retryRequest)
-import Middleware.Capability.Time     (Time)
-import Middleware.Dex.Types           (CreateLiquidityPoolParams (CreateLiquidityPoolParams))
-import Middleware.PabClient.API       (API)
-import Middleware.PabClient.Types
-import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
-import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
-import Servant.Client.Streaming       (ClientM, client)
-import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
+import           Colog.Polysemy.Effect          (Log)
+import           Colog.Polysemy.Formatting      (WithLog, logError)
+import           Data.Aeson                     (FromJSON, ToJSON)
+import           Data.Aeson.Types               (Value, toJSON)
+import           Data.Either.Combinators        (mapLeft)
+import           Dex.Types                      (OrderInfo (OrderInfo),
+                                                 Request (Request), historyId)
+import           Formatting
+import           GHC.Stack                      (HasCallStack)
+import           Middleware.Capability.Error
+import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import           Middleware.Capability.Retry    (retryRequest)
+import           Middleware.Capability.Time     (Time)
+import           Middleware.Dex.Types           (CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                                 MidCancelOrder,
+                                                 toCancelOrderParams)
+import           Middleware.PabClient.API       (API)
+import           Middleware.PabClient.Types
+import           Polysemy                       (Embed, Members, Sem, interpret,
+                                                 makeSem)
+import           Servant                        (Proxy (..),
+                                                 type (:<|>) ((:<|>)))
+import           Servant.Client.Streaming       (ClientM, client)
+import           Servant.Polysemy.Client        (ClientError, ServantClient,
+                                                 runClient, runClient')
 
 
 data ManagePabClient r a where
-  Status :: ContractInstanceId -> ManagePabClient r ContractState
-  GetFunds :: ContractInstanceId -> ManagePabClient r [Fund]
+  Status                   :: ContractInstanceId -> ManagePabClient r ContractState
+  GetFunds                 :: ContractInstanceId -> ManagePabClient r [Fund]
   CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
-  GetMyOrders :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetMyOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  CancelOrder              :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
 
@@ -71,8 +78,8 @@ runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, T
              => Sem (ManagePabClient ': r) a
              -> Sem r a
 runPabClient =
-  interpret
-    (\case
+  interpret $
+    \case
         Status cid -> do
           let PabClient{instanceClient} = pabClient
               getStatus = getInstanceStatus . instanceClient $ cid
@@ -87,7 +94,8 @@ runPabClient =
 
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
-    )
+
+        CancelOrder cid params -> callEndpoint cid "cancel" (toCancelOrderParams params)
 
     where
       mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
