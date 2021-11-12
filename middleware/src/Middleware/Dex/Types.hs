@@ -8,7 +8,7 @@ module Middleware.Dex.Types where
 import           Data.Aeson.Types (FromJSON, ToJSON, toJSON)
 import           Data.Text        (Text)
 import           Dex.Types        (CancelOrderParams (CancelOrderParams),
-                                   OrderInfo (..), fromNat)
+                                   OrderInfo (..), PayoutSummary, fromNat)
 import           GHC.Generics     (Generic)
 import           Ledger           (AssetClass, CurrencySymbol, TokenName,
                                    TxOutRef)
@@ -24,8 +24,8 @@ data FundView = FundView
   , amount :: Integer
   } deriving (Show, Generic, ToJSON)
 
-fundView :: AssetClass -> Integer -> FundView
-fundView = FundView . coinFromAssetClass
+mkFundView :: AssetClass -> Integer -> FundView
+mkFundView = FundView . coinFromAssetClass
 
 data Coin = Coin
   { currencySymbol :: CurrencySymbol
@@ -94,10 +94,18 @@ dexOrder OrderInfo { orderHash      = oh
                    , orderType      = ot } =
     DexOrder oh (fv lc la) (fv ec ea) ot
   where
-    fv coin amount = fundView coin (fromNat amount)
+    fv coin amount = mkFundView coin (fromNat amount)
 
 newtype MidCancelOrder = MidCancelOrder TxOutRef
   deriving (FromJSON, Generic, Show, ToJSON)
 
 toCancelOrderParams :: MidCancelOrder -> CancelOrderParams
 toCancelOrderParams (MidCancelOrder ref) = CancelOrderParams ref
+
+data PayoutView = PayoutView
+   { coin   :: Coin
+   , amount :: Integer
+   } deriving (Show, Generic, ToJSON)
+
+mkPayoutView :: AssetClass -> Integer -> PayoutView
+mkPayoutView = PayoutView . coinFromAssetClass

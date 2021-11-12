@@ -11,6 +11,7 @@ import           Data.Aeson                     (FromJSON, ToJSON)
 import           Data.Aeson.Types               (Value, toJSON)
 import           Data.Either.Combinators        (mapLeft)
 import           Dex.Types                      (OrderInfo (OrderInfo),
+                                                 PayoutSummary,
                                                  Request (Request), historyId)
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
@@ -36,10 +37,16 @@ import           Servant.Polysemy.Client        (ClientError, ServantClient,
 data ManagePabClient r a where
   Status                    :: ContractInstanceId -> ManagePabClient r ContractState
   GetFunds                  :: ContractInstanceId -> ManagePabClient r [Fund]
+  CollectFunds              :: ContractInstanceId -> ManagePabClient r ()
   CreateSellOrder           :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
   CreateLiquidityPoolInPab  :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
   CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
   GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
+  PerformInPab              :: ContractInstanceId -> ManagePabClient r ()
+  PerformNRandomInPab       :: ContractInstanceId -> Integer -> ManagePabClient r ()
+  Stop                      :: ContractInstanceId -> ManagePabClient r ()
   CancelOrder               :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
@@ -95,7 +102,7 @@ runPabClient =
         CreateSellOrder cid params ->
           callEndpoint cid "createSellOrder" params
 
-        CreateLiquidityPoolInPab cid params -> do
+        CreateLiquidityPoolInPab cid params ->
           callEndpoint cid "createLiquidityPool" params
 
         CreateLiquidityOrderInPab cid params -> do
@@ -104,7 +111,26 @@ runPabClient =
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
 
-        CancelOrder cid params -> callEndpoint cid "cancel" (toCancelOrderParams params)
+        GetAllOrders cid ->
+          callEndpoint cid "allOrders" ()
+
+        CancelOrder cid params ->
+          callEndpoint cid "cancel" (toCancelOrderParams params)
+
+        PerformInPab cid ->
+          callEndpoint cid "perform" ()
+
+        PerformNRandomInPab cid n ->
+          callEndpoint cid "performNRandom" n
+
+        CollectFunds cid ->
+          callEndpoint cid "collectFunds" ()
+
+        Stop cid ->
+          callEndpoint cid "stop" ()
+
+        GetMyPayouts cid ->
+          callEndpoint cid "myPayouts" ()
 
     where
       mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
