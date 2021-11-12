@@ -12,9 +12,11 @@ import           Middleware.PabClient              (ManagePabClient,
                                                     cancelOrder, collectFunds,
                                                     createLiquidityOrderInPab,
                                                     createLiquidityPoolInPab,
-                                                    createSellOrder, getFunds,
+                                                    createSellOrder,
+                                                    getAllOrders, getFunds,
                                                     getMyOrders, getMyPayouts,
-                                                    stop)
+                                                    performInPab,
+                                                    performNRandomInPab, stop)
 import           Middleware.PabClient.Types        hiding (Error)
 import           Polysemy
 import           Servant
@@ -28,7 +30,10 @@ data Dex r a where
   CreateLiquidityPool  :: ContractInstanceId -> CreateLiquidityPoolParams -> Dex r ()
   CreateLiquidityOrder :: ContractInstanceId -> CreateLiquidityOrderParams -> Dex r ()
   MyOrders             :: ContractInstanceId -> Dex r [DexOrder]
+  AllOrders            :: ContractInstanceId -> Dex r [DexOrder]
   Payouts              :: ContractInstanceId -> Dex r [PayoutView]
+  Perform              :: ContractInstanceId -> Dex r ()
+  PerformNRandom       :: ContractInstanceId -> Integer -> Dex r ()
   StopContract         :: ContractInstanceId -> Dex r ()
   Cancel               :: ContractInstanceId -> MidCancelOrder -> Dex r ()
 
@@ -42,24 +47,31 @@ runDex = interpret
       Funds cid -> do
         fs <- getFunds cid
         pure $ fmap (uncurry mkFundView) fs
+      Collect cid ->
+        collectFunds cid
       CreateSellOrderEU cid params ->
         createSellOrder cid params
+      CreateLiquidityPool cid params ->
+        createLiquidityPoolInPab cid params
+      CreateLiquidityOrder cid params -> do
+        createLiquidityOrderInPab cid params
       MyOrders cid -> do
         os <- getMyOrders cid
         pure $ fmap dexOrder os
-      CreateLiquidityPool cid params ->
-        createLiquidityPoolInPab cid params
-      Cancel cid params ->
-        cancelOrder cid params
-      CreateLiquidityOrder cid params -> do
-        createLiquidityOrderInPab cid params
-      Collect cid ->
-        collectFunds cid
-      StopContract cid ->
-        stop cid
+      AllOrders cid -> do
+        os <- getAllOrders cid
+        return $ fmap dexOrder os
       Payouts cid -> do
         (PayoutSummary ps) <- getMyPayouts cid
         pure $ fmap (uncurry mkPayoutView) ps
+      Perform cid -> do
+        performInPab cid
+      PerformNRandom cid n -> do
+        performNRandomInPab cid n
+      StopContract cid ->
+        stop cid
+      Cancel cid params ->
+        cancelOrder cid params
   )
 
 dexServer :: Members '[Error AppError, Dex] r => ServerT API (Sem r)
@@ -69,6 +81,9 @@ dexServer = funds
        :<|> createLiquidityPool
        :<|> createLiquidityOrder
        :<|> myOrders
+       :<|> allOrders
        :<|> payouts
+       :<|> perform
+       :<|> performNRandom
        :<|> stopContract
        :<|> cancel

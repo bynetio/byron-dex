@@ -16,7 +16,9 @@ type API = Capture "contract-instance-id" ContractInstanceId :> "funds" :> Get '
       :<|> Capture "contract-instance-id" ContractInstanceId :> "create-liquidity-pool" :> ReqBody '[JSON] CreateLiquidityPoolParams :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "create-liquidity-order" :> ReqBody '[JSON] CreateLiquidityOrderParams :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "orders" :> Get '[JSON] [DexOrder]
-      :<|> Capture "contract-instance-id" ContractInstanceId :> "my-orders" :> Get '[JSON] [DexOrder]
+      :<|> Capture "contract-instance-id" ContractInstanceId :> "all-orders" :> Get '[JSON] [DexOrder]
       :<|> Capture "contract-instance-id" ContractInstanceId :> "payouts" :> Get '[JSON] [PayoutView]
+      :<|> Capture "contract-instance-id" ContractInstanceId :> "perform" :> Post '[JSON] ()
+      :<|> Capture "contract-instance-id" ContractInstanceId :> "perform-random" :> ReqBody '[JSON] Integer :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "stop" :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "cancel" :> ReqBody '[JSON] MidCancelOrder :> Post '[JSON] ()

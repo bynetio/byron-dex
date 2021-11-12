@@ -42,7 +42,10 @@ data ManagePabClient r a where
   CreateLiquidityPoolInPab  :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
   CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
   GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
+  PerformInPab              :: ContractInstanceId -> ManagePabClient r ()
+  PerformNRandomInPab       :: ContractInstanceId -> Integer -> ManagePabClient r ()
   Stop                      :: ContractInstanceId -> ManagePabClient r ()
   CancelOrder               :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
 
@@ -108,8 +111,17 @@ runPabClient =
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
 
+        GetAllOrders cid ->
+          callEndpoint cid "allOrders" ()
+
         CancelOrder cid params ->
           callEndpoint cid "cancel" (toCancelOrderParams params)
+
+        PerformInPab cid ->
+          callEndpoint cid "perform" ()
+
+        PerformNRandomInPab cid n ->
+          callEndpoint cid "performNRandom" n
 
         CollectFunds cid ->
           callEndpoint cid "collectFunds" ()
