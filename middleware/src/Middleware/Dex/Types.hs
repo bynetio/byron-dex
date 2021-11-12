@@ -32,6 +32,15 @@ data Coin = Coin
   , tokenName      :: TokenName
   } deriving (Show, Generic, FromJSON)
 
+data CreateSellOrderParams
+  = CreateSellOrderParams
+      { lockedCoin     :: Coin
+      , expectedCoin   :: Coin
+      , lockedAmount   :: Integer
+      , expectedAmount :: Integer
+      }
+  deriving (Show, Generic, ToJSON, FromJSON)
+
 coinFromAssetClass :: AssetClass -> Coin
 coinFromAssetClass = uncurry Coin . unAssetClass
 
@@ -55,7 +64,7 @@ data PoolPartsParams
   deriving (FromJSON, Generic, Show, ToJSON)
 
 instance ToJSON Coin where
-  toJSON (Coin a b) = toJSON $ assetClass a b
+ toJSON (Coin cs tn) = toJSON $ assetClass cs tn
 
 data DexOrder
   = DexOrder
