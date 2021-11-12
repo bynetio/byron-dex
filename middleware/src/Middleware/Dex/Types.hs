@@ -55,6 +55,16 @@ data CreateLiquidityPoolParams
       }
   deriving (Generic, FromJSON, ToJSON, Show)
 
+data CreateLiquidityOrderParams
+  = CreateLiquidityOrderParams
+      { lockedCoin     :: Coin
+      , expectedCoin   :: Coin
+      , lockedAmount   :: Integer
+      , expectedAmount :: Integer
+      , swapFee        :: (Integer, Integer)
+      }
+  deriving (Generic, FromJSON, ToJSON, Show)
+
 data PoolPartsParams
   = PriceChangeParams
       { coinAPriceChange :: (Integer, Integer)
