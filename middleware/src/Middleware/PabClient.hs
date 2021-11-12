@@ -18,7 +18,11 @@ import           Middleware.Capability.Error
 import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
 import           Middleware.Capability.Retry    (retryRequest)
 import           Middleware.Capability.Time     (Time)
-import           Middleware.Dex.Types           (CreateSellOrderParams, CreateLiquidityPoolParams (CreateLiquidityPoolParams), MidCancelOrder, toCancelOrderParams)
+import           Middleware.Dex.Types           (CreateLiquidityOrderParams (CreateLiquidityOrderParams),
+                                                 CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                                 CreateSellOrderParams,
+                                                 MidCancelOrder,
+                                                 toCancelOrderParams)
 import           Middleware.PabClient.API       (API)
 import           Middleware.PabClient.Types
 import           Polysemy                       (Embed, Members, Sem, interpret,
@@ -30,12 +34,13 @@ import           Servant.Polysemy.Client        (ClientError, ServantClient,
                                                  runClient, runClient')
 
 data ManagePabClient r a where
-  Status :: ContractInstanceId -> ManagePabClient r ContractState
-  GetFunds :: ContractInstanceId -> ManagePabClient r [Fund]
-  CreateSellOrder :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
-  CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
-  GetMyOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
-  CancelOrder              :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
+  Status                    :: ContractInstanceId -> ManagePabClient r ContractState
+  GetFunds                  :: ContractInstanceId -> ManagePabClient r [Fund]
+  CreateSellOrder           :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
+  CreateLiquidityPoolInPab  :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
+  CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
+  GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  CancelOrder               :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
 
@@ -92,6 +97,9 @@ runPabClient =
 
         CreateLiquidityPoolInPab cid params -> do
           callEndpoint cid "createLiquidityPool" params
+
+        CreateLiquidityOrderInPab cid params -> do
+          callEndpoint cid "createLiquidityOrder" params
 
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
