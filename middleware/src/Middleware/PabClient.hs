@@ -5,29 +5,26 @@
 
 module Middleware.PabClient where
 
-import           Colog.Polysemy.Effect          (Log)
-import           Colog.Polysemy.Formatting      (WithLog, logError)
-import           Data.Aeson                     (FromJSON, ToJSON)
-import           Data.Aeson.Types               (Value, toJSON)
-import           Data.Either.Combinators        (mapLeft)
-import           Dex.Types                      (OrderInfo (OrderInfo),
-                                                 Request (Request), historyId)
-import           Formatting
-import           GHC.Stack                      (HasCallStack)
-import           Middleware.Capability.Error
-import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import           Middleware.Capability.Retry    (retryRequest)
-import           Middleware.Capability.Time     (Time)
-import           Middleware.Dex.Types           (CreateSellOrderParams, CreateLiquidityPoolParams (CreateLiquidityPoolParams), MidCancelOrder, toCancelOrderParams)
-import           Middleware.PabClient.API       (API)
-import           Middleware.PabClient.Types
-import           Polysemy                       (Embed, Members, Sem, interpret,
-                                                 makeSem)
-import           Servant                        (Proxy (..),
-                                                 type (:<|>) ((:<|>)))
-import           Servant.Client.Streaming       (ClientM, client)
-import           Servant.Polysemy.Client        (ClientError, ServantClient,
-                                                 runClient, runClient')
+import Colog.Polysemy.Effect          (Log)
+import Colog.Polysemy.Formatting      (WithLog, logError)
+import Data.Aeson                     (FromJSON, ToJSON)
+import Data.Aeson.Types               (Value, toJSON)
+import Data.Either.Combinators        (mapLeft)
+import Dex.Types                      (OrderInfo (OrderInfo), PayoutSummary, Request (Request), historyId)
+import Formatting
+import GHC.Stack                      (HasCallStack)
+import Middleware.Capability.Error
+import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import Middleware.Capability.Retry    (retryRequest)
+import Middleware.Capability.Time     (Time)
+import Middleware.Dex.Types           (CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                       CreateSellOrderParams, MidCancelOrder, toCancelOrderParams)
+import Middleware.PabClient.API       (API)
+import Middleware.PabClient.Types
+import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
+import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
+import Servant.Client.Streaming       (ClientM, client)
+import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
 
 data ManagePabClient r a where
   Status :: ContractInstanceId -> ManagePabClient r ContractState
@@ -36,6 +33,9 @@ data ManagePabClient r a where
   CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
   GetMyOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   CancelOrder              :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
+  CollectFunds             :: ContractInstanceId -> ManagePabClient r ()
+  GetMyPayouts             :: ContractInstanceId -> ManagePabClient r PayoutSummary
+  Stop                     :: ContractInstanceId -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
 
@@ -90,13 +90,23 @@ runPabClient =
         CreateSellOrder cid params ->
           callEndpoint cid "createSellOrder" params
 
-        CreateLiquidityPoolInPab cid params -> do
+        CreateLiquidityPoolInPab cid params ->
           callEndpoint cid "createLiquidityPool" params
 
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
 
-        CancelOrder cid params -> callEndpoint cid "cancel" (toCancelOrderParams params)
+        CancelOrder cid params ->
+          callEndpoint cid "cancel" (toCancelOrderParams params)
+
+        CollectFunds cid ->
+          callEndpoint cid "collectFunds" ()
+
+        Stop cid ->
+          callEndpoint cid "stop" ()
+
+        GetMyPayouts cid ->
+          callEndpoint cid "myPayouts" ()
 
     where
       mapAppError :: (WithLog r, Members '[Error AppError] r) => Either ClientError a -> Sem r a
