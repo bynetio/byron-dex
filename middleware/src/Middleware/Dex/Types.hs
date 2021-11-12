@@ -5,12 +5,14 @@
 
 module Middleware.Dex.Types where
 
-import Data.Aeson.Types (FromJSON, ToJSON, toJSON)
-import Data.Text        (Text)
-import Dex.Types        (CancelOrderParams (CancelOrderParams), OrderInfo (..), PayoutSummary, fromNat)
-import GHC.Generics     (Generic)
-import Ledger           (AssetClass, CurrencySymbol, TokenName, TxOutRef)
-import Ledger.Value     (assetClass, unAssetClass)
+import           Data.Aeson.Types (FromJSON, ToJSON, toJSON)
+import           Data.Text        (Text)
+import           Dex.Types        (CancelOrderParams (CancelOrderParams),
+                                   OrderInfo (..), PayoutSummary, fromNat)
+import           GHC.Generics     (Generic)
+import           Ledger           (AssetClass, CurrencySymbol, TokenName,
+                                   TxOutRef)
+import           Ledger.Value     (assetClass, unAssetClass)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -50,6 +52,16 @@ data CreateLiquidityPoolParams
       , poolPartsParams :: PoolPartsParams
       , swapFee         :: (Integer, Integer)
       , exchangeRate    :: (Integer, Integer)
+      }
+  deriving (Generic, FromJSON, ToJSON, Show)
+
+data CreateLiquidityOrderParams
+  = CreateLiquidityOrderParams
+      { lockedCoin     :: Coin
+      , expectedCoin   :: Coin
+      , lockedAmount   :: Integer
+      , expectedAmount :: Integer
+      , swapFee        :: (Integer, Integer)
       }
   deriving (Generic, FromJSON, ToJSON, Show)
 

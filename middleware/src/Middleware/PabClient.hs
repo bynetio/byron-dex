@@ -5,37 +5,46 @@
 
 module Middleware.PabClient where
 
-import Colog.Polysemy.Effect          (Log)
-import Colog.Polysemy.Formatting      (WithLog, logError)
-import Data.Aeson                     (FromJSON, ToJSON)
-import Data.Aeson.Types               (Value, toJSON)
-import Data.Either.Combinators        (mapLeft)
-import Dex.Types                      (OrderInfo (OrderInfo), PayoutSummary, Request (Request), historyId)
-import Formatting
-import GHC.Stack                      (HasCallStack)
-import Middleware.Capability.Error
-import Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
-import Middleware.Capability.Retry    (retryRequest)
-import Middleware.Capability.Time     (Time)
-import Middleware.Dex.Types           (CreateLiquidityPoolParams (CreateLiquidityPoolParams),
-                                       CreateSellOrderParams, MidCancelOrder, toCancelOrderParams)
-import Middleware.PabClient.API       (API)
-import Middleware.PabClient.Types
-import Polysemy                       (Embed, Members, Sem, interpret, makeSem)
-import Servant                        (Proxy (..), type (:<|>) ((:<|>)))
-import Servant.Client.Streaming       (ClientM, client)
-import Servant.Polysemy.Client        (ClientError, ServantClient, runClient, runClient')
+import           Colog.Polysemy.Effect          (Log)
+import           Colog.Polysemy.Formatting      (WithLog, logError)
+import           Data.Aeson                     (FromJSON, ToJSON)
+import           Data.Aeson.Types               (Value, toJSON)
+import           Data.Either.Combinators        (mapLeft)
+import           Dex.Types                      (OrderInfo (OrderInfo),
+                                                 PayoutSummary,
+                                                 Request (Request), historyId)
+import           Formatting
+import           GHC.Stack                      (HasCallStack)
+import           Middleware.Capability.Error
+import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
+import           Middleware.Capability.Retry    (retryRequest)
+import           Middleware.Capability.Time     (Time)
+import           Middleware.Dex.Types           (CreateLiquidityOrderParams (CreateLiquidityOrderParams),
+                                                 CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                                 CreateSellOrderParams,
+                                                 MidCancelOrder,
+                                                 toCancelOrderParams)
+import           Middleware.PabClient.API       (API)
+import           Middleware.PabClient.Types
+import           Polysemy                       (Embed, Members, Sem, interpret,
+                                                 makeSem)
+import           Servant                        (Proxy (..),
+                                                 type (:<|>) ((:<|>)))
+import           Servant.Client.Streaming       (ClientM, client)
+import           Servant.Polysemy.Client        (ClientError, ServantClient,
+                                                 runClient, runClient')
 
 data ManagePabClient r a where
-  Status :: ContractInstanceId -> ManagePabClient r ContractState
-  GetFunds :: ContractInstanceId -> ManagePabClient r [Fund]
-  CreateSellOrder :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
-  CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
-  GetMyOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
-  CancelOrder              :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
-  CollectFunds             :: ContractInstanceId -> ManagePabClient r ()
-  GetMyPayouts             :: ContractInstanceId -> ManagePabClient r PayoutSummary
-  Stop                     :: ContractInstanceId -> ManagePabClient r ()
+  Status                    :: ContractInstanceId -> ManagePabClient r ContractState
+  GetFunds                  :: ContractInstanceId -> ManagePabClient r [Fund]
+  CollectFunds              :: ContractInstanceId -> ManagePabClient r ()
+  CreateSellOrder           :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
+  CreateLiquidityPoolInPab  :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
+  CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
+  GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
+  Stop                      :: ContractInstanceId -> ManagePabClient r ()
+  CancelOrder               :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
 
@@ -92,6 +101,9 @@ runPabClient =
 
         CreateLiquidityPoolInPab cid params ->
           callEndpoint cid "createLiquidityPool" params
+
+        CreateLiquidityOrderInPab cid params -> do
+          callEndpoint cid "createLiquidityOrder" params
 
         GetMyOrders cid ->
           callEndpoint cid "myOrders" ()

@@ -1,31 +1,36 @@
 
 module Middleware.Dex where
 
-import Colog.Polysemy.Formatting.WithLog (WithLog)
-import Dex.Types                         (PayoutSummary (PayoutSummary))
-import Ledger                            (AssetClass)
-import Ledger.Value                      (assetClass, unAssetClass)
-import Middleware.API                    (API)
-import Middleware.Capability.Error
-import Middleware.Dex.Types              hiding (Error)
-import Middleware.PabClient              (ManagePabClient, cancelOrder, collectFunds,
-                                          createLiquidityPoolInPab, createSellOrder, getFunds, getMyOrders,
-                                          getMyPayouts, stop)
-import Middleware.PabClient.Types        hiding (Error)
-import Polysemy
-import Servant
-import Servant.Polysemy.Server
-import Servant.Server                    (ServerT)
+import           Colog.Polysemy.Formatting.WithLog (WithLog)
+import           Dex.Types                         (PayoutSummary (PayoutSummary))
+import           Ledger                            (AssetClass)
+import           Ledger.Value                      (assetClass, unAssetClass)
+import           Middleware.API                    (API)
+import           Middleware.Capability.Error
+import           Middleware.Dex.Types              hiding (Error)
+import           Middleware.PabClient              (ManagePabClient,
+                                                    cancelOrder, collectFunds,
+                                                    createLiquidityOrderInPab,
+                                                    createLiquidityPoolInPab,
+                                                    createSellOrder, getFunds,
+                                                    getMyOrders, getMyPayouts,
+                                                    stop)
+import           Middleware.PabClient.Types        hiding (Error)
+import           Polysemy
+import           Servant
+import           Servant.Polysemy.Server
+import           Servant.Server                    (ServerT)
 
 data Dex r a where
-  Funds               :: ContractInstanceId -> Dex r [FundView]
-  CreateSellOrderEU   :: ContractInstanceId -> CreateSellOrderParams -> Dex r ()
-  CreateLiquidityPool :: ContractInstanceId -> CreateLiquidityPoolParams -> Dex r ()
-  MyOrders            :: ContractInstanceId -> Dex r [DexOrder]
-  Cancel              :: ContractInstanceId -> MidCancelOrder -> Dex r ()
-  Collect             :: ContractInstanceId -> Dex r ()
-  StopContract        :: ContractInstanceId -> Dex r ()
-  Payouts             :: ContractInstanceId -> Dex r [PayoutView]
+  Funds                :: ContractInstanceId -> Dex r [FundView]
+  Collect              :: ContractInstanceId -> Dex r ()
+  CreateSellOrderEU    :: ContractInstanceId -> CreateSellOrderParams -> Dex r ()
+  CreateLiquidityPool  :: ContractInstanceId -> CreateLiquidityPoolParams -> Dex r ()
+  CreateLiquidityOrder :: ContractInstanceId -> CreateLiquidityOrderParams -> Dex r ()
+  MyOrders             :: ContractInstanceId -> Dex r [DexOrder]
+  Payouts              :: ContractInstanceId -> Dex r [PayoutView]
+  StopContract         :: ContractInstanceId -> Dex r ()
+  Cancel               :: ContractInstanceId -> MidCancelOrder -> Dex r ()
 
 makeSem ''Dex
 
@@ -46,6 +51,8 @@ runDex = interpret
         createLiquidityPoolInPab cid params
       Cancel cid params ->
         cancelOrder cid params
+      CreateLiquidityOrder cid params -> do
+        createLiquidityOrderInPab cid params
       Collect cid ->
         collectFunds cid
       StopContract cid ->
@@ -57,10 +64,11 @@ runDex = interpret
 
 dexServer :: Members '[Error AppError, Dex] r => ServerT API (Sem r)
 dexServer = funds
+       :<|> collect
        :<|> createSellOrderEU
        :<|> createLiquidityPool
+       :<|> createLiquidityOrder
        :<|> myOrders
-       :<|> cancel
-       :<|> collect
-       :<|> stopContract
        :<|> payouts
+       :<|> stopContract
+       :<|> cancel
