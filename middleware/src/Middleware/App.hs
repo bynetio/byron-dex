@@ -51,9 +51,6 @@ import           Servant.Swagger.UI             (SwaggerSchemaUI,
                                                  swaggerSchemaUIServerT')
 import           System.IO                      (stdout)
 
-type DexAPI = API
-          :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"
-
 runApp :: HasCallStack => IO ()
 runApp = do
   logEnv <- newLogEnv stdout
@@ -75,8 +72,11 @@ createApp = do
   logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
   logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
   let api = Proxy @API
-      app = serve api (hoistServer api (runServer pab logEnv) dexServer)
-  runWarpServerSettings' @API serverCfg app
+      sapi = Proxy @SwaggerAPI
+      dapi = Proxy @DexAPI
+      server = hoistServer api (runServer pab logEnv) dexServer
+      app = serve sapi swagger
+  runWarpServerSettings' @SwaggerAPI serverCfg app
   where
     -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
     -- | move error mapper to separate package
@@ -130,7 +130,5 @@ runWarpServerSettings' settings appServer = withLowerToIO $ \lowerToIO finished 
   Warp.runSettings settings (corsConfig appServer)
   finished
 
-swag :: forall dir r. (ToSchema API
-                        , Members '[Error AppError, Dex] r)
-     => Servant.ServerT (SwaggerSchemaUI' dir API) (Sem r)
-swag = swaggerSchemaUIServerT' dexServer
+swagger :: Server SwaggerAPI
+swagger = swaggerSchemaUIServer $ toOpenApi (Proxy :: Proxy API)

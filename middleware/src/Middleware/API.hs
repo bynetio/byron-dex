@@ -11,6 +11,7 @@ import           Middleware.Dex.Types       (CancelOrderParams (CancelOrderParam
 import           Middleware.PabClient.Types (ContractInstanceId)
 import           Servant                    (Capture, Description, Get, JSON,
                                              Post, ReqBody, (:<|>), (:>))
+import           Servant.Swagger.UI         (SwaggerSchemaUI)
 
 type API = Capture "contract-instance-id" ContractInstanceId :> "funds"
            :> Description "List of user funds."
@@ -48,3 +49,7 @@ type API = Capture "contract-instance-id" ContractInstanceId :> "funds"
       :<|> Capture "contract-instance-id" ContractInstanceId :> "cancel"
            :> Description "Cancel order."
            :> ReqBody '[JSON] CancelOrderParams :> Post '[JSON] ()
+
+type SwaggerAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
+
+type DexAPI = SwaggerAPI :<|> API
