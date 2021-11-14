@@ -16,7 +16,10 @@ import           Colog.Polysemy.Formatting      (Msg, Severity, WithLog,
                                                  renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Aeson                     (encode)
+import qualified Data.Aeson                     as JSON
 import           Data.Function                  ((&))
+import           Data.OpenApi                   (OpenApi)
+import           Data.OpenApi.Schema            (ToSchema)
 import           Data.Text                      (Text)
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
@@ -28,7 +31,7 @@ import           Middleware.Capability.Config   (AppConfig (pabUrl),
 import           Middleware.Capability.Error    hiding (Handler, throwError)
 import           Middleware.Capability.ReqIdGen (runReqIdGen)
 import           Middleware.Capability.Time     (runTime)
-import           Middleware.Dex                 (dexServer, runDex)
+import           Middleware.Dex                 (Dex, dexServer, runDex)
 import qualified Middleware.Dex.Types           as DexTypes
 import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
@@ -37,10 +40,19 @@ import           Polysemy
 import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
 import           Servant
+import           Servant.OpenApi                (toOpenApi)
 import           Servant.Polysemy.Client        (runServantClient,
                                                  runServantClientUrl)
 import           Servant.Polysemy.Server
+import           Servant.Swagger.UI             (SwaggerSchemaUI,
+                                                 SwaggerSchemaUI',
+                                                 swaggerSchemaUIServer,
+                                                 swaggerSchemaUIServerT,
+                                                 swaggerSchemaUIServerT')
 import           System.IO                      (stdout)
+
+type DexAPI = API
+          :<|> SwaggerSchemaUI "swagger-ui" "swagger.json"
 
 runApp :: HasCallStack => IO ()
 runApp = do
@@ -117,3 +129,8 @@ runWarpServerSettings'
 runWarpServerSettings' settings appServer = withLowerToIO $ \lowerToIO finished -> do
   Warp.runSettings settings (corsConfig appServer)
   finished
+
+swag :: forall dir r. (ToSchema API
+                        , Members '[Error AppError, Dex] r)
+     => Servant.ServerT (SwaggerSchemaUI' dir API) (Sem r)
+swag = swaggerSchemaUIServerT' dexServer
