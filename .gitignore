@@ -7,3 +7,4 @@ uniswap/.hpc
 .psc-ide-port
 dist-newstyle
 TAGS
+.direnv/
