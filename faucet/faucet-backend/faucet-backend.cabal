@@ -18,7 +18,8 @@ library
       Faucet.Data,
       Faucet.API,
       Faucet.Internal,
-      Config
+      Config,
+      Logger
     build-depends:
       base >= 4.9 && < 5,
       aeson,
@@ -38,6 +39,7 @@ library
       conferer-dhall,
       conferer-warp,
       warp,
+      co-log,
     hs-source-dirs: src
 
 executable faucet-app

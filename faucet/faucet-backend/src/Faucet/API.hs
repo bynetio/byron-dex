@@ -7,18 +7,22 @@
 
 module Faucet.API (app, FaucetService(..)) where
 
+import           Cardano.Api
+import qualified Colog                as Log
 import           Control.Exception    (Exception, try)
 import           Control.Monad.Except (ExceptT (ExceptT), MonadIO (liftIO),
                                        (<=<))
 import           Data.Aeson           (ToJSON (toJSON), encode)
 import           Data.Text            (Text, pack)
+import qualified Data.Text            as T
 import           Faucet.Data          (AddressParam, FaucetException (..),
-                                       TokenName (..))
+                                       Token, TokenName (..))
 import           GHC.Generics         (Generic)
+import           Logger               (logger)
 import           Servant
 
-type API = "faucet" :> Capture "address" AddressParam :> QueryParam "tokenName" TokenName :> GetNoContent
-            :<|> "tokens" :> Get '[JSON] [TokenName]
+type API = "faucet" :> Capture "address" AddressParam :> ReqBody '[JSON] TokenName :> Post '[JSON] TxId
+            :<|> "tokens" :> Get '[JSON] [Token]
 
 newtype ErrorMessage = ErrorMessage
   { errorMessage :: Text
@@ -27,14 +31,13 @@ newtype ErrorMessage = ErrorMessage
 server :: FaucetService -> Server API
 server service = handleFaucet' :<|> handleTokens
   where
-      handleFaucet' :: AddressParam -> Maybe TokenName -> Handler NoContent
-      handleFaucet' address tn = liftHandler $ handleFaucet service address tn >> return NoContent
-      handleTokens :: Handler [TokenName]
+      handleFaucet' :: AddressParam -> TokenName -> Handler TxId
+      handleFaucet' address tn = liftHandler $ handleFaucet service address tn
+      handleTokens :: Handler [Token]
       handleTokens = liftHandler $ return $ getTokens service
 
       adaptErrors ::  Either FaucetException a -> Either ServerError a
       adaptErrors (Left (TokenNameNotSupportedError (TokenName tn))) = Left $ notFound ("Token not supported: '" <> pack tn <> "'")
-      adaptErrors (Left (LackOfTokenNameError _)) = Left $ badRequest (pack "Lack of 'tokens' parameter")
       adaptErrors (Left NoUtxoToConsumeError) = Left $ conflict (pack "Wait few seconds and try again")
       adaptErrors (Left _) = Left $ internalServerError "Internal Server Error"
       adaptErrors (Right value) = Right value
@@ -44,8 +47,6 @@ server service = handleFaucet' :<|> handleTokens
       internalServerError = httpError err500
 
       notFound = httpError err404
-
-      badRequest = httpError err400
 
       httpError :: ServerError -> Text -> ServerError
       httpError err msg =
@@ -61,7 +62,7 @@ server service = handleFaucet' :<|> handleTokens
         where
           logError :: Exception e =>  Either e a -> IO (Either e a)
           logError err@(Left e) = do
-            liftIO $ putStrLn $ "Error: " <> show e
+            liftIO $ logger Log.E $ T.pack (show e)
             return err
           logError a            = return a
 
@@ -69,8 +70,8 @@ proxyAPI :: Proxy API
 proxyAPI = Proxy
 
 data FaucetService = FaucetService {
-  getTokens    :: [TokenName],
-  handleFaucet :: AddressParam -> Maybe TokenName -> IO ()
+  getTokens    :: [Token],
+  handleFaucet :: AddressParam -> TokenName -> IO TxId
 }
 
 app :: FaucetService -> Application
