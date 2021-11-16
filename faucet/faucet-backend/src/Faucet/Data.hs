@@ -1,8 +1,9 @@
+{-# LANGUAGE DeriveAnyClass             #-}
 {-# LANGUAGE DeriveGeneric              #-}
 {-# LANGUAGE DerivingStrategies         #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
-module Faucet.Data (AddressParam(..), TokenName(..), FaucetException(..)) where
+module Faucet.Data (AddressParam(..), TokenName(..), Token(..), TokenCurrency(..), FaucetException(..)) where
 
 import           Control.Exception (Exception)
 import           Data.Aeson        (FromJSON, ToJSON)
@@ -18,6 +19,14 @@ newtype TokenName = TokenName { unTokenName :: String }
   deriving (Eq, Show, Generic)
   deriving newtype (FromHttpApiData, ToJSON, FromJSON, Ord)
 
+newtype TokenCurrency = TokenCurrency { unTokenCurrency :: String }
+  deriving (Eq, Show, Generic)
+  deriving newtype (ToJSON)
+
+data Token = Token { tokenCurrency :: TokenCurrency, tokenName :: TokenName }
+  deriving (Eq, Show, Generic)
+  deriving anyclass (ToJSON)
+
 data FaucetException
   = SubmitTxError String
   | SomeError String
@@ -26,7 +35,6 @@ data FaucetException
   | UknownNetworkIdError String
   | AddressDecodingError String
   | SkeyDeserialiseError String
-  | LackOfTokenNameError String
   | TokenNameNotSupportedError TokenName
   | NoUtxoToConsumeError
   deriving (Show, Typeable)
