@@ -1,11 +1,13 @@
 {-# LANGUAGE DeriveAnyClass        #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings     #-}
 -- |
 
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types (FromJSON, ToJSON, toJSON)
+import           Data.Aeson.Types (FromJSON, ToJSON, parseJSON, toJSON,
+                                   withObject, (.:))
 import           Data.Text        (Text)
 import           Dex.Types        (CancelOrderParams (CancelOrderParams),
                                    OrderInfo (..), PayoutSummary, fromNat)
@@ -18,19 +20,21 @@ newtype Error = Error
   { errorMessage :: Text
   } deriving (Generic, ToJSON)
 
--- | Data type to represent wallet founds.
-data FundView = FundView
-  { coin   :: Coin
-  , amount :: Integer
-  } deriving (Show, Generic, ToJSON)
-
-mkFundView :: AssetClass -> Integer -> FundView
-mkFundView = FundView . coinFromAssetClass
-
 data Coin = Coin
   { currencySymbol :: CurrencySymbol
   , tokenName      :: TokenName
-  } deriving (Show, Generic, FromJSON)
+  } deriving (Show, Generic)
+
+instance FromJSON Coin where
+  parseJSON = withObject "Coin" $ \v -> Coin <$> v .: "symbol" <*> v .: "name"
+
+instance ToJSON Coin where
+ toJSON (Coin cs tn) = toJSON $ assetClass cs tn
+
+coinFromAssetClass :: AssetClass -> Coin
+coinFromAssetClass = uncurry Coin . unAssetClass
+
+-- PARAMS
 
 data CreateSellOrderParams
   = CreateSellOrderParams
@@ -40,9 +44,6 @@ data CreateSellOrderParams
       , expectedAmount :: Integer
       }
   deriving (Show, Generic, ToJSON, FromJSON)
-
-coinFromAssetClass :: AssetClass -> Coin
-coinFromAssetClass = uncurry Coin . unAssetClass
 
 data CreateLiquidityPoolParams
   = CreateLiquidityPoolParams
@@ -73,11 +74,25 @@ data PoolPartsParams
       }
   deriving (FromJSON, Generic, Show, ToJSON)
 
-instance ToJSON Coin where
- toJSON (Coin cs tn) = toJSON $ assetClass cs tn
+newtype CancelOrderParams = CancelOrderParams TxOutRef
+  deriving (FromJSON, Generic, Show, ToJSON)
 
-data DexOrder
-  = DexOrder
+newtype PerformRandomParams = PerformRandomParams Integer
+  deriving (FromJSON, Generic, Show, ToJSON)
+
+-- VIEWS
+
+-- | Data type to represent wallet founds.
+data FundView = FundView
+  { coin   :: Coin
+  , amount :: Integer
+  } deriving (Show, Generic, ToJSON)
+
+mkFundView :: AssetClass -> Integer -> FundView
+mkFundView = FundView . coinFromAssetClass
+
+data OrderView
+  = OrderView
       { orderHash    :: TxOutRef
       , lockedCoin   :: FundView
       , expectedCoin :: FundView
@@ -85,22 +100,16 @@ data DexOrder
       }
   deriving (Generic, Show, ToJSON)
 
-dexOrder :: OrderInfo -> DexOrder
+dexOrder :: OrderInfo -> OrderView
 dexOrder OrderInfo { orderHash      = oh
                    , lockedCoin     = lc
                    , lockedAmount   = la
                    , expectedCoin   = ec
                    , expectedAmount = ea
                    , orderType      = ot } =
-    DexOrder oh (fv lc la) (fv ec ea) ot
+    OrderView oh (fv lc la) (fv ec ea) ot
   where
     fv coin amount = mkFundView coin (fromNat amount)
-
-newtype MidCancelOrder = MidCancelOrder TxOutRef
-  deriving (FromJSON, Generic, Show, ToJSON)
-
-toCancelOrderParams :: MidCancelOrder -> CancelOrderParams
-toCancelOrderParams (MidCancelOrder ref) = CancelOrderParams ref
 
 data PayoutView = PayoutView
    { coin   :: Coin

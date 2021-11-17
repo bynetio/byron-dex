@@ -29,13 +29,13 @@ data Dex r a where
   CreateSellOrderEU    :: ContractInstanceId -> CreateSellOrderParams -> Dex r ()
   CreateLiquidityPool  :: ContractInstanceId -> CreateLiquidityPoolParams -> Dex r ()
   CreateLiquidityOrder :: ContractInstanceId -> CreateLiquidityOrderParams -> Dex r ()
-  MyOrders             :: ContractInstanceId -> Dex r [DexOrder]
-  AllOrders            :: ContractInstanceId -> Dex r [DexOrder]
+  MyOrders             :: ContractInstanceId -> Dex r [OrderView]
+  AllOrders            :: ContractInstanceId -> Dex r [OrderView]
   Payouts              :: ContractInstanceId -> Dex r [PayoutView]
   Perform              :: ContractInstanceId -> Dex r ()
-  PerformNRandom       :: ContractInstanceId -> Integer -> Dex r ()
+  PerformNRandom       :: ContractInstanceId -> PerformRandomParams -> Dex r ()
   StopContract         :: ContractInstanceId -> Dex r ()
-  Cancel               :: ContractInstanceId -> MidCancelOrder -> Dex r ()
+  Cancel               :: ContractInstanceId -> CancelOrderParams -> Dex r ()
 
 makeSem ''Dex
 
