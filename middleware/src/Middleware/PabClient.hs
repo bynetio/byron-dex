@@ -19,11 +19,11 @@ import           Middleware.Capability.Error
 import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
 import           Middleware.Capability.Retry    (retryRequest)
 import           Middleware.Capability.Time     (Time)
-import           Middleware.Dex.Types           (CreateLiquidityOrderParams (CreateLiquidityOrderParams),
+import           Middleware.Dex.Types           (CancelOrderParams,
+                                                 CreateLiquidityOrderParams (CreateLiquidityOrderParams),
                                                  CreateLiquidityPoolParams (CreateLiquidityPoolParams),
                                                  CreateSellOrderParams,
-                                                 MidCancelOrder,
-                                                 toCancelOrderParams)
+                                                 PerformRandomParams (PerformRandomParams))
 import           Middleware.PabClient.API       (API)
 import           Middleware.PabClient.Types
 import           Polysemy                       (Embed, Members, Sem, interpret,
@@ -45,9 +45,9 @@ data ManagePabClient r a where
   GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
   PerformInPab              :: ContractInstanceId -> ManagePabClient r ()
-  PerformNRandomInPab       :: ContractInstanceId -> Integer -> ManagePabClient r ()
+  PerformNRandomInPab       :: ContractInstanceId -> PerformRandomParams -> ManagePabClient r ()
   Stop                      :: ContractInstanceId -> ManagePabClient r ()
-  CancelOrder               :: ContractInstanceId -> MidCancelOrder -> ManagePabClient r ()
+  CancelOrder               :: ContractInstanceId -> CancelOrderParams -> ManagePabClient r ()
 
 makeSem ''ManagePabClient
 
@@ -83,7 +83,6 @@ pabClient = PabClient{..}
             :<|> stopInstance
             ) = toInstanceClient cid
 
-
 runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, Time] r)
              => Sem (ManagePabClient ': r) a
              -> Sem r a
@@ -115,12 +114,12 @@ runPabClient =
           callEndpoint cid "allOrders" ()
 
         CancelOrder cid params ->
-          callEndpoint cid "cancel" (toCancelOrderParams params)
+          callEndpoint cid "cancel" params
 
         PerformInPab cid ->
           callEndpoint cid "perform" ()
 
-        PerformNRandomInPab cid n ->
+        PerformNRandomInPab cid (PerformRandomParams n) ->
           callEndpoint cid "performNRandom" n
 
         CollectFunds cid ->
