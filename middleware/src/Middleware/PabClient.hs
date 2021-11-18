@@ -23,7 +23,9 @@ import           Middleware.Dex.Types           (CancelOrderParams,
                                                  CreateLiquidityOrderParams (CreateLiquidityOrderParams),
                                                  CreateLiquidityPoolParams (CreateLiquidityPoolParams),
                                                  CreateSellOrderParams,
-                                                 PerformRandomParams (PerformRandomParams))
+                                                 PerformRandomParams (PerformRandomParams),
+                                                 convertLiquidityOrderToPab,
+                                                 convertLiquidityPoolToPab)
 import           Middleware.PabClient.API       (API)
 import           Middleware.PabClient.Types
 import           Polysemy                       (Embed, Members, Sem, interpret,
@@ -35,11 +37,11 @@ import           Servant.Polysemy.Client        (ClientError, ServantClient,
                                                  runClient, runClient')
 
 data ManagePabClient r a where
-  Status                    :: ContractInstanceId -> ManagePabClient r ContractState
-  GetFunds                  :: ContractInstanceId -> ManagePabClient r [Fund]
-  CollectFunds              :: ContractInstanceId -> ManagePabClient r ()
-  CreateSellOrder           :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
-  CreateLiquidityPoolInPab  :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
+  Status :: ContractInstanceId -> ManagePabClient r ContractState
+  GetFunds :: ContractInstanceId -> ManagePabClient r [Fund]
+  CollectFunds :: ContractInstanceId -> ManagePabClient r ()
+  CreateSellOrder :: ContractInstanceId -> CreateSellOrderParams -> ManagePabClient r ()
+  CreateLiquidityPoolInPab :: ContractInstanceId -> CreateLiquidityPoolParams -> ManagePabClient r ()
   CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
   GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
@@ -52,36 +54,36 @@ data ManagePabClient r a where
 makeSem ''ManagePabClient
 
 data PabClient = PabClient
-  { healthcheck    :: ClientM ()
-  -- ^ call healthcheck method
-  , instanceClient :: ContractInstanceId -> InstanceClient
-  -- ^ call methods for instance client.
+  { -- | call healthcheck method
+    healthcheck    :: ClientM (),
+    -- | call methods for instance client.
+    instanceClient :: ContractInstanceId -> InstanceClient
   }
 
 -- | Contract instance endpoints
 data InstanceClient = InstanceClient
-  { getInstanceStatus    :: ClientM ContractState
-  -- ^ get instance status
-  , callInstanceEndpoint :: String -> Value -> ClientM ()
-  -- ^ call instance endpoint
-  , stopInstance         :: ClientM ()
-  -- ^ call stop instance method
+  { -- | get instance status
+    getInstanceStatus    :: ClientM ContractState,
+    -- | call instance endpoint
+    callInstanceEndpoint :: String -> Value -> ClientM (),
+    -- | call stop instance method
+    stopInstance         :: ClientM ()
   }
 
 -- | Init pab client
 pabClient :: PabClient
-pabClient = PabClient{..}
+pabClient = PabClient {..}
   where
-    (healthcheck
-      :<|> toInstanceClient
+    ( healthcheck
+        :<|> toInstanceClient
       ) = client (Proxy @API)
 
-    instanceClient cid = InstanceClient{..}
-        where
-          (getInstanceStatus
+    instanceClient cid = InstanceClient {..}
+      where
+        ( getInstanceStatus
             :<|> callInstanceEndpoint
             :<|> stopInstance
-            ) = toInstanceClient cid
+          ) = toInstanceClient cid
 
 runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, Time] r)
              => Sem (ManagePabClient ': r) a
@@ -89,46 +91,46 @@ runPabClient :: (WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, T
 runPabClient =
   interpret $
     \case
-        Status cid -> do
+      Status cid -> do
           let PabClient{instanceClient} = pabClient
               getStatus = getInstanceStatus . instanceClient $ cid
           callRes <- runClient' getStatus
           mapAppError callRes
 
-        GetFunds cid ->
+      GetFunds cid ->
           callEndpoint cid "funds" ()
 
-        CreateSellOrder cid params ->
+      CreateSellOrder cid params ->
           callEndpoint cid "createSellOrder" params
 
-        CreateLiquidityPoolInPab cid params ->
-          callEndpoint cid "createLiquidityPool" params
+      CreateLiquidityPoolInPab cid params ->
+        callEndpoint cid "createLiquidityPool" (convertLiquidityPoolToPab params)
 
-        CreateLiquidityOrderInPab cid params -> do
-          callEndpoint cid "createLiquidityOrder" params
+      CreateLiquidityOrderInPab cid params ->
+        callEndpoint cid "createLiquidityOrder" (convertLiquidityOrderToPab params)
 
-        GetMyOrders cid ->
+      GetMyOrders cid ->
           callEndpoint cid "myOrders" ()
 
-        GetAllOrders cid ->
+      GetAllOrders cid ->
           callEndpoint cid "allOrders" ()
 
-        CancelOrder cid params ->
+      CancelOrder cid params ->
           callEndpoint cid "cancel" params
 
-        PerformInPab cid ->
+      PerformInPab cid ->
           callEndpoint cid "perform" ()
 
-        PerformNRandomInPab cid (PerformRandomParams n) ->
+      PerformNRandomInPab cid (PerformRandomParams n) ->
           callEndpoint cid "performNRandom" n
 
-        CollectFunds cid ->
+      CollectFunds cid ->
           callEndpoint cid "collectFunds" ()
 
-        Stop cid ->
+      Stop cid ->
           callEndpoint cid "stop" ()
 
-        GetMyPayouts cid ->
+      GetMyPayouts cid ->
           callEndpoint cid "myPayouts" ()
 
     where
@@ -138,27 +140,25 @@ runPabClient =
         throw $ HttpError err
       mapAppError (Right v) = pure v
 
-
 callEndpoint :: forall r req res. (ToJSON req, FromJSON res, WithLog r, Members '[ServantClient, ReqIdGen, Error AppError, Time] r)
              => ContractInstanceId
              -> String
              -> req
              -> Sem r res
 callEndpoint cid name a = do
-   let PabClient{instanceClient} = pabClient
-       callEndpoint' = callInstanceEndpoint . instanceClient $ cid
-       getStatus = getInstanceStatus . instanceClient $ cid
-   req <- wrapRequest a
+  let PabClient {instanceClient} = pabClient
+      callEndpoint' = callInstanceEndpoint . instanceClient $ cid
+      getStatus = getInstanceStatus . instanceClient $ cid
+  req <- wrapRequest a
 
-   let body = toJSON req
-       hid  = historyId req
+  let body = toJSON req
+      hid = historyId req
 
-   -- send request, Retry three times with one second interval between.
-   retryRequest 3 1 Right $ callEndpoint' name body
+  -- send request, Retry three times with one second interval between.
+  retryRequest 3 1 Right $ callEndpoint' name body
 
-   -- receive response, Retry five times with two second interval between.
-   retryRequest 5 2 (lookupResBody @res hid) getStatus
-
+  -- receive response, Retry five times with two second interval between.
+  retryRequest 5 2 (lookupResBody @res hid) getStatus
 
 wrapRequest :: (ToJSON a, Members '[ReqIdGen] r) => a -> Sem r (Request a)
 wrapRequest content = do
