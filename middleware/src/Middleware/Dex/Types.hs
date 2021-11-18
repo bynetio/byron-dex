@@ -18,7 +18,8 @@ import           Dex.Types        (CancelOrderParams (CancelOrderParams),
 import           GHC.Generics     (Generic)
 import           Ledger           (AssetClass, CurrencySymbol, TokenName,
                                    TxOutRef)
-import           Ledger.Value     (assetClass, unAssetClass)
+import qualified Ledger.Value     as LV (assetClass, currencySymbol, tokenName,
+                                         unAssetClass)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -32,16 +33,19 @@ data Coin = Coin
   deriving (Show, Generic)
 
 instance FromJSON Coin where
-  parseJSON = withObject "Coin" $ \v -> Coin <$> v .: "symbol" <*> v .: "name"
+  parseJSON = withObject "Coin" $ \v -> Coin <$> toSymbol (v .: "symbol")
+                                             <*> toName (v .: "name")
+    where toSymbol = fmap LV.currencySymbol
+          toName   = fmap LV.tokenName
 
 instance ToJSON Coin where
   toJSON = toJSON . assetClassFromCoin
 
 coinFromAssetClass :: AssetClass -> Coin
-coinFromAssetClass = uncurry Coin . unAssetClass
+coinFromAssetClass = uncurry Coin . LV.unAssetClass
 
 assetClassFromCoin :: Coin -> AssetClass
-assetClassFromCoin (Coin cs tn) = assetClass cs tn
+assetClassFromCoin (Coin cs tn) = LV.assetClass cs tn
 
 -- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double
