@@ -85,6 +85,8 @@ type DexSchema =
   .\/ Endpoint "funds" (Request ())
   .\/ Endpoint "allOrders" (Request ())
   .\/ Endpoint "myOrders" (Request ())
+  .\/ Endpoint "ordersBySet" (Request CoinSet)
+  .\/ Endpoint "sets" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
   .\/ Endpoint "performNRandom" (Request Integer)
@@ -284,6 +286,12 @@ allOrders = do
                   lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
               in return $ Just OrderInfo {..}
 
+ordersBySet :: CoinSet -> Contract DexState DexSchema Text [OrderInfo]
+ordersBySet = Prelude.undefined
+
+sets :: Contract DexState DexSchema Text [CoinSet]
+sets = Prelude.undefined
+
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
   pkh <- ownPubKeyHash
@@ -392,6 +400,8 @@ dexEndpoints =
   , perform'
   , myOrders'
   , allOrders'
+  , ordersBySet'
+  , sets'
   , funds'
   , cancel'
   , collectFunds'
@@ -432,6 +442,8 @@ dexEndpoints =
     perform'              = f (Proxy @"perform") historyId (const Performed) (const perform)
     myOrders'             = f (Proxy @"myOrders") historyId MyOrders (const myOrders)
     allOrders'            = f (Proxy @"allOrders") historyId AllOrders (const allOrders)
+    ordersBySet'          = f (Proxy @"ordersBySet") historyId OrdersBySet (\Request {..} -> ordersBySet content)
+    sets'                 = f (Proxy @"sets") historyId Sets (const sets)
     funds'                = f (Proxy @"funds") historyId Funds (const funds)
     cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
     collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)
