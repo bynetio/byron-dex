@@ -259,7 +259,7 @@ data CoinSet
      { lockedCoin   :: AssetClass
      , expectedCoin :: AssetClass
      }
-  deriving (Generic, Show, FromJSON, ToJSON)
+  deriving (Generic, Show, FromJSON, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''CoinSet [('CoinSet, 0)]
 PlutusTx.makeLift ''CoinSet
 

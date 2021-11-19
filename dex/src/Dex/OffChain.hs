@@ -287,7 +287,26 @@ allOrders = do
               in return $ Just OrderInfo {..}
 
 ordersBySet :: CoinSet -> Contract DexState DexSchema Text [OrderInfo]
-ordersBySet = Prelude.undefined
+ordersBySet (CoinSet lc ec)= do
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  mapped <- catMaybes <$> mapM toOrderInfo utxos
+  return $ filter (\OrderInfo {..} -> lockedCoin == lc && expectedCoin == ec) mapped
+  where
+    toOrderInfo (orderHash, o) = do
+      datum <- getDexDatum o
+      case datum of
+        Payout _ -> return Nothing
+        Order order ->
+          case order of
+            LiquidityOrder LiquidityOrderInfo {..} ->
+              let orderType = "Liquidity"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
+            SellOrder SellOrderInfo {..} ->
+              let orderType = "Sell"
+                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+              in return $ Just OrderInfo {..}
 
 sets :: Contract DexState DexSchema Text [CoinSet]
 sets = Prelude.undefined
