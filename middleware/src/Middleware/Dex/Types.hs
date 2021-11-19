@@ -6,20 +6,23 @@
 -- |
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types (FromJSON, ToJSON, parseJSON, toJSON,
-                                   withObject, (.:))
-import           Data.Ratio       (approxRational, denominator, numerator)
-import           Data.Text        (Text)
-import           Dex.Types        (CancelOrderParams (CancelOrderParams),
-                                   LiquidityOrderParams (LiquidityOrderParams),
-                                   LiquidityPoolParams (LiquidityPoolParams),
-                                   Nat (..), OrderInfo (..), PayoutSummary,
-                                   PoolPartsParams (..), fromNat)
-import           GHC.Generics     (Generic)
-import           Ledger           (AssetClass, CurrencySymbol, TokenName,
-                                   TxOutRef)
-import qualified Ledger.Value     as LV (assetClass, currencySymbol, tokenName,
-                                         unAssetClass)
+import           Data.Aeson.Types   (FromJSON, ToJSON, parseJSON, toJSON,
+                                     withObject, (.:))
+import           Data.Ratio         (approxRational, denominator, numerator)
+import           Data.Text          (Text)
+import           Data.Text.Encoding (encodeUtf8)
+import           Dex.Types          (CancelOrderParams (CancelOrderParams),
+                                     LiquidityOrderParams (LiquidityOrderParams),
+                                     LiquidityPoolParams (LiquidityPoolParams),
+                                     Nat (..), OrderInfo (..), PayoutSummary,
+                                     PoolPartsParams (..), fromNat)
+import           GHC.Generics       (Generic)
+import           Ledger             (AssetClass, CurrencySymbol, TokenName,
+                                     TxOutRef)
+import qualified Ledger.Value       as LV (CurrencySymbol (..), TokenName (..),
+                                           assetClass, currencySymbol,
+                                           tokenName, unAssetClass,
+                                           unCurrencySymbol)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -33,10 +36,13 @@ data Coin = Coin
   deriving (Show, Generic)
 
 instance FromJSON Coin where
-  parseJSON = withObject "Coin" $ \v -> Coin <$> toSymbol (v .: "symbol")
-                                             <*> toName (v .: "name")
-    where toSymbol = fmap LV.currencySymbol
-          toName   = fmap LV.tokenName
+  parseJSON = withObject "Coin" $ \v ->
+    Coin
+      <$> toSymbol (v .: "symbol")
+      <*> toName (v .: "name")
+    where
+      toSymbol = fmap LV.currencySymbol
+      toName = fmap $ LV.tokenName . encodeUtf8
 
 instance ToJSON Coin where
   toJSON = toJSON . assetClassFromCoin
