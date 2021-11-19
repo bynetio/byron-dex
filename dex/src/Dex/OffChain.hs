@@ -85,7 +85,7 @@ type DexSchema =
   .\/ Endpoint "funds" (Request ())
   .\/ Endpoint "allOrders" (Request ())
   .\/ Endpoint "myOrders" (Request ())
-  .\/ Endpoint "ordersBySet" (Request CoinSet)
+  .\/ Endpoint "ordersBySet" (Request AssetSet)
   .\/ Endpoint "sets" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
@@ -286,8 +286,8 @@ allOrders = do
                   lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
               in return $ Just OrderInfo {..}
 
-ordersBySet :: CoinSet -> Contract DexState DexSchema Text [OrderInfo]
-ordersBySet (CoinSet lc ec)= do
+ordersBySet :: AssetSet -> Contract DexState DexSchema Text [OrderInfo]
+ordersBySet (AssetSet lc ec)= do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
@@ -308,7 +308,7 @@ ordersBySet (CoinSet lc ec)= do
                   lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
               in return $ Just OrderInfo {..}
 
-sets :: Contract DexState DexSchema Text [CoinSet]
+sets :: Contract DexState DexSchema Text [AssetSet]
 sets = Prelude.undefined
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()

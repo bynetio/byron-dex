@@ -20,6 +20,7 @@ import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
 import           Middleware.Capability.Retry    (retryRequest)
 import           Middleware.Capability.Time     (Time)
 import           Middleware.Dex.Types           (CancelOrderParams,
+                                                 CoinSet (CoinSet),
                                                  CreateLiquidityOrderParams (CreateLiquidityOrderParams),
                                                  CreateLiquidityPoolParams (CreateLiquidityPoolParams),
                                                  CreateSellOrderParams,
@@ -45,6 +46,7 @@ data ManagePabClient r a where
   CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
   GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetOrdersBySet            :: ContractInstanceId -> CoinSet -> ManagePabClient r [OrderInfo]
   GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
   PerformInPab              :: ContractInstanceId -> ManagePabClient r ()
   PerformNRandomInPab       :: ContractInstanceId -> PerformRandomParams -> ManagePabClient r ()
@@ -114,6 +116,9 @@ runPabClient =
 
       GetAllOrders cid ->
           callEndpoint cid "allOrders" ()
+
+      GetOrdersBySet cid params ->
+        callEndpoint cid "ordersBySet" params
 
       CancelOrder cid params ->
           callEndpoint cid "cancel" params

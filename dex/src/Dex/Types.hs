@@ -254,14 +254,14 @@ data OrderInfo
   deriving (FromJSON, Generic, Show, ToJSON)
 
 -- TODO add field for the size of the set
-data CoinSet
-  = CoinSet
+data AssetSet
+  = AssetSet
      { lockedCoin   :: AssetClass
      , expectedCoin :: AssetClass
      }
   deriving (Generic, Show, FromJSON, ToJSON, ToSchema)
-PlutusTx.makeIsDataIndexed ''CoinSet [('CoinSet, 0)]
-PlutusTx.makeLift ''CoinSet
+PlutusTx.makeIsDataIndexed ''AssetSet [('AssetSet, 0)]
+PlutusTx.makeLift ''AssetSet
 
 newtype PayoutSummary
   = PayoutSummary
@@ -279,7 +279,7 @@ data DexContractState
   | Funds [(AssetClass, Integer)]
   | MyOrders [OrderInfo]
   | OrdersBySet [OrderInfo]
-  | Sets [CoinSet]
+  | Sets [AssetSet]
   | Canceled
   | Collected
   | MyPayouts PayoutSummary

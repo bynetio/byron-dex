@@ -47,6 +47,14 @@ coinFromAssetClass = uncurry Coin . LV.unAssetClass
 assetClassFromCoin :: Coin -> AssetClass
 assetClassFromCoin (Coin cs tn) = LV.assetClass cs tn
 
+-- TODO add field for the size of the set
+data CoinSet
+  = CoinSet
+  { lockedCoin   :: Coin,
+    expectedCoin :: Coin
+  }
+  deriving (Show, Generic, ToJSON, FromJSON)
+
 -- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double
   deriving (Show, Eq, Generic, ToJSON, FromJSON)

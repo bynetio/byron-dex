@@ -15,6 +15,7 @@ import           Middleware.PabClient              (ManagePabClient,
                                                     createSellOrder,
                                                     getAllOrders, getFunds,
                                                     getMyOrders, getMyPayouts,
+                                                    getOrdersBySet,
                                                     performInPab,
                                                     performNRandomInPab, stop)
 import           Middleware.PabClient.Types        hiding (Error)
@@ -31,6 +32,7 @@ data Dex r a where
   CreateLiquidityOrder :: ContractInstanceId -> CreateLiquidityOrderParams -> Dex r ()
   MyOrders             :: ContractInstanceId -> Dex r [OrderView]
   AllOrders            :: ContractInstanceId -> Dex r [OrderView]
+  OrdersBySet          :: ContractInstanceId -> CoinSet -> Dex r [OrderView]
   Payouts              :: ContractInstanceId -> Dex r [PayoutView]
   Perform              :: ContractInstanceId -> Dex r ()
   PerformNRandom       :: ContractInstanceId -> PerformRandomParams -> Dex r ()
@@ -61,6 +63,9 @@ runDex = interpret
       AllOrders cid -> do
         os <- getAllOrders cid
         return $ fmap dexOrder os
+      OrdersBySet cid params -> do
+        os <- getOrdersBySet cid params
+        return $ fmap dexOrder os
       Payouts cid -> do
         (PayoutSummary ps) <- getMyPayouts cid
         pure $ fmap (uncurry mkPayoutView) ps
@@ -82,6 +87,7 @@ dexServer = funds
        :<|> createLiquidityOrder
        :<|> myOrders
        :<|> allOrders
+       :<|> ordersBySet
        :<|> payouts
        :<|> perform
        :<|> performNRandom
