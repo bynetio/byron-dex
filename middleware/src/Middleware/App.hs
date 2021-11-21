@@ -5,21 +5,14 @@
 
 module Middleware.App where
 
-import           Colog                          (Message)
-import           Colog.Core.IO                  (logStringStdout)
-import           Colog.Message                  (Message)
-import           Colog.Polysemy                 (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting      (Msg, Severity, WithLog,
-                                                 addThreadAndTimeToLog, cmap,
-                                                 logInfo, logTextStderr,
-                                                 logTextStdout, newLogEnv,
+import           Colog.Polysemy                 (runLogAction)
+import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog,
+                                                 cmap, logInfo, logTextStderr,
+                                                 newLogEnv,
                                                  renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Aeson                     (encode)
-import qualified Data.Aeson                     as JSON
 import           Data.Function                  ((&))
-import           Data.OpenApi                   (OpenApi)
-import           Data.OpenApi.Schema            (ToSchema)
 import           Data.Text                      (Text)
 import           Formatting
 import           GHC.Stack                      (HasCallStack)
@@ -31,24 +24,17 @@ import           Middleware.Capability.Config   (AppConfig (pabUrl),
 import           Middleware.Capability.Error    hiding (Handler, throwError)
 import           Middleware.Capability.ReqIdGen (runReqIdGen)
 import           Middleware.Capability.Time     (runTime)
-import           Middleware.Dex                 (Dex, dexServer, runDex)
+import           Middleware.Dex                 (dexServer, runDex)
 import qualified Middleware.Dex.Types           as DexTypes
 import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp       as Warp
 import           Polysemy
-import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
 import           Servant
 import           Servant.OpenApi                (toOpenApi)
-import           Servant.Polysemy.Client        (runServantClient,
-                                                 runServantClientUrl)
-import           Servant.Polysemy.Server
-import           Servant.Swagger.UI             (SwaggerSchemaUI,
-                                                 SwaggerSchemaUI',
-                                                 swaggerSchemaUIServer,
-                                                 swaggerSchemaUIServerT,
-                                                 swaggerSchemaUIServerT')
+import           Servant.Polysemy.Client        (runServantClientUrl)
+import           Servant.Swagger.UI             (swaggerSchemaUIServer)
 import           System.IO                      (stdout)
 
 runApp :: HasCallStack => IO ()
