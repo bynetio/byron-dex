@@ -52,4 +52,4 @@ type API = Capture "contract-instance-id" ContractInstanceId :> "funds"
 
 type SwaggerAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
 
-type DexAPI = SwaggerAPI :<|> API
+type DexAPI = API :<|> SwaggerAPI

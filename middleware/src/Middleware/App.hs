@@ -67,16 +67,13 @@ createApp = do
   appConfig <- load
   -- FIXME: Duplicated in runApp
   logEnv <- embed $ newLogEnv stdout
-  let pab = pabUrl appConfig
-      serverCfg = appConfigServer appConfig
+  let serverCfg = appConfigServer appConfig
   logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
   logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
-  let api = Proxy @API
-      sapi = Proxy @SwaggerAPI
-      dapi = Proxy @DexAPI
-      server = hoistServer api (runServer pab logEnv) dexServer
-      app = serve sapi swagger
-  runWarpServerSettings' @SwaggerAPI serverCfg app
+  let pab = pabUrl appConfig
+      server = hoistServer (Proxy @API) (runServer pab logEnv) dexServer
+      app = serve (Proxy @DexAPI) (server :<|> swagger)
+  runWarpServerSettings' @DexAPI serverCfg app
   where
     -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
     -- | move error mapper to separate package
@@ -130,5 +127,5 @@ runWarpServerSettings' settings appServer = withLowerToIO $ \lowerToIO finished 
   Warp.runSettings settings (corsConfig appServer)
   finished
 
-swagger :: Server SwaggerAPI
+swagger :: ServerT SwaggerAPI Handler
 swagger = swaggerSchemaUIServer $ toOpenApi (Proxy :: Proxy API)
