@@ -6,23 +6,24 @@
 -- |
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types   (FromJSON, ToJSON, object, parseJSON,
-                                     toJSON, withObject, (.:), (.=))
-import           Data.Ratio         (approxRational, denominator, numerator)
-import           Data.Text          (Text)
-import           Data.Text.Encoding (encodeUtf8)
-import           Dex.Types          (CancelOrderParams (CancelOrderParams),
-                                     LiquidityOrderParams (LiquidityOrderParams),
-                                     LiquidityPoolParams (LiquidityPoolParams),
-                                     Nat (..), OrderInfo (..), PayoutSummary,
-                                     PoolPartsParams (..), SellOrderParams (..),
-                                     fromNat)
-import           GHC.Generics       (Generic)
-import           Ledger             (AssetClass, CurrencySymbol, TokenName,
-                                     TxOutRef)
-import qualified Ledger.Value       as LV (assetClass, currencySymbol,
-                                           tokenName, unAssetClass,
-                                           unCurrencySymbol, unTokenName)
+import           Data.Aeson.Types    (FromJSON, ToJSON, object, parseJSON,
+                                      toJSON, withObject, (.:), (.=))
+import           Data.OpenApi.Schema (ToSchema)
+import           Data.Ratio          (approxRational, denominator, numerator)
+import           Data.Text           (Text)
+import           Data.Text.Encoding  (encodeUtf8)
+import           Dex.Types           (CancelOrderParams (CancelOrderParams),
+                                      LiquidityOrderParams (LiquidityOrderParams),
+                                      LiquidityPoolParams (LiquidityPoolParams),
+                                      Nat (..), OrderInfo (..), PayoutSummary,
+                                      PoolPartsParams (..),
+                                      SellOrderParams (..), fromNat)
+import           GHC.Generics        (Generic)
+import           Ledger              (AssetClass, CurrencySymbol, TokenName,
+                                      TxOutRef)
+import qualified Ledger.Value        as LV (assetClass, currencySymbol,
+                                            tokenName, unAssetClass,
+                                            unCurrencySymbol, unTokenName)
 
 newtype Error = Error
   { errorMessage :: Text
