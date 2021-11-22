@@ -15,7 +15,8 @@ import           Dex.Types          (CancelOrderParams (CancelOrderParams),
                                      LiquidityOrderParams (LiquidityOrderParams),
                                      LiquidityPoolParams (LiquidityPoolParams),
                                      Nat (..), OrderInfo (..), PayoutSummary,
-                                     PoolPartsParams (..), fromNat)
+                                     PoolPartsParams (..), SellOrderParams (..),
+                                     fromNat)
 import           GHC.Generics       (Generic)
 import           Ledger             (AssetClass, CurrencySymbol, TokenName,
                                      TxOutRef)
@@ -81,6 +82,10 @@ data CreateSellOrderParams = CreateSellOrderParams
     expectedAmount :: Integer
   }
   deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+convertSellOrderToPab :: CreateSellOrderParams -> SellOrderParams
+convertSellOrderToPab (CreateSellOrderParams lc ec la ea) =
+  SellOrderParams (assetClassFromCoin lc) (assetClassFromCoin ec) (Nat la) (Nat ea)
 
 data CreateLiquidityPoolParams = CreateLiquidityPoolParams
   { coinA           :: Coin,
