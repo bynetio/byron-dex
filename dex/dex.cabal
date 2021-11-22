@@ -7,13 +7,13 @@ extra-source-files: CHANGELOG.md
 
 library
   hs-source-dirs: src
-  exposed-modules: Dex.OnChain
-                 , Dex.OffChain
-                 , Dex.Types
-                 , Dex.Manual
-                 , Dex.Trace
-                 , Dex.WalletHistory
-                 , Dex.LiquidityPool.PoolParts
+  exposed-modules:     Dex.OnChain
+                     , Dex.OffChain
+                     , Dex.Types
+                     , Dex.Manual
+                     , Dex.Trace
+                     , Dex.WalletHistory
+                     , Dex.LiquidityPool.PoolParts
   build-depends:       aeson
                      , base ^>=4.14.1.0
                      , containers
@@ -44,6 +44,30 @@ library
 executable dex-pab
   main-is: Main.hs
   hs-source-dirs: pab
+  ghc-options:
+    -threaded -Werror -Wall
+  build-depends: base >= 4.9 && < 5
+               , plutus-contract -any
+               , plutus-pab -any
+               , dex -any
+               , aeson -any
+               , freer-simple -any
+               , prettyprinter -any
+               , filemanip -any
+               , freer-extras -any
+               , plutus-ledger -any
+               , aeson -any
+               , containers -any
+               , text -any
+               , plutus-use-cases -any
+               , plutus-ledger-api -any
+               , bytestring
+               , data-default
+               , openapi3
+
+executable dex-pab-simulator
+  main-is: Main.hs
+  hs-source-dirs: pab-simulator
   ghc-options:
     -threaded -Werror -Wall
   build-depends: base >= 4.9 && < 5

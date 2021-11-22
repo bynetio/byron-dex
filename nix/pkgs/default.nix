@@ -2,22 +2,22 @@
 let
   gitignore-nix = pkgs.callPackage plutus."gitignore.nix" { };
 
-  compiler-nix-name = plutus.plutus.haskell.compiler-nix-name;
+  compiler-nix-name = plutus.plutus-apps.haskell.compiler-nix-name;
 
   haskell = pkgs.callPackage ./haskell {
     inherit gitignore-nix sources haskell-nix;
     inherit compiler-nix-name;
   };
 
-  hlint = plutus.plutus.hlint;
+  hlint = plutus.plutus-apps.hlint;
 
-  cabal-install = plutus.plutus.cabal-install;
+  cabal-install = plutus.plutus-apps.cabal-install;
 
-  stylish-haskell = plutus.plutus.stylish-haskell;
+  stylish-haskell = plutus.plutus-apps.stylish-haskell;
 
-  haskell-language-server = plutus.plutus.haskell-language-server;
+  haskell-language-server = plutus.plutus-apps.haskell-language-server;
 
-  purty-pre-commit = plutus.plutus.purty-pre-commit;
+  purty-pre-commit = plutus.plutus-apps.purty-pre-commit;
 
 in
 {
