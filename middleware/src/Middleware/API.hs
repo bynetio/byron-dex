@@ -20,7 +20,7 @@ type API = Capture "contract-instance-id" ContractInstanceId :> "funds"         
       :<|> Capture "contract-instance-id" ContractInstanceId :> "create-liquidity-order" :> ReqBody '[JSON] CreateLiquidityOrderParams :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "orders"                                                               :> Get  '[JSON] [OrderView]
       :<|> Capture "contract-instance-id" ContractInstanceId :> "all-orders"                                                           :> Get  '[JSON] [OrderView]
-      :<|> Capture "contract-instance-id" ContractInstanceId :> "orders-by-set"          :> ReqBody '[JSON] CoinSet                    :> Get  '[JSON] [OrderView]
+      :<|> Capture "contract-instance-id" ContractInstanceId :> "orders-by-set"          :> ReqBody '[JSON] CoinSet                    :> Post '[JSON] [OrderView]
       :<|> Capture "contract-instance-id" ContractInstanceId :> "payouts"                                                              :> Get  '[JSON] [PayoutView]
       :<|> Capture "contract-instance-id" ContractInstanceId :> "perform"                                                              :> Post '[JSON] ()
       :<|> Capture "contract-instance-id" ContractInstanceId :> "perform-random"         :> ReqBody '[JSON] PerformRandomParams        :> Post '[JSON] ()
