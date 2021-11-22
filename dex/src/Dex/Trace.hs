@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase        #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -fplugin-opt PlutusTx.Plugin:profile-all #-}
+{-# LANGUAGE TypeApplications  #-}
 
 module Dex.Trace
   ( customTraceConfig
@@ -17,17 +18,14 @@ import           Ledger.Constraints                      hiding (ownPubKeyHash)
 import           Ledger.Value                            as Value
 import           Plutus.Contract                         hiding (throwError)
 import qualified Plutus.Contracts.Currency               as Currency
-import           Plutus.Trace.Emulator.Types             (ContractInstanceLog (..),
-                                                          ContractInstanceMsg (..))
+import           Plutus.Trace.Emulator.Types             (ContractInstanceLog (..), ContractInstanceMsg (..))
 import           Wallet.Emulator.MultiAgent              (EmulatorEvent' (..))
-import           Wallet.Emulator.Types                   (Wallet, knownWallet,
-                                                          walletPubKeyHash)
+import           Wallet.Emulator.Types                   (Wallet, knownWallet, walletPubKeyHash)
 
 import qualified Data.Aeson                              as A
-import           Data.Text.Prettyprint.Doc               (Pretty,
-                                                          defaultLayoutOptions,
-                                                          layoutPretty, pretty)
+import           Data.Text.Prettyprint.Doc               (Pretty, defaultLayoutOptions, layoutPretty, pretty)
 import           Data.Text.Prettyprint.Doc.Render.String (renderString)
+import           Data.Void                               (Void)
 import           Plutus.Trace.Emulator                   (TraceConfig (..))
 import           System.IO                               (stdout)
 
@@ -43,8 +41,8 @@ setupTokens = do
     forM_ wallets $ \w -> do
         let pkh = walletPubKeyHash w
         when (pkh /= ownPK) $ do
-            tx <- submitTx $ mustPayToPubKey pkh v
-            awaitTxConfirmed $ txId tx
+            mkTxConstraints @Void mempty (mustPayToPubKey pkh v)
+              >>= submitTxConfirmed . adjustUnbalancedTx
     tell $ Just $ Semigroup.Last cur
   where
     amount = 1000000

@@ -61,6 +61,7 @@ executable dex-pab
                , text -any
                , plutus-use-cases -any
                , plutus-ledger-api -any
+               , purescript-bridge -any
                , bytestring
                , data-default
                , openapi3
