@@ -2,6 +2,7 @@ index-state: 2021-08-14T00:00:00Z
 
 packages: dex
         , middleware
+        , faucet/faucet-backend
 
 -- You never, ever, want this.
 write-ghc-environment-files: never

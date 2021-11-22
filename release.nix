@@ -52,10 +52,12 @@ let
 
   pab-exec = exes.dex."dex-pab";
   middleware-exec = exes.middleware."middleware-manual";
+  faucet-exec = exes."faucet-backend"."faucet-app";
 
 in
 {
   backend = mkDockerImage pkgs pab-exec "dex-backend" "dex-pab";
   middleware =
     mkDockerImage pkgs middleware-exec "dex-middleware" "midleware-manual";
+  faucet = (import ./faucet/faucet-backend/nix/release.nix).mkDockerImage pkgs faucet-exec;
 }

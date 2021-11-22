@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  faucet:
+    image: dex-faucet:latest
+    tty: true
+    ports:
+      - "8085:8085"
+    environment:
+      - APP_FAUCET_WALLET_ADDRESS="addr_test1qrexdmlktfa55uddpm0s79yfaht9c77h0qm0nd224hndqaea055p66w7gjp65zusx40xfl6q9eng4x6l3vxg9rhf5nrs08c6r2"  
+    volumes:
+      - /home/ssledz/git/iohk-dev/.cardano-wallets/9c70aac3-1445-4b67-9d70-39cbd4bbb347:/etc/faucet/wallet/
+      - /home/ssledz/.cardano-node/node-ipc:/var/node-ipc
