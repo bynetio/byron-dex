@@ -19,8 +19,7 @@ import           Dex.Types          (CancelOrderParams (CancelOrderParams),
 import           GHC.Generics       (Generic)
 import           Ledger             (AssetClass, CurrencySymbol, TokenName,
                                      TxOutRef)
-import qualified Ledger.Value       as LV (CurrencySymbol (..), TokenName (..),
-                                           assetClass, currencySymbol,
+import qualified Ledger.Value       as LV (assetClass, currencySymbol,
                                            tokenName, unAssetClass,
                                            unCurrencySymbol, unTokenName)
 
@@ -33,7 +32,7 @@ data Coin = Coin
   { currencySymbol :: CurrencySymbol,
     tokenName      :: TokenName
   }
-  deriving (Show, Generic)
+  deriving (Show, Generic, ToSchema)
 
 instance FromJSON Coin where
   parseJSON = withObject "Coin" $ \v ->
@@ -59,7 +58,7 @@ assetClassFromCoin (Coin cs tn) = LV.assetClass cs tn
 
 -- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double
-  deriving (Show, Eq, Generic, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, ToJSON, FromJSON, ToSchema)
 
 mkPercentage :: (Nat, Nat) -> Percentage
 mkPercentage (Nat x, Nat y) = Percentage $ calculatePercengate x y
@@ -81,7 +80,7 @@ data CreateSellOrderParams = CreateSellOrderParams
     lockedAmount   :: Integer,
     expectedAmount :: Integer
   }
-  deriving (Show, Generic, ToJSON, FromJSON)
+  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
 
 data CreateLiquidityPoolParams = CreateLiquidityPoolParams
   { coinA           :: Coin,
@@ -91,7 +90,7 @@ data CreateLiquidityPoolParams = CreateLiquidityPoolParams
     swapFee         :: Percentage,
     exchangeRate    :: Percentage
   }
-  deriving (Generic, FromJSON, ToJSON, Show)
+  deriving (Generic, FromJSON, ToJSON, Show, ToSchema)
 
 -- FIXME use JSON codecs instead of explicit type conversion
 convertLiquidityPoolToPab :: CreateLiquidityPoolParams -> LiquidityPoolParams
@@ -109,7 +108,7 @@ data CreateLiquidityOrderParams = CreateLiquidityOrderParams
     expectedAmount :: Integer,
     swapFee        :: Percentage
   }
-  deriving (Generic, FromJSON, ToJSON, Show)
+  deriving (Generic, FromJSON, ToJSON, Show, ToSchema)
 
 convertLiquidityOrderToPab :: CreateLiquidityOrderParams -> LiquidityOrderParams
 convertLiquidityOrderToPab (CreateLiquidityOrderParams lc ec la ea (Percentage d)) =
@@ -124,7 +123,7 @@ data CreatePoolPartsParams = CreatePriceChangeParams
     coinBPriceChange :: Percentage,
     numberOfParts    :: Integer
   }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 convertPoolToPab :: CreatePoolPartsParams -> PoolPartsParams
 convertPoolToPab (CreatePriceChangeParams (Percentage a) (Percentage b) np) =
@@ -135,10 +134,10 @@ convertPoolToMid (PriceChangeParams a b (Nat p)) =
   CreatePriceChangeParams (mkPercentage a) (mkPercentage b) p
 
 newtype CancelOrderParams = CancelOrderParams TxOutRef
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 newtype PerformRandomParams = PerformRandomParams Integer
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- VIEWS
 
@@ -147,7 +146,7 @@ data FundView = FundView
   { coin   :: Coin,
     amount :: Integer
   }
-  deriving (Show, Generic, ToJSON)
+  deriving (Show, Generic, ToJSON, ToSchema)
 
 mkFundView :: AssetClass -> Integer -> FundView
 mkFundView = FundView . coinFromAssetClass
@@ -158,7 +157,7 @@ data OrderView = OrderView
     expectedCoin :: FundView,
     orderType    :: Text
   }
-  deriving (Generic, Show, ToJSON)
+  deriving (Generic, Show, ToJSON, ToSchema)
 
 dexOrder :: OrderInfo -> OrderView
 dexOrder
@@ -178,7 +177,7 @@ data PayoutView = PayoutView
   { coin   :: Coin,
     amount :: Integer
   }
-  deriving (Show, Generic, ToJSON)
+  deriving (Show, Generic, ToJSON, ToSchema)
 
 mkPayoutView :: AssetClass -> Integer -> PayoutView
 mkPayoutView = PayoutView . coinFromAssetClass

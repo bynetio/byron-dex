@@ -214,3 +214,20 @@ curl -v -XPOST -d '{ "coinA": { "tokenName": { "unTokenName": "A" }, "currencySy
 cabal test dex-test
 cabal run dex-pab
 ```
+
+## Deploy docker images
+
+To build docker image with dex application (middleware or backend) run following commands:
+
+```bash
+nix-build release.nix -A middleware
+docker load < result
+```
+
+This operation is automated via `deploy.sh` script. The script build and publish images to the docker registry.
+
+```bash
+nix-shell
+docker login plutus4binarapps
+./deploy.sh
+```

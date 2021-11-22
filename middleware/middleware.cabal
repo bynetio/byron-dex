@@ -36,6 +36,7 @@ library
                       , exceptions
                       , formatting >= 7.1.3
                       , mtl
+                      , openapi3
                       , polysemy
                       , polysemy-plugin
                       , plutus-pab -any
@@ -43,8 +44,11 @@ library
                       , retry
                       , servant
                       , servant-client
+                      , servant-openapi3
                       , servant-polysemy
                       , servant-server
+                      , servant-swagger
+                      , servant-swagger-ui
                       , text
                       , uuid
                       , wai

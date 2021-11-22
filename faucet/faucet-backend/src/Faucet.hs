@@ -28,15 +28,17 @@ handleFaucet' ctx availableTokens address tn = do
   logger I $ T.pack ("Sending " <> show tn <> " to " <> show address)
   runApp (faucet address tn) ctx
 
-faucetApp :: IO ()
-faucetApp = do
-    config <- loadAppConfig
-    logger I $ T.pack ("Starting server on " <> hostPort config <> " ...")
-    logger I $ (decodeUtf8 . BL.toStrict) ("Config: " <> encodePretty config)
-    faucetContexct <- mkFaucetContext config
-    let availableTokens = TokenName . T.unpack <$> (mintConfigTokens . faucetConfigMint . appConfigFaucet) config
+encodeConfig :: AppConfig -> T.Text
+encodeConfig = decodeUtf8 . BL.toStrict . encodePretty
+
+startApp :: AppConfig -> IO ()
+startApp cfg = do
+    logger I $ T.pack ("Starting server on " <> hostPort <> " ...")
+    logger I $ "Config: " <> encodeConfig cfg
+    faucetContexct <- mkFaucetContext cfg
+    let availableTokens = TokenName . T.unpack <$> (mintConfigTokens . faucetConfigMint . appConfigFaucet) cfg
     policyId <- runApp mintPolicyId faucetContexct
-    runSettings (appConfigServer config) $
+    runSettings (appConfigServer cfg) $
       simpleCors $ app FaucetService {
         getTokens =  tokenFrom policyId <$> availableTokens,
         handleFaucet = handleFaucet' faucetContexct (Set.fromList availableTokens)
@@ -45,8 +47,16 @@ faucetApp = do
       tokenFrom policyId = Token $ (TokenCurrency . read . show) policyId
       port = getPort . appConfigServer
       host  = getHost . appConfigServer
-      hostPort cfg = foldl (<>) "" [show $ host cfg, ":", show $ port cfg]
+      hostPort = foldl (<>) "" [show $ host cfg, ":", show $ port cfg]
       mkFaucetContext :: AppConfig -> IO (AppFaucetEnv AppFaucet)
       mkFaucetContext (AppConfig _ faucetCfg nodeCfg) = do
         refs <- newMVar Set.empty
         return $ AppFaucetEnv nodeCfg faucetCfg refs richMessageAction
+
+faucetApp :: IO ()
+faucetApp = do
+    cliConfig <- parseCliConfig
+    appConfig <- loadAppConfig cliConfig
+    case cliConfig of
+      Start _      -> startApp appConfig
+      ShowConfig _ -> putStrLn $ T.unpack $ encodeConfig appConfig
