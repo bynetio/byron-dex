@@ -10,20 +10,14 @@ import           Test.Hspec
 spec :: Spec
 spec = do
   describe "toJSON" $ do
-    it "returns Coin serialiased to JSON in AssetClass format" $ do
-      coinToPAB `shouldBe` encode someCoin
+    it "returns Coin serialiased to JSON in symbol/name format" $ do
+      byteCoin `shouldBe` encode someCoin
   describe "fromJSON" $ do
     it "returns a Coin deserialised from JSON in symbol/name format" $ do
-      decode coinFromRequest `shouldBe` Just someCoin
-  describe "fromJSON" $ do
-    it "returns a Coin deserialised from JSON in AssetClass format" $ do
-      decode coinToPAB `shouldBe` Just someCoin
+      decode byteCoin `shouldBe` Just someCoin
 
-coinFromRequest :: ByteString
-coinFromRequest = "{ \"symbol\": \"aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698\", \"name\": \"A\" }"
-
-coinToPAB :: ByteString
-coinToPAB = "{\"unAssetClass\":[{\"unCurrencySymbol\":\"aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698\"},{\"unTokenName\":\"A\"}]}"
+byteCoin :: ByteString
+byteCoin = "{ \"symbol\": \"aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698\", \"name\": \"A\" }"
 
 someCoin :: Coin
 someCoin = Coin { currencySymbol = "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698", tokenName = "A" }

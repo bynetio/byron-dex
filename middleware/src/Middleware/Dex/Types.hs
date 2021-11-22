@@ -6,8 +6,8 @@
 -- |
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types   (FromJSON, ToJSON, parseJSON, toJSON,
-                                     withObject, (.:))
+import           Data.Aeson.Types   (FromJSON, ToJSON, object, parseJSON,
+                                     toJSON, withObject, (.:), (.=))
 import           Data.Ratio         (approxRational, denominator, numerator)
 import           Data.Text          (Text)
 import           Data.Text.Encoding (encodeUtf8)
@@ -22,7 +22,7 @@ import           Ledger             (AssetClass, CurrencySymbol, TokenName,
 import qualified Ledger.Value       as LV (CurrencySymbol (..), TokenName (..),
                                            assetClass, currencySymbol,
                                            tokenName, unAssetClass,
-                                           unCurrencySymbol)
+                                           unCurrencySymbol, unTokenName)
 
 newtype Error = Error
   { errorMessage :: Text
@@ -45,7 +45,11 @@ instance FromJSON Coin where
       toName = fmap $ LV.tokenName . encodeUtf8
 
 instance ToJSON Coin where
-  toJSON = toJSON . assetClassFromCoin
+  toJSON coin =
+    object
+      [ "symbol" .= toJSON (LV.unCurrencySymbol . currencySymbol $ coin),
+        "name" .= toJSON (LV.unTokenName . tokenName $ coin)
+      ]
 
 coinFromAssetClass :: AssetClass -> Coin
 coinFromAssetClass = uncurry Coin . LV.unAssetClass
