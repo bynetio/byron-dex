@@ -249,42 +249,12 @@ myOrders = do
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
   return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
-  where
-    toOrderInfo (orderHash, o) = do
-      datum <- getDexDatum o
-      case datum of
-        Payout _ -> return Nothing
-        Order order ->
-          case order of
-            LiquidityOrder LiquidityOrderInfo {..} ->
-              let orderType = "Liquidity"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
-            SellOrder      SellOrderInfo      {..} ->
-              let orderType = "Sell"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
 
 allOrders :: Contract DexState DexSchema Text [OrderInfo]
 allOrders = do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   catMaybes <$> mapM toOrderInfo utxos
-  where
-    toOrderInfo (orderHash, o) = do
-      datum <- getDexDatum o
-      case datum of
-        Payout _ -> return Nothing
-        Order order ->
-          case order of
-            LiquidityOrder LiquidityOrderInfo {..} ->
-              let orderType = "Liquidity"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
-            SellOrder      SellOrderInfo      {..} ->
-              let orderType = "Sell"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
 
 ordersBySet :: AssetSet -> Contract DexState DexSchema Text [OrderInfo]
 ordersBySet (AssetSet lc ec)= do
@@ -292,24 +262,29 @@ ordersBySet (AssetSet lc ec)= do
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
   return $ filter (\OrderInfo {..} -> lockedCoin == lc && expectedCoin == ec) mapped
-  where
-    toOrderInfo (orderHash, o) = do
-      datum <- getDexDatum o
-      case datum of
-        Payout _ -> return Nothing
-        Order order ->
-          case order of
-            LiquidityOrder LiquidityOrderInfo {..} ->
-              let orderType = "Liquidity"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
-            SellOrder SellOrderInfo {..} ->
-              let orderType = "Sell"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
 
 sets :: Contract DexState DexSchema Text [AssetSet]
-sets = Prelude.undefined
+sets = do
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  orders <- catMaybes <$> mapM toOrderInfo utxos
+  return $ map (\OrderInfo {..} -> AssetSet lockedCoin expectedCoin) orders
+
+toOrderInfo :: (TxOutRef, ChainIndexTxOut) -> Contract w s Text (Maybe OrderInfo)
+toOrderInfo (orderHash, o) = do
+  datum <- getDexDatum o
+  case datum of
+    Payout _ -> return Nothing
+    Order order ->
+      case order of
+        LiquidityOrder LiquidityOrderInfo {..} ->
+          let orderType = "Liquidity"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+          in return $ Just OrderInfo {..}
+        SellOrder SellOrderInfo {..} ->
+          let orderType = "Sell"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+          in return $ Just OrderInfo {..}
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
