@@ -18,6 +18,8 @@ import           Data.Aeson.Types                        (emptyArray,
                                                           parseMaybe)
 import           Data.Either.Combinators                 (mapLeft, maybeToRight,
                                                           rightToMaybe)
+import           Data.OpenApi.Internal.ParamSchema       (ToParamSchema)
+import qualified Data.OpenApi.Schema                     as OpenApi
 import           Data.Text
 import           Data.UUID                               (UUID)
 import           Dex.WalletHistory                       (History (History),
@@ -35,7 +37,7 @@ import           Servant.API
 newtype ContractInstanceId = ContractInstanceId { unContractInstanceId :: UUID }
     deriving (Eq, Ord, Show, Generic)
     deriving newtype (FromJSONKey, ToJSONKey, ToHttpApiData, FromHttpApiData)
-    deriving anyclass (FromJSON, ToJSON)
+    deriving anyclass (FromJSON, ToJSON, OpenApi.ToSchema, ToParamSchema)
 
 type ContractState = ContractInstanceClientState String
 
