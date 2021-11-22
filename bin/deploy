@@ -4,12 +4,13 @@ set -exu
 
 deploy_app ()  {
    app_name=$1
-   result=$(nix-build --no-out-link release.nix -A $app_name)
+   result=$(nix-build --no-out-link release.nix -A "$app_name")
 
-   docker load < $result
-   docker tag dex-$app_name plutus4binarapps/dex-$app_name
-   docker push plutus4binarapps/dex-$app_name
+   docker load < "$result"
+   docker tag "dex-$app_name" "plutus4binarapps/dex-$app_name"
+   docker push "plutus4binarapps/dex-$app_name"
 }
 
 deploy_app "backend"
 deploy_app "middleware"
+deploy_app "faucet"

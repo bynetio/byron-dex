@@ -65,6 +65,8 @@ faucet (AddressParam receiver) tn = do
         txId <- runApp (faucet' pp utxo sKey sender receiver' lovelace (tn, mTokenQ)) ctx
         let refs' = Set.intersection (Set.insert txIn refs) (Set.fromList $ fst <$> utxos)
         return (refs', txId)
+  where
+    unUTxO (UTxO utxos) = utxos
 
 mayHead :: [a] -> Maybe a
 mayHead (a : _) = Just a
@@ -91,7 +93,7 @@ walletConfig :: AppFaucet WalletConfig
 walletConfig = asks $ faucetConfigWallet . faucetConfig
 
 walletLovelace :: AppFaucet Lovelace
-walletLovelace = Lovelace . walletConfigLovelace <$> walletConfig
+walletLovelace = quantityToLovelace . Quantity . walletConfigLovelace <$> walletConfig
 
 parseAddress :: T.Text -> IO AddressAny
 parseAddress addr = liftMaybeIO maybeAddress (AddressDecodingError $ T.unpack addr)
@@ -117,7 +119,7 @@ mintPolicyId = do
   case scriptWitnessScript mintScriptWitness' of
     ScriptInEra _ script -> return $ scriptPolicyId script
 
-faucet' :: WithLog env Message AppFaucet => ProtocolParameters -> (TxIn, TxOut CtxUTxO AlonzoEra) -> SigningKey PaymentKey -> AddressAny -> AddressAny -> Lovelace -> (TokenName, Integer) -> AppFaucet TxId
+faucet' :: WithLog env Message AppFaucet => ProtocolParameters -> (TxIn, TxOut AlonzoEra) -> SigningKey PaymentKey -> AddressAny -> AddressAny -> Lovelace -> (TokenName, Integer) -> AppFaucet TxId
 faucet' pParams (txIn, txOut) sKey sender receiver lovelace (tn, quantity) = do
   policyId <- mintPolicyId
   scriptWitness <- mintScriptWitness
@@ -132,9 +134,6 @@ faucet' pParams (txIn, txOut) sKey sender receiver lovelace (tn, quantity) = do
 
     txMintedValue policyId scriptWitness = TxMintValue MultiAssetInAlonzoEra (mintValue policyId) $ BuildTxWith $ Map.fromList [(policyId, scriptWitness)]
 
-    negateLovelace :: Lovelace -> Lovelace
-    negateLovelace (Lovelace val) = Lovelace (-val)
-
     senderZeroTxOut = txOutFromLovelace sender mempty
 
     balance :: TxBodyContent BuildTx AlonzoEra -> Either TxBodyError (TxBodyContent BuildTx AlonzoEra)
@@ -142,16 +141,21 @@ faucet' pParams (txIn, txOut) sKey sender receiver lovelace (tn, quantity) = do
                           fee = evaluateTransactionFee pParams <$> body <*> pure 1 <*> pure 0
                           dfee = liftM2 (<>) fee fee
                           diff = liftM2 (<>) dfee $ pure  lovelace
-                          change = liftM2 (<>) (lovelaceToValue . negateLovelace <$> diff) (pure $ txOutValue txOut)
+                          change = liftM2 (<>) (negateValue . lovelaceToValue <$> diff) (pure $ txOutValue txOut)
                         in liftM3 update (pure content) dfee change
       where
-        txOutValue :: TxOut CtxUTxO AlonzoEra -> Value
+        txOutValue :: TxOut AlonzoEra -> Value
         txOutValue (TxOut _ value _) = txOutValueToValue value
         update :: TxBodyContent BuildTx AlonzoEra -> Lovelace -> Value -> TxBodyContent BuildTx AlonzoEra
         update c fee out = c {
           txFee = TxFeeExplicit TxFeesExplicitInAlonzoEra fee,
           txOuts = txOutFromValue sender out : filter (/= senderZeroTxOut) (txOuts c)
         }
+        txOutValueToValue :: TxOutValue era -> Value
+        txOutValueToValue tv =
+          case tv of
+            TxOutAdaOnly _ l -> lovelaceToValue l
+            TxOutValue _ v   -> v
 
     txBody policyId scriptWitness = liftIO $ liftEitherIO $ flip fmap (balance txContent >>= makeTransactionBody) $ \b -> (getTxId b, b)
       where
@@ -168,11 +172,11 @@ requireSigWitness pkh = SimpleScriptWitness SimpleScriptV1InAlonzo SimpleScriptV
     script :: SimpleScript SimpleScriptV1
     script = Cardano.Api.RequireSignature pkh
 
-txOutFromLovelace :: AddressAny -> Lovelace -> TxOut CtxTx AlonzoEra
+txOutFromLovelace :: AddressAny -> Lovelace -> TxOut AlonzoEra
 txOutFromLovelace addr l = txOutFromValue addr $ lovelaceToValue l
 
-txOutFromValue :: AddressAny -> Value -> TxOut CtxTx AlonzoEra
-txOutFromValue addr v = TxOut addressInEra (TxOutValue MultiAssetInAlonzoEra v) TxOutDatumNone
+txOutFromValue :: AddressAny -> Value -> TxOut AlonzoEra
+txOutFromValue addr v = TxOut addressInEra (TxOutValue MultiAssetInAlonzoEra v) TxOutDatumHashNone
   where
     addressInEra = case anyAddressInEra AlonzoEra addr of
       Just addr' -> addr'
@@ -183,7 +187,7 @@ mkEmptyTxBodyContent = TxBodyContent {
         txIns = [],
         txInsCollateral = TxInsCollateral CollateralInAlonzoEra [],
         txOuts = [],
-        txFee = TxFeeExplicit TxFeesExplicitInAlonzoEra ( Lovelace 0),
+        txFee = TxFeeExplicit TxFeesExplicitInAlonzoEra mempty,
         txValidityRange = (TxValidityNoLowerBound, TxValidityNoUpperBound ValidityNoUpperBoundInAlonzoEra),
         txMetadata = TxMetadataNone ,
         txAuxScripts = TxAuxScriptsNone,
@@ -193,7 +197,8 @@ mkEmptyTxBodyContent = TxBodyContent {
         txCertificates = TxCertificatesNone,
         txUpdateProposal = TxUpdateProposalNone,
         txMintValue = TxMintNone,
-        txScriptValidity = TxScriptValidityNone
+        txScriptValidity = TxScriptValidityNone,
+        txExtraScriptData = BuildTxWith TxExtraScriptDataNone
       }
 
 signTx :: SigningKey PaymentKey -> TxBody AlonzoEra -> Tx AlonzoEra
