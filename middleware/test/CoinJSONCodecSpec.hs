@@ -17,9 +17,7 @@ spec = do
       decode byteCoin `shouldBe` Just someCoin
 
 byteCoin :: ByteString
-byteCoin = "{ \"symbol\": \"aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698\", \"name\": \"A\" }"
+byteCoin = "{\"name\":\"A\",\"symbol\":\"aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698\"}"
 
 someCoin :: Coin
 someCoin = Coin { currencySymbol = "aa906c3a72afdd99d48a001f4c73cbf8cf54c62493e0d00774f32698", tokenName = "A" }
-
-instance Eq Coin
