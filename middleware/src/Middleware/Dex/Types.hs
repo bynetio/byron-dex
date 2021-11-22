@@ -149,7 +149,7 @@ convertPoolToMid (PriceChangeParams a b (Nat p)) =
 newtype CancelOrderParams = CancelOrderParams TxOutRef
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-newtype PerformRandomParams = PerformRandomParams Integer
+newtype PerformRandomParams = PerformRandomParams { unPerformRandomParams :: Integer }
   deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- VIEWS
