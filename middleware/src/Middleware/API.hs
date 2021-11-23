@@ -20,19 +20,19 @@ type API =
     :> Get '[JSON] [FundView]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "collect-funds"
       :> Description "Collect user funds."
-      :> PostAccepted '[JSON] NoContent
+      :> PostAccepted '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "create-sell-order"
       :> Description "Create a sell order."
       :> ReqBody '[JSON] CreateSellOrderParams
-      :> PostCreated '[JSON] NoContent
+      :> PostCreated '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "create-liquidity-pool"
       :> Description "Create a liquidity pool"
       :> ReqBody '[JSON] CreateLiquidityPoolParams
-      :> PostCreated '[JSON] NoContent
+      :> PostCreated '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "create-liquidity-order"
       :> Description "Create a liquidity order."
       :> ReqBody '[JSON] CreateLiquidityOrderParams
-      :> Post '[JSON] NoContent
+      :> PostCreated '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "orders"
       :> Description "List user orders."
       :> Get '[JSON] [OrderView]
@@ -44,18 +44,18 @@ type API =
       :> Get '[JSON] [PayoutView]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "perform"
       :> Description "Perform match."
-      :> PostAccepted '[JSON] NoContent
+      :> PostAccepted '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "perform-random"
       :> Description "Perform random match."
       :> ReqBody '[JSON] PerformRandomParams
-      :> PostAccepted '[JSON] NoContent
+      :> PostAccepted '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "stop"
       :> Description "Stop."
-      :> PostAccepted '[JSON] NoContent
+      :> PostAccepted '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "cancel"
       :> Description "Cancel order."
       :> ReqBody '[JSON] CancelOrderParams
-      :> PostAccepted '[JSON] NoContent
+      :> PostAccepted '[JSON] ()
 
 type SwaggerAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"
 
