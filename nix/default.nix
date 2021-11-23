@@ -11,7 +11,7 @@ let
 
   haskell-nix = pkgs.haskell-nix;
 
-  dex = import ./pkgs {
+  uniswap = import ./pkgs {
     inherit pkgs haskell-nix sources plutus pre-commit-hooks-nix;
   };
 
@@ -19,5 +19,5 @@ in
 {
   inherit pkgs;
 
-  inherit plutus dex easy-purescript-nix;
+  inherit plutus uniswap easy-purescript-nix;
 }

@@ -3,7 +3,7 @@
 , tag ? null
 , extraContents ? [ ]
 , extraCommands ? ""
-, nonRootUser ? "dex"
+, nonRootUser ? "uniswap"
 , nonRootUserId ? "1000"
 , dockerTools
 , bashInteractive

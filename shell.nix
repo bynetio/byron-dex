@@ -1,8 +1,8 @@
 let
   packages = import ./.;
-  inherit (packages) pkgs dex easy-purescript-nix;
+  inherit (packages) pkgs uniswap easy-purescript-nix;
   inherit (pkgs) lib stdenv utillinux python3 nixpkgs-fmt;
-  inherit (dex)
+  inherit (uniswap)
     haskell pre-commit-hooks-nix stylish-haskell purty-pre-commit;
   inherit (easy-purescript-nix) purs spago zephyr purty;
 
@@ -41,7 +41,7 @@ let
     [ libsodium-vrf xz ghcid niv nixpkgs-fmt nodejs-14_x z3 zlib nodePackages.parcel-bundler ]
     ++ lib.optionals stdenv.isDarwin [ clang ]);
 
-  localInputs = (with dex; [
+  localInputs = (with uniswap; [
     hlint
     cabal-install
     haskell-language-server
