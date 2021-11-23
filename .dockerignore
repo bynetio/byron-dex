@@ -1,8 +1,0 @@
-.pre-commit-config.yaml
-tmp
-**/dist-newstyle/
-tags
-uniswap/.hpc
-.git/
-.ghcup/
-.vscode/

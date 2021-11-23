@@ -3,7 +3,7 @@ let
   deferPluginErrors = true;
   project = haskell-nix.project {
     src = haskell-nix.haskellLib.cleanGit {
-      name = "uniswap";
+      name = "dex";
       src = ../../../.;
     };
 

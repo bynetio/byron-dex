@@ -1,7 +1,7 @@
 let
   packages = import ./.;
-  inherit (packages) uniswap;
-  inherit (uniswap) haskell;
+  inherit (packages) dex;
+  inherit (dex) haskell;
 
 in
 haskell.project.shellFor {

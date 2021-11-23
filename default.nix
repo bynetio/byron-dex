@@ -1,18 +1,18 @@
 let
   packages = import ./nix;
 
-  inherit (packages) pkgs uniswap easy-purescript-nix;
-  project = uniswap.haskell.project;
+  inherit (packages) pkgs dex easy-purescript-nix;
+  project = dex.haskell.project;
 
-  inherit (uniswap) haskell stylish-haskell devcontainer;
+  inherit (dex) haskell stylish-haskell devcontainer;
 
 in
 {
-  inherit pkgs uniswap easy-purescript-nix;
+  inherit pkgs dex easy-purescript-nix;
 
   inherit project;
 
   devcontainer = import ./nix/devcontainer/dex-devcontainer.nix {
-    inherit pkgs uniswap;
+    inherit pkgs dex;
   };
 }
