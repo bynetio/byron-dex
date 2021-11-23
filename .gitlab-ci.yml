@@ -54,6 +54,15 @@ image: "plutus4binarapps/dex-plutus-dev:v1.2"
         - /builds/plutus/dex/dist-newstyle
       policy: pull-push
 
+.faucet-cache:
+  <<: *base_cache
+  cache:
+    - <<: *cabal_cache
+    - key: faucet-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/dex/dist-newstyle
+      policy: pull-push
+
 stages:
   - lint
   - prebuild
@@ -111,3 +120,20 @@ build_middleware:
   script:
     - ls -la /builds/plutus/dex/prebuild-cache/
     - cabal build middleware
+
+# faucet
+lint_faucet:
+  stage: lint
+  extends: .automatic
+  script: "hlint faucet/faucet-backend/src"
+
+build_faucet:
+  stage: build
+  extends:
+    - .automatic
+    - .faucet-cache
+  needs:
+    - prebuild
+    - lint_faucet
+  script:
+    - cabal build faucet-backend
