@@ -1,3 +1,25 @@
+Running
+=======
+
+```
+> cabal run faucet-app --help
+
+Faucet App
+
+Usage: faucet-app (start | showconfig)
+
+Available options:
+  -h,--help                Show this help text
+
+Available commands:
+  start                    
+  showconfig
+```
+
+```
+> cabal run faucet-app -- start --config app.config
+```
+
 API
 ===
 

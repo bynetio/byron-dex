@@ -26,7 +26,8 @@ import           Middleware.Dex.Types           (CancelOrderParams,
                                                  CreateSellOrderParams,
                                                  PerformRandomParams (PerformRandomParams),
                                                  convertLiquidityOrderToPab,
-                                                 convertLiquidityPoolToPab)
+                                                 convertLiquidityPoolToPab,
+                                                 convertSellOrderToPab)
 import           Middleware.PabClient.API       (API)
 import           Middleware.PabClient.Types
 import           Polysemy                       (Embed, Members, Sem, interpret,
@@ -103,7 +104,7 @@ runPabClient =
           callEndpoint cid "funds" ()
 
       CreateSellOrder cid params ->
-          callEndpoint cid "createSellOrder" params
+          callEndpoint cid "createSellOrder" (convertSellOrderToPab params)
 
       CreateLiquidityPoolInPab cid params ->
         callEndpoint cid "createLiquidityPool" (convertLiquidityPoolToPab params)

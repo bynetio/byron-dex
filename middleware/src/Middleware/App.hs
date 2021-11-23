@@ -5,14 +5,10 @@
 
 module Middleware.App where
 
-import           Colog                          (Message)
-import           Colog.Core.IO                  (logStringStdout)
-import           Colog.Message                  (Message)
-import           Colog.Polysemy                 (Log, log, runLogAction)
-import           Colog.Polysemy.Formatting      (Msg, Severity, WithLog,
-                                                 addThreadAndTimeToLog, cmap,
-                                                 logInfo, logTextStderr,
-                                                 logTextStdout, newLogEnv,
+import           Colog.Polysemy                 (runLogAction)
+import           Colog.Polysemy.Formatting      (WithLog, addThreadAndTimeToLog,
+                                                 cmap, logInfo, logTextStderr,
+                                                 newLogEnv,
                                                  renderThreadTimeMessage)
 import           Control.Monad.Except
 import           Data.Aeson                     (encode)
@@ -34,12 +30,11 @@ import           Middleware.PabClient           (runPabClient)
 import           Network.Wai
 import qualified Network.Wai.Handler.Warp       as Warp
 import           Polysemy
-import           Polysemy.Reader                (runReader)
 import           Prelude                        hiding (log)
 import           Servant
-import           Servant.Polysemy.Client        (runServantClient,
-                                                 runServantClientUrl)
-import           Servant.Polysemy.Server
+import           Servant.OpenApi                (toOpenApi)
+import           Servant.Polysemy.Client        (runServantClientUrl)
+import           Servant.Swagger.UI             (swaggerSchemaUIServer)
 import           System.IO                      (stdout)
 
 runApp :: HasCallStack => IO ()
@@ -58,13 +53,13 @@ createApp = do
   appConfig <- load
   -- FIXME: Duplicated in runApp
   logEnv <- embed $ newLogEnv stdout
-  let pab = pabUrl appConfig
-      serverCfg = appConfigServer appConfig
+  let serverCfg = appConfigServer appConfig
   logInfo (text % shown) "Running on port: " (Warp.getPort serverCfg)
   logInfo (text % shown) "Bind to: "         (Warp.getHost serverCfg)
-  let api = Proxy @API
-      app = serve api (hoistServer api (runServer pab logEnv) dexServer)
-  runWarpServerSettings' @API serverCfg app
+  let pab = pabUrl appConfig
+      server = hoistServer (Proxy @API) (runServer pab logEnv) dexServer
+      app = serve (Proxy @DexAPI) (server :<|> swagger)
+  runWarpServerSettings' @DexAPI serverCfg app
   where
     -- | TODO: Handle all errors, add "JSON" body for error messages and improve messages.
     -- | move error mapper to separate package
@@ -117,3 +112,6 @@ runWarpServerSettings'
 runWarpServerSettings' settings appServer = withLowerToIO $ \lowerToIO finished -> do
   Warp.runSettings settings (corsConfig appServer)
   finished
+
+swagger :: ServerT SwaggerAPI Handler
+swagger = swaggerSchemaUIServer $ toOpenApi (Proxy :: Proxy API)

@@ -6,20 +6,29 @@
 -- |
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types (FromJSON, ToJSON, parseJSON, toJSON,
-                                   withObject, (.:))
-import           Data.Ratio       (approxRational, denominator, numerator)
-import           Data.Text        (Text)
-import           Dex.Types        (CancelOrderParams (CancelOrderParams),
-                                   LiquidityOrderParams (LiquidityOrderParams),
-                                   LiquidityPoolParams (LiquidityPoolParams),
-                                   Nat (..), OrderInfo (..), PayoutSummary,
-                                   PoolPartsParams (..), fromNat)
-import           GHC.Generics     (Generic)
-import           Ledger           (AssetClass, CurrencySymbol, TokenName,
-                                   TxOutRef)
-import qualified Ledger.Value     as LV (assetClass, currencySymbol, tokenName,
-                                         unAssetClass)
+import           Data.Aeson.Types           (FromJSON, ToJSON, object,
+                                             parseJSON, toJSON, withObject,
+                                             (.:), (.=))
+import           Data.OpenApi.Schema        (ToSchema)
+import           Data.Ratio                 (approxRational, denominator,
+                                             numerator)
+import           Data.Text                  (Text)
+import           Data.Text.Encoding         (decodeUtf8, encodeUtf8)
+import           Dex.Types                  (CancelOrderParams (CancelOrderParams),
+                                             LiquidityOrderParams (LiquidityOrderParams),
+                                             LiquidityPoolParams (LiquidityPoolParams),
+                                             Nat (..), OrderInfo (..),
+                                             PayoutSummary,
+                                             PoolPartsParams (..),
+                                             SellOrderParams (..), fromNat)
+import           GHC.Generics               (Generic)
+import           Ledger                     (AssetClass, CurrencySymbol,
+                                             TokenName, TxOutRef)
+import qualified Ledger.Value               as LV (assetClass, currencySymbol,
+                                                   tokenName, unAssetClass,
+                                                   unCurrencySymbol,
+                                                   unTokenName)
+import           PlutusTx.Builtins.Internal (BuiltinByteString (..))
 
 newtype Error = Error
   { errorMessage :: Text
@@ -30,16 +39,25 @@ data Coin = Coin
   { currencySymbol :: CurrencySymbol,
     tokenName      :: TokenName
   }
-  deriving (Show, Generic)
+  deriving (Show, Eq, Generic, ToSchema)
 
 instance FromJSON Coin where
-  parseJSON = withObject "Coin" $ \v -> Coin <$> toSymbol (v .: "symbol")
-                                             <*> toName (v .: "name")
-    where toSymbol = fmap LV.currencySymbol
-          toName   = fmap LV.tokenName
+  parseJSON = withObject "Coin" $ \v ->
+    Coin
+      <$> toSymbol (v .: "symbol")
+      <*> toName (v .: "name")
+    where
+      toSymbol = fmap LV.currencySymbol
+      toName = fmap $ LV.tokenName . encodeUtf8
 
 instance ToJSON Coin where
-  toJSON = toJSON . assetClassFromCoin
+  toJSON coin =
+    object
+      [ "symbol" .= toJSON (LV.unCurrencySymbol . currencySymbol $ coin),
+        "name" .= toJSON (decodeUtf8 . unBSS . LV.unTokenName . tokenName $ coin)
+      ]
+      where
+        unBSS (BuiltinByteString s) = s
 
 coinFromAssetClass :: AssetClass -> Coin
 coinFromAssetClass = uncurry Coin . LV.unAssetClass
@@ -57,7 +75,7 @@ data CoinSet
 
 -- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double
-  deriving (Show, Eq, Generic, ToJSON, FromJSON)
+  deriving (Show, Eq, Generic, ToJSON, FromJSON, ToSchema)
 
 mkPercentage :: (Nat, Nat) -> Percentage
 mkPercentage (Nat x, Nat y) = Percentage $ calculatePercengate x y
@@ -79,7 +97,11 @@ data CreateSellOrderParams = CreateSellOrderParams
     lockedAmount   :: Integer,
     expectedAmount :: Integer
   }
-  deriving (Show, Generic, ToJSON, FromJSON)
+  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+convertSellOrderToPab :: CreateSellOrderParams -> SellOrderParams
+convertSellOrderToPab (CreateSellOrderParams lc ec la ea) =
+  SellOrderParams (assetClassFromCoin lc) (assetClassFromCoin ec) (Nat la) (Nat ea)
 
 data CreateLiquidityPoolParams = CreateLiquidityPoolParams
   { coinA           :: Coin,
@@ -89,7 +111,7 @@ data CreateLiquidityPoolParams = CreateLiquidityPoolParams
     swapFee         :: Percentage,
     exchangeRate    :: Percentage
   }
-  deriving (Generic, FromJSON, ToJSON, Show)
+  deriving (Generic, FromJSON, ToJSON, Show, ToSchema)
 
 -- FIXME use JSON codecs instead of explicit type conversion
 convertLiquidityPoolToPab :: CreateLiquidityPoolParams -> LiquidityPoolParams
@@ -107,7 +129,7 @@ data CreateLiquidityOrderParams = CreateLiquidityOrderParams
     expectedAmount :: Integer,
     swapFee        :: Percentage
   }
-  deriving (Generic, FromJSON, ToJSON, Show)
+  deriving (Generic, FromJSON, ToJSON, Show, ToSchema)
 
 convertLiquidityOrderToPab :: CreateLiquidityOrderParams -> LiquidityOrderParams
 convertLiquidityOrderToPab (CreateLiquidityOrderParams lc ec la ea (Percentage d)) =
@@ -122,7 +144,7 @@ data CreatePoolPartsParams = CreatePriceChangeParams
     coinBPriceChange :: Percentage,
     numberOfParts    :: Integer
   }
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 convertPoolToPab :: CreatePoolPartsParams -> PoolPartsParams
 convertPoolToPab (CreatePriceChangeParams (Percentage a) (Percentage b) np) =
@@ -133,10 +155,10 @@ convertPoolToMid (PriceChangeParams a b (Nat p)) =
   CreatePriceChangeParams (mkPercentage a) (mkPercentage b) p
 
 newtype CancelOrderParams = CancelOrderParams TxOutRef
-  deriving (FromJSON, Generic, Show, ToJSON)
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
-newtype PerformRandomParams = PerformRandomParams Integer
-  deriving (FromJSON, Generic, Show, ToJSON)
+newtype PerformRandomParams = PerformRandomParams { unPerformRandomParams :: Integer }
+  deriving (FromJSON, Generic, Show, ToJSON, ToSchema)
 
 -- VIEWS
 
@@ -145,7 +167,7 @@ data FundView = FundView
   { coin   :: Coin,
     amount :: Integer
   }
-  deriving (Show, Generic, ToJSON)
+  deriving (Show, Generic, ToJSON, ToSchema)
 
 mkFundView :: AssetClass -> Integer -> FundView
 mkFundView = FundView . coinFromAssetClass
@@ -156,7 +178,7 @@ data OrderView = OrderView
     expectedCoin :: FundView,
     orderType    :: Text
   }
-  deriving (Generic, Show, ToJSON)
+  deriving (Generic, Show, ToJSON, ToSchema)
 
 dexOrder :: OrderInfo -> OrderView
 dexOrder
@@ -176,7 +198,7 @@ data PayoutView = PayoutView
   { coin   :: Coin,
     amount :: Integer
   }
-  deriving (Show, Generic, ToJSON)
+  deriving (Show, Generic, ToJSON, ToSchema)
 
 mkPayoutView :: AssetClass -> Integer -> PayoutView
 mkPayoutView = PayoutView . coinFromAssetClass

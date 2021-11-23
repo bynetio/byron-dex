@@ -39,6 +39,7 @@ server service = handleFaucet' :<|> handleTokens
       adaptErrors ::  Either FaucetException a -> Either ServerError a
       adaptErrors (Left (TokenNameNotSupportedError (TokenName tn))) = Left $ notFound ("Token not supported: '" <> pack tn <> "'")
       adaptErrors (Left NoUtxoToConsumeError) = Left $ conflict (pack "Wait few seconds and try again")
+      adaptErrors (Left (AddressDecodingError _)) = Left $ badRequest (pack "Invalid wallet address")
       adaptErrors (Left _) = Left $ internalServerError "Internal Server Error"
       adaptErrors (Right value) = Right value
 
@@ -47,6 +48,8 @@ server service = handleFaucet' :<|> handleTokens
       internalServerError = httpError err500
 
       notFound = httpError err404
+
+      badRequest = httpError err400
 
       httpError :: ServerError -> Text -> ServerError
       httpError err msg =
