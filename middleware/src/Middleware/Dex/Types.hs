@@ -14,7 +14,8 @@ import           Data.Ratio                 (approxRational, denominator,
                                              numerator)
 import           Data.Text                  (Text)
 import           Data.Text.Encoding         (decodeUtf8, encodeUtf8)
-import           Dex.Types                  (CancelOrderParams (CancelOrderParams),
+import           Dex.Types                  (AssetSet (AssetSet),
+                                             CancelOrderParams (CancelOrderParams),
                                              LiquidityOrderParams (LiquidityOrderParams),
                                              LiquidityPoolParams (LiquidityPoolParams),
                                              Nat (..), OrderInfo (..),
@@ -71,7 +72,13 @@ data CoinSet
   { lockedCoin   :: Coin,
     expectedCoin :: Coin
   }
-  deriving (Show, Generic, ToJSON, FromJSON)
+  deriving (Show, Generic, ToJSON, FromJSON, ToSchema)
+
+convertCoinSetToPab :: CoinSet -> AssetSet
+convertCoinSetToPab (CoinSet lc ec) = AssetSet (assetClassFromCoin lc) (assetClassFromCoin ec)
+
+mkCoinSet :: AssetSet -> CoinSet
+mkCoinSet (AssetSet lc ec) = CoinSet (coinFromAssetClass lc) (coinFromAssetClass ec)
 
 -- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double

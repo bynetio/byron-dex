@@ -41,8 +41,12 @@ type API =
       :> Description "List all orders."
       :> Get '[JSON] [OrderView]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "orders-by-set"
+      :> Description "List orders by coin sets"
       :> ReqBody '[JSON] CoinSet
       :> Post '[JSON] [OrderView]
+    :<|> Capture "contract-instance-id" ContractInstanceId :> "sets"
+      :> Description "Get all unique sets of coins"
+      :> Get '[JSON] [CoinSet]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "payouts"
       :> Description "List user payouts."
       :> Get '[JSON] [PayoutView]
