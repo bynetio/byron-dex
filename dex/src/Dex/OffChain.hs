@@ -121,7 +121,7 @@ createSellOrder smgen SellOrderParams {..} = do
                     , orderId = uuidToBBS uuid
                     }
   let tx = Constraints.mustPayToTheScript (Order $ SellOrder orderInfo) (singleton lockedCoin lockedAmount)
-  void $ submitTxConstraints dexInstance tx
+  mkTxConstraints (Constraints.typedValidatorLookups dexInstance) tx >>= void . submitUnbalancedTx. Constraints.adjustUnbalancedTx
   return uuid
 
 createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
@@ -138,7 +138,7 @@ createLiquidityOrder smgen LiquidityOrderParams {..} = do
           , orderId = uuidToBBS uuid
           }
   let tx = Constraints.mustPayToTheScript (Order $ LiquidityOrder orderInfo) (singleton lockedCoin lockedAmount)
-  void $ submitTxConstraints dexInstance tx
+  mkTxConstraints (Constraints.typedValidatorLookups dexInstance) tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
   return uuid
 
 createLiquidityPool :: SMGen -> LiquidityPoolParams -> Contract DexState DexSchema Text ()
@@ -182,10 +182,10 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
                               , orderId        = uuidToBBS uuid
                               }
                             )
-  let constraints = flip map (liquidityOrdersA ++ liquidityOrdersB)
-        $ \((amount, coin), order) -> Constraints.mustPayToTheScript (Order $ LiquidityOrder order) (singleton coin amount)
+  let txs = flip map (liquidityOrdersA ++ liquidityOrdersB)
+            $ \((amount, coin), order) -> Constraints.mustPayToTheScript (Order $ LiquidityOrder order) (singleton coin amount)
+  mkTxConstraints (Constraints.typedValidatorLookups dexInstance) (mconcat txs) >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
 
-  void $ submitTxConstraints dexInstance (mconcat constraints)
 
 perform :: Contract DexState DexSchema Text ()
 perform = do
@@ -206,7 +206,7 @@ perform = do
           <> Constraints.unspentOutputs (Map.fromList utxos)
       tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
         ) mempty filtered
-  void $ submitTxConstraintsWith lookups tx
+  mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
 
 -- function for testing only
 performNRandom :: SMGen -> Integer -> Contract DexState DexSchema Text ()
@@ -230,7 +230,7 @@ performNRandom smgen n = do
             <> Constraints.unspentOutputs (Map.fromList $ map (\(o,oref,_) -> (oref,o)) selected)
         tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
           ) mempty selected
-    void $ submitTxConstraintsWith lookups tx
+    mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
 
 
 funds :: Contract w s Text [(AssetClass, Integer)]
@@ -301,7 +301,7 @@ cancel CancelOrderParams {..} = do
 
       tx     = Constraints.mustSpendScriptOutput orderHash $ Redeemer $ PlutusTx.toBuiltinData CancelOrder
 
-  void $ submitTxConstraintsWith lookups tx
+  mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
 
   where
     toOwnerHash :: ChainIndexTxOut -> Contract w s Text PubKeyHash
@@ -325,7 +325,7 @@ collectFunds = do
         <> Constraints.unspentOutputs (Map.fromList $ filter (\(txOutRef, _) -> any ((txOutRef ==) . fst) ownedPayouts) utxos)
   let tx = mconcat $ map (\(txOutRef, _) ->
                             Constraints.mustSpendScriptOutput txOutRef $ Redeemer $ PlutusTx.toBuiltinData CollectCoins) ownedPayouts
-  void $ submitTxConstraintsWith lookups tx
+  mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
   where
   toPayoutInfo (txOutRef, txOut) = do
     datum <- getDexDatum txOut

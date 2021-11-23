@@ -1,7 +1,7 @@
 let
   sources = import ./sources.nix { inherit pkgs; };
 
-  plutus = import sources.plutus { };
+  plutus = import sources.plutus-apps { };
 
   easy-purescript-nix = import sources.easy-purescript-nix { inherit pkgs; };
 

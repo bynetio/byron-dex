@@ -1,4 +1,4 @@
-image: "plutus4binarapps/dex-plutus-dev:v1.4"
+image: "plutus4binarapps/dex-plutus-dev:v1.5"
 
 .automatic:
   rules:
