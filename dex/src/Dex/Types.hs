@@ -25,7 +25,6 @@ module Dex.Types
   where
 
 import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
-
 import           Data.Text           (Text)
 import           Dex.WalletHistory
 import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
@@ -253,6 +252,16 @@ data OrderInfo
       }
   deriving (FromJSON, Generic, Show, ToJSON)
 
+-- TODO add field for the size of the set
+data AssetSet
+  = AssetSet
+     { lockedCoin   :: AssetClass
+     , expectedCoin :: AssetClass
+     }
+  deriving (Generic, Show, Prelude.Eq, FromJSON, ToJSON, ToSchema)
+PlutusTx.makeIsDataIndexed ''AssetSet [('AssetSet, 0)]
+PlutusTx.makeLift ''AssetSet
+
 newtype PayoutSummary
   = PayoutSummary
       { payoutValue :: [(AssetClass, Integer)]
@@ -268,6 +277,8 @@ data DexContractState
   | Stopped
   | Funds [(AssetClass, Integer)]
   | MyOrders [OrderInfo]
+  | OrdersBySet [OrderInfo]
+  | Sets [AssetSet]
   | Canceled
   | Collected
   | MyPayouts PayoutSummary

@@ -32,6 +32,7 @@ import           Data.List                   (foldl', sortOn)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes)
 import           Data.Proxy                  (Proxy (..))
+import qualified Data.Set.Unordered.Unique   as Set
 import           Data.Text                   (Text)
 import           Data.UUID                   as UUID
 import           Data.Void                   (Void)
@@ -85,6 +86,8 @@ type DexSchema =
   .\/ Endpoint "funds" (Request ())
   .\/ Endpoint "allOrders" (Request ())
   .\/ Endpoint "myOrders" (Request ())
+  .\/ Endpoint "ordersBySet" (Request AssetSet)
+  .\/ Endpoint "sets" (Request ())
   .\/ Endpoint "cancel" (Request CancelOrderParams)
   .\/ Endpoint "collectFunds" (Request ())
   .\/ Endpoint "performNRandom" (Request Integer)
@@ -247,42 +250,42 @@ myOrders = do
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
   return $ filter (\OrderInfo {..} -> ownerHash == pkh) mapped
-  where
-    toOrderInfo (orderHash, o) = do
-      datum <- getDexDatum o
-      case datum of
-        Payout _ -> return Nothing
-        Order order ->
-          case order of
-            LiquidityOrder LiquidityOrderInfo {..} ->
-              let orderType = "Liquidity"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
-            SellOrder      SellOrderInfo      {..} ->
-              let orderType = "Sell"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
 
 allOrders :: Contract DexState DexSchema Text [OrderInfo]
 allOrders = do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   catMaybes <$> mapM toOrderInfo utxos
-  where
-    toOrderInfo (orderHash, o) = do
-      datum <- getDexDatum o
-      case datum of
-        Payout _ -> return Nothing
-        Order order ->
-          case order of
-            LiquidityOrder LiquidityOrderInfo {..} ->
-              let orderType = "Liquidity"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
-            SellOrder      SellOrderInfo      {..} ->
-              let orderType = "Sell"
-                  lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
-              in return $ Just OrderInfo {..}
+
+ordersBySet :: AssetSet -> Contract DexState DexSchema Text [OrderInfo]
+ordersBySet (AssetSet lc ec)= do
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  mapped <- catMaybes <$> mapM toOrderInfo utxos
+  return $ filter (\OrderInfo {..} -> lockedCoin == lc && expectedCoin == ec) mapped
+
+sets :: Contract DexState DexSchema Text [AssetSet]
+sets = do
+  let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
+  utxos <- Map.toList <$> utxosAt address
+  orders <- catMaybes <$> mapM toOrderInfo utxos
+  return $ Set.unUUSet $ foldl' (\acc OrderInfo {..} -> let temp = AssetSet lockedCoin expectedCoin in Set.insert temp acc) Set.empty orders
+
+toOrderInfo :: (TxOutRef, ChainIndexTxOut) -> Contract w s Text (Maybe OrderInfo)
+toOrderInfo (orderHash, o) = do
+  datum <- getDexDatum o
+  case datum of
+    Payout _ -> return Nothing
+    Order order ->
+      case order of
+        LiquidityOrder LiquidityOrderInfo {..} ->
+          let orderType = "Liquidity"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+          in return $ Just OrderInfo {..}
+        SellOrder SellOrderInfo {..} ->
+          let orderType = "Sell"
+              lockedAmount = Nat (assetClassValueOf (view ciTxOutValue o) lockedCoin)
+          in return $ Just OrderInfo {..}
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
@@ -392,6 +395,8 @@ dexEndpoints =
   , perform'
   , myOrders'
   , allOrders'
+  , ordersBySet'
+  , sets'
   , funds'
   , cancel'
   , collectFunds'
@@ -432,6 +437,8 @@ dexEndpoints =
     perform'              = f (Proxy @"perform") historyId (const Performed) (const perform)
     myOrders'             = f (Proxy @"myOrders") historyId MyOrders (const myOrders)
     allOrders'            = f (Proxy @"allOrders") historyId AllOrders (const allOrders)
+    ordersBySet'          = f (Proxy @"ordersBySet") historyId OrdersBySet (\Request {..} -> ordersBySet content)
+    sets'                 = f (Proxy @"sets") historyId Sets (const sets)
     funds'                = f (Proxy @"funds") historyId Funds (const funds)
     cancel'               = f (Proxy @"cancel") historyId (const Canceled) (\Request {..} -> cancel content)
     collectFunds'         = f (Proxy @"collectFunds") historyId (const Collected) (const collectFunds)

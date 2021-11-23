@@ -10,7 +10,8 @@ import           Colog.Polysemy.Formatting      (WithLog, logError)
 import           Data.Aeson                     (FromJSON, ToJSON)
 import           Data.Aeson.Types               (Value, toJSON)
 import           Data.Either.Combinators        (mapLeft)
-import           Dex.Types                      (OrderInfo (OrderInfo),
+import           Dex.Types                      (AssetSet (AssetSet),
+                                                 OrderInfo (OrderInfo),
                                                  PayoutSummary,
                                                  Request (Request), historyId)
 import           Formatting
@@ -20,10 +21,12 @@ import           Middleware.Capability.ReqIdGen (ReqIdGen, nextReqId)
 import           Middleware.Capability.Retry    (retryRequest)
 import           Middleware.Capability.Time     (Time)
 import           Middleware.Dex.Types           (CancelOrderParams,
+                                                 CoinSet (CoinSet),
                                                  CreateLiquidityOrderParams (CreateLiquidityOrderParams),
                                                  CreateLiquidityPoolParams (CreateLiquidityPoolParams),
                                                  CreateSellOrderParams,
                                                  PerformRandomParams (PerformRandomParams),
+                                                 convertCoinSetToPab,
                                                  convertLiquidityOrderToPab,
                                                  convertLiquidityPoolToPab,
                                                  convertSellOrderToPab)
@@ -46,6 +49,8 @@ data ManagePabClient r a where
   CreateLiquidityOrderInPab :: ContractInstanceId -> CreateLiquidityOrderParams -> ManagePabClient r ()
   GetMyOrders               :: ContractInstanceId -> ManagePabClient r [OrderInfo]
   GetAllOrders              :: ContractInstanceId -> ManagePabClient r [OrderInfo]
+  GetOrdersBySet            :: ContractInstanceId -> CoinSet -> ManagePabClient r [OrderInfo]
+  GetSets                   :: ContractInstanceId -> ManagePabClient r [AssetSet]
   GetMyPayouts              :: ContractInstanceId -> ManagePabClient r PayoutSummary
   PerformInPab              :: ContractInstanceId -> ManagePabClient r ()
   PerformNRandomInPab       :: ContractInstanceId -> PerformRandomParams -> ManagePabClient r ()
@@ -115,6 +120,12 @@ runPabClient =
 
       GetAllOrders cid ->
           callEndpoint cid "allOrders" ()
+
+      GetOrdersBySet cid params ->
+        callEndpoint cid "ordersBySet" (convertCoinSetToPab params)
+
+      GetSets cid ->
+        callEndpoint cid "sets" ()
 
       CancelOrder cid params ->
           callEndpoint cid "cancel" params

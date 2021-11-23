@@ -1,6 +1,7 @@
 module Middleware.API where
 
 import           Middleware.Dex.Types       (CancelOrderParams (CancelOrderParams),
+                                             CoinSet (CoinSet),
                                              CreateLiquidityOrderParams (CreateLiquidityOrderParams),
                                              CreateLiquidityPoolParams (CreateLiquidityPoolParams),
                                              CreateSellOrderParams,
@@ -39,6 +40,13 @@ type API =
     :<|> Capture "contract-instance-id" ContractInstanceId :> "all-orders"
       :> Description "List all orders."
       :> Get '[JSON] [OrderView]
+    :<|> Capture "contract-instance-id" ContractInstanceId :> "orders-by-set"
+      :> Description "List orders by coin sets"
+      :> ReqBody '[JSON] CoinSet
+      :> Post '[JSON] [OrderView]
+    :<|> Capture "contract-instance-id" ContractInstanceId :> "sets"
+      :> Description "Get all unique sets of coins"
+      :> Get '[JSON] [CoinSet]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "payouts"
       :> Description "List user payouts."
       :> Get '[JSON] [PayoutView]
