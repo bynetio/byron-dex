@@ -35,6 +35,7 @@ library
                      , lens-aeson
                      , freer-simple
                      , random
+                     , sets
                      , splitmix
                      , uuid
                      , cardano-api

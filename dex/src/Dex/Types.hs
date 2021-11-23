@@ -25,7 +25,6 @@ module Dex.Types
   where
 
 import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
-
 import           Data.Text           (Text)
 import           Dex.WalletHistory
 import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
@@ -259,7 +258,7 @@ data AssetSet
      { lockedCoin   :: AssetClass
      , expectedCoin :: AssetClass
      }
-  deriving (Generic, Show, FromJSON, ToJSON, ToSchema)
+  deriving (Generic, Show, Prelude.Eq, FromJSON, ToJSON, ToSchema)
 PlutusTx.makeIsDataIndexed ''AssetSet [('AssetSet, 0)]
 PlutusTx.makeLift ''AssetSet
 

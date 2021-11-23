@@ -32,6 +32,7 @@ import           Data.List                   (foldl', sortOn)
 import qualified Data.Map                    as Map
 import           Data.Maybe                  (catMaybes)
 import           Data.Proxy                  (Proxy (..))
+import qualified Data.Set.Unordered.Unique   as Set
 import           Data.Text                   (Text)
 import           Data.UUID                   as UUID
 import           Data.Void                   (Void)
@@ -268,7 +269,7 @@ sets = do
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   orders <- catMaybes <$> mapM toOrderInfo utxos
-  return $ map (\OrderInfo {..} -> AssetSet lockedCoin expectedCoin) orders
+  return $ Set.unUUSet $ foldl' (\acc OrderInfo {..} -> let temp = AssetSet lockedCoin expectedCoin in Set.insert temp acc) Set.empty orders
 
 toOrderInfo :: (TxOutRef, ChainIndexTxOut) -> Contract w s Text (Maybe OrderInfo)
 toOrderInfo (orderHash, o) = do
