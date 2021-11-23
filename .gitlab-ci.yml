@@ -16,7 +16,7 @@ image: "plutus4binarapps/dex-plutus-dev:v1.5"
   cache: &cabal_cache
     key: cache-dot-cabal
     paths:
-      - /builds/plutus/dex/prebuild-cache/
+      - /builds/plutus/uniswap/prebuild-cache/
     policy: pull-push
 
 .copy-cabal-cache:
@@ -26,15 +26,15 @@ image: "plutus4binarapps/dex-plutus-dev:v1.5"
   variables:
     GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/
   before_script:
-    - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
-    - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
+    - cp -rf /builds/plutus/uniswap/prebuild-cache/.cabal /home/uniswap/
+    - cp -rf /builds/plutus/uniswap/prebuild-cache/dist-newstyle /builds/plutus/uniswap/
 
 .base-cache: &base_cache
   variables:
     GIT_CLEAN_FLAGS: -ffdx -e prebuild-cache/ -e dist-newstyle/
   before_script:
-    - cp -rf /builds/plutus/dex/prebuild-cache/.cabal /home/uniswap/
-    - cp -rf /builds/plutus/dex/prebuild-cache/dist-newstyle /builds/plutus/dex/
+    - cp -rf /builds/plutus/uniswap/prebuild-cache/.cabal /home/uniswap/
+    - cp -rf /builds/plutus/uniswap/prebuild-cache/dist-newstyle /builds/plutus/uniswap/
 
 .dex-cache:
   <<: *base_cache
@@ -42,7 +42,7 @@ image: "plutus4binarapps/dex-plutus-dev:v1.5"
     - <<: *cabal_cache
     - key: dex-cache-$CI_COMMIT_REF_SLUG
       paths:
-        - /builds/plutus/dex/dist-newstyle
+        - /builds/plutus/uniswap/dist-newstyle
       policy: pull-push
 
 .middleware-cache:
@@ -50,6 +50,15 @@ image: "plutus4binarapps/dex-plutus-dev:v1.5"
   cache:
     - <<: *cabal_cache
     - key: middleware-cache-$CI_COMMIT_REF_SLUG
+      paths:
+        - /builds/plutus/uniswap/dist-newstyle
+      policy: pull-push
+
+.faucet-cache:
+  <<: *base_cache
+  cache:
+    - <<: *cabal_cache
+    - key: faucet-cache-$CI_COMMIT_REF_SLUG
       paths:
         - /builds/plutus/dex/dist-newstyle
       policy: pull-push
@@ -67,12 +76,12 @@ prebuild:
     - .cabal-cache
   script:
     - |
-      if [[ ! -d /builds/plutus/dex/prebuild-cache/.cabal ]]; then
+      if [[ ! -d /builds/plutus/uniswap/prebuild-cache/.cabal ]]; then
         cabal update
         cabal configure --index-state=2021-07-07T00:00:00Z
         #  The GitLab CI can only archive files from directories relative to your build directory.
-        cp -Rf /home/uniswap/.cabal /builds/plutus/dex/prebuild-cache/
-        cp -Rf /builds/plutus/dex/dist-newstyle /builds/plutus/dex/prebuild-cache/
+        cp -Rf /home/uniswap/.cabal /builds/plutus/uniswap/prebuild-cache/
+        cp -Rf /builds/plutus/uniswap/dist-newstyle /builds/plutus/uniswap/prebuild-cache/
       else
        echo "Using cache.. ."
       fi
@@ -109,5 +118,22 @@ build_middleware:
     - prebuild
     - lint_middleware
   script:
-    - ls -la /builds/plutus/dex/prebuild-cache/
+    - ls -la /builds/plutus/uniswap/prebuild-cache/
     - cabal build middleware
+
+# faucet
+lint_faucet:
+  stage: lint
+  extends: .automatic
+  script: "hlint faucet/faucet-backend/src"
+
+build_faucet:
+  stage: build
+  extends:
+    - .automatic
+    - .faucet-cache
+  needs:
+    - prebuild
+    - lint_faucet
+  script:
+    - cabal build faucet-backend

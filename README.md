@@ -1,3 +1,5 @@
+[![pipeline status](https://gitlab.binarapps.com/plutus/dex/badges/master/pipeline.svg)](https://gitlab.binarapps.com/plutus/dex/-/commits/master)
+
 # dex
 
 ## Nix setup
