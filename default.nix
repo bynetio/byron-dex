@@ -12,7 +12,7 @@ in
 
   inherit project;
 
-  devcontainer = import ./nix/devcontainer/uniswap-devcontainer.nix {
+  devcontainer = import ./nix/devcontainer/dex-devcontainer.nix {
     inherit pkgs uniswap;
   };
 }

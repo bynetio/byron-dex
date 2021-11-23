@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -exu
+
+version=$1
+result=$(nix-build --no-out-link default.nix -A devcontainer)
+
+docker load < "$result"
+docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:$version"
+docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:latest"
+docker push "plutus4binarapps/dex-plutus-dev:$version"
+docker push "plutus4binarapps/dex-plutus-dev:latest"
