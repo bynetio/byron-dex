@@ -17,7 +17,5 @@ let
 
 in
 {
-  inherit pkgs;
-
-  inherit plutus uniswap easy-purescript-nix;
+  inherit pkgs plutus uniswap easy-purescript-nix;
 }

@@ -3,6 +3,7 @@ let
 
   pkgs = packages.pkgs;
   haskellNix = pkgs.haskell-nix;
+  plutusApps = packages.plutus.plutus-apps;
 
   projectPackages =
     haskellNix.haskellLib.selectProjectPackages packages.project.hsPkgs;
@@ -53,11 +54,13 @@ let
   pab-exec = exes.dex."dex-pab";
   middleware-exec = exes.middleware."middleware-manual";
   faucet-exec = exes."faucet-backend"."faucet-app";
+  plutus-chain-index-exec = plutusApps.haskell.packages.plutus-chain-index.components.exes."plutus-chain-index";
 
 in
 {
   backend = mkDockerImage pkgs pab-exec "dex-backend" "dex-pab";
-  middleware =
-    mkDockerImage pkgs middleware-exec "dex-middleware" "midleware-manual";
-  faucet = (import ./faucet/faucet-backend/nix/release.nix).mkDockerImage pkgs faucet-exec;
+  middleware = mkDockerImage pkgs middleware-exec "dex-middleware" "midleware-manual";
+  chain-index = mkDockerImage pkgs plutus-chain-index-exec "dex-chain-index" "plutus-chain-index";
+  faucet =
+    (import ./faucet/faucet-backend/nix/release.nix).mkDockerImage pkgs faucet-exec;
 }

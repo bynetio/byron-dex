@@ -10,6 +10,7 @@ deploy_app ()  {
   docker push "plutus4binarapps/dex-$app_name"
 }
 
+deploy_app "chain-index"
 deploy_app "backend"
 deploy_app "middleware"
 deploy_app "faucet"
