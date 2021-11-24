@@ -65,8 +65,6 @@ faucet (AddressParam receiver) tn = do
         txId <- runApp (faucet' pp utxo sKey sender receiver' lovelace (tn, mTokenQ)) ctx
         let refs' = Set.intersection (Set.insert txIn refs) (Set.fromList $ fst <$> utxos)
         return (refs', txId)
-  where
-    unUTxO (UTxO utxos) = utxos
 
 mayHead :: [a] -> Maybe a
 mayHead (a : _) = Just a
@@ -119,7 +117,7 @@ mintPolicyId = do
   case scriptWitnessScript mintScriptWitness' of
     ScriptInEra _ script -> return $ scriptPolicyId script
 
-faucet' :: WithLog env Message AppFaucet => ProtocolParameters -> (TxIn, TxOut AlonzoEra) -> SigningKey PaymentKey -> AddressAny -> AddressAny -> Lovelace -> (TokenName, Integer) -> AppFaucet TxId
+faucet' :: WithLog env Message AppFaucet => ProtocolParameters -> (TxIn, TxOut CtxUTxO AlonzoEra) -> SigningKey PaymentKey -> AddressAny -> AddressAny -> Lovelace -> (TokenName, Integer) -> AppFaucet TxId
 faucet' pParams (txIn, txOut) sKey sender receiver lovelace (tn, quantity) = do
   policyId <- mintPolicyId
   scriptWitness <- mintScriptWitness
@@ -144,18 +142,13 @@ faucet' pParams (txIn, txOut) sKey sender receiver lovelace (tn, quantity) = do
                           change = liftM2 (<>) (negateValue . lovelaceToValue <$> diff) (pure $ txOutValue txOut)
                         in liftM3 update (pure content) dfee change
       where
-        txOutValue :: TxOut AlonzoEra -> Value
+        txOutValue :: TxOut CtxUTxO AlonzoEra -> Value
         txOutValue (TxOut _ value _) = txOutValueToValue value
         update :: TxBodyContent BuildTx AlonzoEra -> Lovelace -> Value -> TxBodyContent BuildTx AlonzoEra
         update c fee out = c {
           txFee = TxFeeExplicit TxFeesExplicitInAlonzoEra fee,
           txOuts = txOutFromValue sender out : filter (/= senderZeroTxOut) (txOuts c)
         }
-        txOutValueToValue :: TxOutValue era -> Value
-        txOutValueToValue tv =
-          case tv of
-            TxOutAdaOnly _ l -> lovelaceToValue l
-            TxOutValue _ v   -> v
 
     txBody policyId scriptWitness = liftIO $ liftEitherIO $ flip fmap (balance txContent >>= makeTransactionBody) $ \b -> (getTxId b, b)
       where
@@ -172,11 +165,11 @@ requireSigWitness pkh = SimpleScriptWitness SimpleScriptV1InAlonzo SimpleScriptV
     script :: SimpleScript SimpleScriptV1
     script = Cardano.Api.RequireSignature pkh
 
-txOutFromLovelace :: AddressAny -> Lovelace -> TxOut AlonzoEra
+txOutFromLovelace :: AddressAny -> Lovelace -> TxOut CtxTx AlonzoEra
 txOutFromLovelace addr l = txOutFromValue addr $ lovelaceToValue l
 
-txOutFromValue :: AddressAny -> Value -> TxOut AlonzoEra
-txOutFromValue addr v = TxOut addressInEra (TxOutValue MultiAssetInAlonzoEra v) TxOutDatumHashNone
+txOutFromValue :: AddressAny -> Value -> TxOut CtxTx AlonzoEra
+txOutFromValue addr v = TxOut addressInEra (TxOutValue MultiAssetInAlonzoEra v) TxOutDatumNone
   where
     addressInEra = case anyAddressInEra AlonzoEra addr of
       Just addr' -> addr'
@@ -197,8 +190,7 @@ mkEmptyTxBodyContent = TxBodyContent {
         txCertificates = TxCertificatesNone,
         txUpdateProposal = TxUpdateProposalNone,
         txMintValue = TxMintNone,
-        txScriptValidity = TxScriptValidityNone,
-        txExtraScriptData = BuildTxWith TxExtraScriptDataNone
+        txScriptValidity = TxScriptValidityNone
       }
 
 signTx :: SigningKey PaymentKey -> TxBody AlonzoEra -> Tx AlonzoEra
