@@ -3,7 +3,7 @@ dbConfig:
   dbConfigPoolSize: 20
 
 pabWebserverConfig:
-  baseUrl: http://localhost:9080
+  baseUrl: http://pab-executable:9080
   staticDir: plutus-pab-client/dist
   permissiveCorsPolicy: False
   # Optional timeout (in seconds) for calls to endpoints that are not currently
@@ -12,13 +12,13 @@ pabWebserverConfig:
   endpointTimeout: 5
 
 walletServerConfig:
-  baseUrl: http://localhost:8090
+  baseUrl: http://cardano-wallet:8090
   wallet:
     getWallet: 1
 
 nodeServerConfig:
-  mscSocketPath: testnet/node.sock
-  mscBaseUrl: "localhost"
+  mscSocketPath: /ipc/node.sock
+  mscBaseUrl: "cardano-node"
   mscKeptBlocks: 2160
   mscNetworkId: "1097911063" # Testnet network ID (main net = empty string)
   mscSlotConfig:
@@ -32,19 +32,19 @@ nodeServerConfig:
   mscNodeMode: AlonzoNode
 
 chainIndexConfig:
-  ciBaseUrl: http://localhost:9083
+  ciBaseUrl: http://plutus-chain-index:9083
   ciWatchedAddresses: []
 
 requestProcessingConfig:
   requestProcessingInterval: 1
 
 signingProcessConfig:
-  spBaseUrl: http://localhost:9084
+  spBaseUrl: http://localhost:9084 # change to proper service name
   spWallet:
     getWallet: 1
 
 metadataServerConfig:
-  mdBaseUrl: http://localhost:9085
+  mdBaseUrl: http://localhost:9085 # change to proper service name
 # Optional EKG Server Config
 # ----
 # monitoringConfig:
