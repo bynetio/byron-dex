@@ -59,6 +59,7 @@ services:
       - ./config:/config
     entrypoint: []
     command: bash -c "
+      /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml migrate &&
       /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
       "
 
