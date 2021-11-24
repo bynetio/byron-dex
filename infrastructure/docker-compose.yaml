@@ -1,0 +1,77 @@
+version: "3.5"
+
+services:
+  cardano-node:
+    image: inputoutput/cardano-node:1.30.1
+    volumes:
+      - node-${NETWORK}-db:/data
+      - node-ipc:/ipc
+    ports:
+      - 3003:3003
+    entrypoint: []
+    command: bash -c "
+      $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology  /config/${NETWORK}/${NETWORK}t-topology.json
+      "
+    environment:
+      CMD: "cardano-node run --config --socket-path /ipc/node.socket --database /node-db --port 3003 --listen-address 0.0.0.0"
+      NETWORK:
+    restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        compress: "true"
+        max-file: "10"
+        max-size: "50m"
+
+  cardano-wallet:
+    image: inputoutput/cardano-wallet:2021.11.11
+    volumes:
+      - wallet-${NETWORK}-db:/wallet-db
+      - node-ipc:/ipc
+    ports:
+      - 8090:8090 #change to another port
+    entrypoint: []
+    command: bash -c "
+      ([[ $$NETWORK == \"mainnet\" ]] && $$CMD --mainnet) ||
+      ($$CMD --testnet /config/${NETWORK}/${NETWORK}-byron-genesis.json)
+      "
+    environment:
+      CMD: "cardano-wallet serve --node-socket /ipc/node.socket --database /wallet-db --listen-address 0.0.0.0"
+      NETWORK:
+    restart: on-failure
+    logging:
+      driver: "json-file"
+      options:
+        compress: "true"
+        max-file: "10"
+        max-size: "50m"
+
+  plutus-chain-index:
+    image: inputoutput/plutus-chain-index #build chain index docker image
+    entrypoint: []
+    command: bash -c "
+      plutus-chain-index --config /config/${NETWORK}/chain-index-config.json start-index
+      "
+
+  pab-executable:
+    image: plutus4binarapps/dex-backend
+    entrypoint: []
+    command: bash -c "
+      /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
+      "
+
+  dex-middleware:
+    image: plutus4binarapps/dex-middleware
+    entrypoint: []
+    ports:
+      - 8080:8080
+
+volumes:
+  node-mainnet-db:
+  node-testnet-db:
+  node-alonzo-purple-db:
+  wallet-mainnet-db:
+  wallet-testnet-db:
+  wallet-alonzo-purple-db:
+  node-ipc:
+  node-config:
