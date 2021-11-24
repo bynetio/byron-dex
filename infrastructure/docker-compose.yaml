@@ -4,16 +4,17 @@ services:
   cardano-node:
     image: inputoutput/cardano-node:1.30.1
     volumes:
-      - node-${NETWORK}-db:/data
+      - node-${NETWORK}-db:/node-db
       - node-ipc:/ipc
+      - ./config:/config
     ports:
       - 3003:3003
     entrypoint: []
     command: bash -c "
-      $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology  /config/${NETWORK}/${NETWORK}t-topology.json
+      $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology  /config/${NETWORK}/${NETWORK}-topology.json
       "
     environment:
-      CMD: "cardano-node run --config --socket-path /ipc/node.socket --database /node-db --port 3003 --listen-address 0.0.0.0"
+      CMD: "cardano-node run --socket-path /ipc/node.socket --database-path /node-db --port 3003"
       NETWORK:
     restart: on-failure
     logging: &logging
@@ -28,6 +29,7 @@ services:
     volumes:
       - wallet-${NETWORK}-db:/wallet-db
       - node-ipc:/ipc
+      - ./config:/config
     ports:
       - 8090:8090 #change to another port
     entrypoint: []
@@ -45,22 +47,26 @@ services:
   plutus-chain-index:
     image: plutus4binarapps/dex-chain-index
     entrypoint: []
+    volumes:
+      - ./config:/config
     command: bash -c "
       plutus-chain-index --config /config/${NETWORK}/chain-index-config.json start-index
       "
 
   pab-executable:
     image: plutus4binarapps/dex-backend
+    volumes:
+      - ./config:/config
     entrypoint: []
     command: bash -c "
       /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
       "
 
-  dex-middleware:
-    image: plutus4binarapps/dex-middleware
-    entrypoint: []
-    ports:
-      - 8080:8080
+#  dex-middleware:
+#    image: plutus4binarapps/dex-middleware
+#    entrypoint: []
+#    ports:
+#      - 8080:8080
 
 volumes:
   node-mainnet-db:
