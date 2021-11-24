@@ -44,7 +44,7 @@ let
     pkgs.dockerTools.buildImage {
       name = imageName;
       tag = "latest";
-      contents = [ package pkgs.bash ];
+      contents = [ package pkgs.bash pkgs.busybox ];
       config = { Cmd = [ "/bin/${execName}" ]; };
     };
 

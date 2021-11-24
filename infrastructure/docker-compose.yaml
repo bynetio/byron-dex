@@ -11,7 +11,7 @@ services:
       - 3003:3003
     entrypoint: []
     command: bash -c "
-      $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology  /config/${NETWORK}/${NETWORK}-topology.json
+      $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology /config/${NETWORK}/${NETWORK}-topology.json
       "
     environment:
       CMD: "cardano-node run --socket-path /ipc/node.socket --database-path /node-db --port 3003"
@@ -48,9 +48,11 @@ services:
     image: plutus4binarapps/dex-chain-index
     entrypoint: []
     volumes:
+      - node-${NETWORK}-db:/node-db
+      - node-ipc:/ipc
       - ./config:/config
     command: bash -c "
-      plutus-chain-index --config /config/${NETWORK}/chain-index-config.json start-index
+      plutus-chain-index --config /config/${NETWORK}/chain-index-config.json --socket-path /ipc/node.socket --db-path /node-db start-index
       "
 
   pab-executable:
