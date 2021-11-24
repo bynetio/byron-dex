@@ -63,11 +63,12 @@ services:
       /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
       "
 
-#  dex-middleware:
-#    image: plutus4binarapps/dex-middleware
-#    entrypoint: []
-#    ports:
-#      - 8080:8080
+  dex-middleware:
+    image: plutus4binarapps/dex-middleware
+    entrypoint: []
+    command: middleware-manual
+    ports:
+      - 8080:8080
 
 volumes:
   node-mainnet-db:
