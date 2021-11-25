@@ -79,6 +79,18 @@ services:
     ports:
       - 8080:8080
 
+  faucet:
+    image: plutus4binarapps/dex-faucet:latest
+    tty: true
+    ports:
+      - "8085:8085"
+    environment:
+      - APP_FAUCET_WALLET_ADDRESS=addr_test1qrexdmlktfa55uddpm0s79yfaht9c77h0qm0nd224hndqaea055p66w7gjp65zusx40xfl6q9eng4x6l3vxg9rhf5nrs08c6r2
+      - APP_NODE_SOCKET_PATH=/var/node-ipc/node.socket
+    volumes:
+      - ./config/wallet/9c70aac3-1445-4b67-9d70-39cbd4bbb347:/etc/faucet/wallet/
+      - node-ipc:/var/node-ipc
+
 volumes:
   node-mainnet-db:
   node-testnet-db:
