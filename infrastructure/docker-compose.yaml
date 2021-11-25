@@ -8,13 +8,13 @@ services:
       - node-ipc:/ipc
       - ./config:/config
     ports:
-      - 3003:3003
+      - 3001:3001
     entrypoint: []
     command: bash -c "
       $$CMD --config /config/${NETWORK}/${NETWORK}-config.json --topology /config/${NETWORK}/${NETWORK}-topology.json
       "
     environment:
-      CMD: "cardano-node run --socket-path /ipc/node.socket --database-path /node-db/node.db --port 3003"
+      CMD: "cardano-node run --socket-path /ipc/node.socket --database-path /node-db/node.db --port 3001"
       NETWORK:
     restart: on-failure
     logging: &logging
@@ -31,7 +31,7 @@ services:
       - node-ipc:/ipc
       - ./config:/config
     ports:
-      - 8090:8090 #change to another port
+      - 8093:8090
     entrypoint: []
     command: bash -c "
       ([[ $$NETWORK == \"mainnet\" ]] && $$CMD --mainnet) ||
@@ -48,22 +48,28 @@ services:
     image: plutus4binarapps/dex-chain-index
     entrypoint: []
     volumes:
-      - chain-${NETWORK}-db:/chain-db
+      # - chain-${NETWORK}-db:/chain-db
       - node-ipc:/ipc
       - ./config:/config
+    ports:
+      - 9083:9083
     command: bash -c "
-      plutus-chain-index --config /config/${NETWORK}/chain-index-config.json --socket-path /ipc/node.socket --db-path /chain-db/index.db start-index
+      plutus-chain-index --config /config/${NETWORK}/chain-index-config.json --socket-path /ipc/node.socket --db-path /config/${NETWORK}/chain-index.db start-index
       "
 
-      #pab-executable:
-      #  image: plutus4binarapps/dex-backend
-      #  volumes:
-      #    - ./config:/config
-      #  entrypoint: []
-      #  command: bash -c "
-      #    /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml migrate &&
-      #    /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
-      #    "
+  pab-executable:
+    image: plutus4binarapps/dex-backend
+    volumes:
+      - ./config:/config
+    entrypoint: []
+    command: bash -c "
+      /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml migrate &&
+      /bin/dex-pab --passphrase pab123456789 --config /config/${NETWORK}/pab-config.yml webserver
+      "
+    environment:
+      NETWORK:
+    ports:
+      - 9080:9080
 
   dex-middleware:
     image: plutus4binarapps/dex-middleware
