@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   cardano-node:
-    image: inputoutput/cardano-node:1.30.1
+    image: inputoutput/cardano-node:1.31.1
     volumes:
       - node-${NETWORK}-db:/node-db
       - node-ipc:/ipc
