@@ -60,6 +60,7 @@ services:
   pab-executable:
     image: plutus4binarapps/dex-backend
     volumes:
+      - node-ipc:/ipc
       - ./config:/config
     entrypoint: []
     command: bash -c "
