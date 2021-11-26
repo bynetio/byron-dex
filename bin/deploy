@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -exu
 
 COMMAND=${1:-"help"}
 DEX_APP_ROOT=${DEX_APP_ROOT:-"$HOME/apps/dex"}
@@ -6,8 +7,17 @@ export NETWORK=${NETWORK:-"testnet"}
 shift
 
 goto () {
-  if [ -d "$DEX_APP_ROOT/$1" ]; then
-    cd "$DEX_APP_ROOT/$1"
+  if [ -d "$DEX_APP_ROOT" ]; then
+    if [ -z ${1+x} ]; then
+      cd "$DEX_APP_ROOT"
+    else
+      if [ -d "$DEX_APP_ROOT/$1" ]; then
+        cd "$DEX_APP_ROOT/$1"
+      else
+        >&2 echo "$0: no such directory: $DEX_APP_ROOT/$1"
+        exit 1
+      fi
+    fi
   else
     >&2 echo "$0: no such directory: $DEX_APP_ROOT"
     exit 1
@@ -25,20 +35,25 @@ build_service_image ()  {
 }
 
 help_msg () {
-  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|update|help]"
+  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|help]"
   >&2 echo
-  >&2 echo '  build    Build image ("chain-index" | "backend" | "middleware" | "faucet") (default: all).'
-  >&2 echo '  up       Launch the application (all services).'
-  >&2 echo '  down     Terminate the application (all services).'
-  >&2 echo '  run      Run instance of the service (see: `docker-compose run` for arguments).'
-  >&2 echo '  restart  Restart service (see: `docker-compose restart` for arguments).'
-  >&2 echo '  ps       Enlist services and their statuses.'
-  >&2 echo '  logs     Enlist application logs (see: `docker-compose logs` for arguments).'
-  >&2 echo '  update   Perform a git pull on repository (see: `git pull` for arguments).'
+  >&2 echo "Set DEX_APP_ROOT environment variable to a root of app project (default: $HOME/apps/dex)."
+  >&2 echo "Set NETWORK to either testnet or mainnet (default: testnet)."
+  >&2 echo
+  >&2 echo '  build            Build image(s) ("chain-index" | "backend" | "middleware" | "faucet") (default: all).'
+  >&2 echo '  up               Launch the application (all services).'
+  >&2 echo '  down             Terminate the application (all services).'
+  >&2 echo '  run              Run instance of the service (see: `docker-compose run` for arguments).'
+  >&2 echo '  restart          Restart service (see: `docker-compose restart` for arguments).'
+  >&2 echo '  ps               Enlist services and their statuses.'
+  >&2 echo '  logs             Enlist application logs (see: `docker-compose logs` for arguments).'
+  >&2 echo '  bump-repository  Perform a git pull on repository (see: `git pull` for arguments).'
+  >&2 echo '  bump-topology    Fetch topology configuration files.'
+  >&2 echo '  help             This message.'
 }
 
 case "$COMMAND" in
-  build)
+  bui*)
     goto
     if [ -z ${1+x} ]; then
       build_service_image "chain-index"
@@ -50,43 +65,51 @@ case "$COMMAND" in
     fi
     ;;
 
-  up)
+  u*)
     goto "infrastructure"
     docker-compose up -d
     ;;
 
-  down)
+  d*)
     goto "infrastructure"
     docker-compose down --remove-orphans
     ;;
 
-  run)
+  ru*)
     goto "infrastructure"
     docker-compose run --rm $@
     ;;
 
-  restart)
+  re*)
     goto "infrastructure"
     docker-compose restart $@
     ;;
 
-  ps)
+  p*)
     goto "infrastructure"
     docker-compose ps
     ;;
 
-  logs)
+  l*)
     goto "infrastructure"
     docker-compose logs $@
     ;;
 
-  update)
+  bump-r*)
     goto
     if [ -z ${1+x} ]; then
       git pull
     else
       git pull origin "$1"
     fi
+    ;;
+
+  bump-t*)
+    url_base="https://hydra.iohk.io/build/7654130/download/1"
+    files=( "config.json" "byron-genesis.json" "shelley-genesis.json" "alonzo-genesis.json" "topology.json" "db-sync-config.json" )
+    for file in ${files[@]}; do
+      curl "$url_base/$NETWORK-$file" > "$DEX_APP_ROOT/infrastructure/config/$NETWORK/$NETWORK-$file"
+    done
     ;;
 
   *)
