@@ -17,8 +17,9 @@ walletServerConfig:
     getWallet: 1
 
 nodeServerConfig:
+  mscBaseUrl: http://cardano-node:3001
   mscSocketPath: /ipc/node.sock
-  mscBaseUrl: "cardano-node"
+    # mscBaseUrl: "cardano-node"
   mscKeptBlocks: 2160
   mscNetworkId: "1097911063" # Testnet network ID (main net = empty string)
   mscSlotConfig:
