@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-set -exu
 
 COMMAND=${1:-"help"}
 DEX_APP_ROOT=${DEX_APP_ROOT:-"$HOME/apps/dex"}
