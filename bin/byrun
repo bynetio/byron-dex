@@ -34,7 +34,9 @@ build_service_image ()  {
 }
 
 help_msg () {
-  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|bump-server|help]"
+  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|bump-server|bump-dev|help]"
+  >&2 echo
+  >&2 echo "A swiss-army-knife for DEX infrastructure and development purposes."
   >&2 echo
   >&2 echo "Set DEX_APP_ROOT environment variable to a root of app project (default: $HOME/apps/dex)."
   >&2 echo "Set NETWORK to either testnet or mainnet (default: testnet)."
@@ -49,6 +51,7 @@ help_msg () {
   >&2 echo '  bump-repository  Perform a git pull on repository (see: `git pull` for arguments).'
   >&2 echo '  bump-topology    Fetch topology configuration files.'
   >&2 echo '  bump-server      Load newest configuration of server from nix/deployment.'
+  >&2 echo '  bump-dev         Build and publish new development image.'
   >&2 echo '  help             This message.'
 }
 
@@ -136,6 +139,17 @@ case "$COMMAND" in
         exit 125
       fi
     fi
+    ;;
+
+  bump-d*)
+    version=$1
+    result=$(nix-build --no-out-link default.nix -A devcontainer)
+
+    docker load < "$result"
+    docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:$version"
+    docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:latest"
+    docker push "plutus4binarapps/dex-plutus-dev:$version"
+    docker push "plutus4binarapps/dex-plutus-dev:latest"
     ;;
 
   *)
