@@ -34,7 +34,7 @@ build_service_image ()  {
 }
 
 help_msg () {
-  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|help]"
+  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|bump-server|help]"
   >&2 echo
   >&2 echo "Set DEX_APP_ROOT environment variable to a root of app project (default: $HOME/apps/dex)."
   >&2 echo "Set NETWORK to either testnet or mainnet (default: testnet)."
@@ -48,6 +48,7 @@ help_msg () {
   >&2 echo '  logs             Enlist application logs (see: `docker-compose logs` for arguments).'
   >&2 echo '  bump-repository  Perform a git pull on repository (see: `git pull` for arguments).'
   >&2 echo '  bump-topology    Fetch topology configuration files.'
+  >&2 echo '  bump-server      Load newest configuration of server from nix/deployment.'
   >&2 echo '  help             This message.'
 }
 
@@ -109,6 +110,18 @@ case "$COMMAND" in
     for file in ${files[@]}; do
       curl "$url_base/$NETWORK-$file" > "$DEX_APP_ROOT/infrastructure/config/$NETWORK/$NETWORK-$file"
     done
+    ;;
+
+  bump-s*)
+    if [ $(id -u) -ne 0 ]; then
+      >&2 echo "$0: you must be a root to do it"
+      exit 127
+    fi
+    script_dir=$(dirname $0)
+    source_dir=$(dirname $script_dir)
+    cp /etc/nixos/configuration.nix /etc/nixos/configuration.nix.$$.bak
+    cp $source_dir/nix/deployment/ec2.nix /etc/nixos/configuration.nix.$$.bak
+    nixos-rebuild -j 2 switch
     ;;
 
   *)
