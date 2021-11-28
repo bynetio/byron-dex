@@ -76,7 +76,7 @@ services:
       - 9080:9080
     depends_on:
       - cardano-node
-        #- plutus-chain-index
+      - plutus-chain-index
       - cardano-wallet
 
   dex-middleware:
