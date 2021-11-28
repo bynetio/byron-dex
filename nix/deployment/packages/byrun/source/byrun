@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+
+COMMAND=${1:-"help"}
+DEX_APP_ROOT=${DEX_APP_ROOT:-"$HOME/apps/dex"}
+export NETWORK=${NETWORK:-"testnet"}
+shift
+
+goto () {
+  if [ -d "$DEX_APP_ROOT" ]; then
+    if [ -z ${1+x} ]; then
+      cd "$DEX_APP_ROOT"
+    else
+      if [ -d "$DEX_APP_ROOT/$1" ]; then
+        cd "$DEX_APP_ROOT/$1"
+      else
+        >&2 echo "$0: no such directory: $DEX_APP_ROOT/$1"
+        exit 1
+      fi
+    fi
+  else
+    >&2 echo "$0: no such directory: $DEX_APP_ROOT"
+    exit 1
+  fi
+}
+
+build_service_image ()  {
+  app_name=$1
+  result=$(nix-build --no-out-link release.nix -A "$app_name")
+
+  docker load < "$result"
+  docker tag "dex-$app_name" "plutus4binarapps/dex-$app_name"
+  docker push "plutus4binarapps/dex-$app_name"
+  rm "$result"
+}
+
+help_msg () {
+  >&2 echo "usage: $0 [build|up|down|run|restart|ps|logs|bump-repository|bump-topology|bump-server|bump-dev|help]"
+  >&2 echo
+  >&2 echo "A swiss-army-knife for DEX infrastructure and development purposes."
+  >&2 echo
+  >&2 echo "Set DEX_APP_ROOT environment variable to a root of app project (default: $HOME/apps/dex)."
+  >&2 echo "Set NETWORK to either testnet or mainnet (default: testnet)."
+  >&2 echo
+  >&2 echo '  build            Build image(s) ("chain-index" | "backend" | "middleware" | "faucet") (default: all).'
+  >&2 echo '  up               Launch the application (all services).'
+  >&2 echo '  down             Terminate the application (all services).'
+  >&2 echo '  run              Run instance of the service (see: `docker-compose run` for arguments).'
+  >&2 echo '  restart          Restart service (see: `docker-compose restart` for arguments).'
+  >&2 echo '  ps               Enlist services and their statuses.'
+  >&2 echo '  logs             Enlist application logs (see: `docker-compose logs` for arguments).'
+  >&2 echo '  bump-repository  Perform a git pull on repository (see: `git pull` for arguments).'
+  >&2 echo '  bump-topology    Fetch topology configuration files.'
+  >&2 echo '  bump-server      Load newest configuration of server from nix/deployment.'
+  >&2 echo '  bump-dev         Build and publish new development image.'
+  >&2 echo '  help             This message.'
+}
+
+case "$COMMAND" in
+  bui*)
+    goto
+    if [ -z ${1+x} ]; then
+      build_service_image "chain-index"
+      build_service_image "backend"
+      build_service_image "middleware"
+      build_service_image "faucet"
+    else
+      build_service_image "$1"
+    fi
+    ;;
+
+  u*)
+    goto "infrastructure"
+    docker-compose up -d
+    ;;
+
+  d*)
+    goto "infrastructure"
+    docker-compose down --remove-orphans
+    ;;
+
+  ru*)
+    goto "infrastructure"
+    docker-compose run --rm $@
+    ;;
+
+  re*)
+    goto "infrastructure"
+    docker-compose restart $@
+    ;;
+
+  p*)
+    goto "infrastructure"
+    docker-compose ps
+    ;;
+
+  l*)
+    goto "infrastructure"
+    docker-compose logs $@
+    ;;
+
+  bump-r*)
+    goto
+    if [ -z ${1+x} ]; then
+      git pull
+    else
+      git pull origin "$1"
+    fi
+    ;;
+
+  bump-t*)
+    url_base="https://hydra.iohk.io/build/7654130/download/1"
+    files=( "config.json" "byron-genesis.json" "shelley-genesis.json" "alonzo-genesis.json" "topology.json" "db-sync-config.json" )
+    for file in ${files[@]}; do
+      curl "$url_base/$NETWORK-$file" > "$DEX_APP_ROOT/infrastructure/config/$NETWORK/$NETWORK-$file"
+    done
+    ;;
+
+  bump-s*)
+    script_dir=$(dirname "$0")
+    source_dir=$(dirname "$script_dir")
+
+    if [ $(id -u) -ne 0 ]; then
+      >&2 echo "$0: you have to be a root to do that!"
+      exit 127
+    fi
+
+    if [ -z ${1+x} ]; then
+      >&2 echo "$0: no target machine given"
+      exit 126
+    else
+      if [ -d "$source_dir/nix/deployment/machines/$1" ]; then
+        cp -vr "$source_dir/nix/deployment/machines/$1/default.nix" /etc/nixos/configuration.nix
+        cp -vr "$source_dir/nix/deployment/roles" /etc/nixos/
+        cp -vr "$source_dir/nix/deployment/users" /etc/nixos/
+
+        nixos-rebuild switch
+      else
+        >&2 echo "$0: unknown target machine: $1"
+        exit 125
+      fi
+    fi
+    ;;
+
+  bump-d*)
+    version=$1
+    result=$(nix-build --no-out-link default.nix -A devcontainer)
+
+    docker load < "$result"
+    docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:$version"
+    docker tag "dex-devcontainer" "plutus4binarapps/dex-plutus-dev:latest"
+    docker push "plutus4binarapps/dex-plutus-dev:$version"
+    docker push "plutus4binarapps/dex-plutus-dev:latest"
+    ;;
+
+  *)
+    help_msg
+    ;;
+esac

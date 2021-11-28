@@ -1,4 +1,5 @@
 { pkgs, ... }:
+
 {
   # common settings
   networking.firewall.allowedTCPPorts = [ 8080 ];
@@ -16,8 +17,14 @@
     "iohk.cachix.org-1:DpRUyj7h7V830dp/i6Nti+NEO2/nhblbov/8MW7Rqoo="
   ];
 
+  # custom packages
+  nixpkgs.config.packageOverrides = pkgs: rec {
+    byrun = pkgs.callPackage ../../packages/byrun {};
+  };
+
   # standard set of packages
   environment.systemPackages = with pkgs; [
+    byrun
     docker-compose
     git
     htop
