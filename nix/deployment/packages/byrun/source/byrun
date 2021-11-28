@@ -130,6 +130,7 @@ case "$COMMAND" in
     else
       if [ -d "$source_dir/nix/deployment/machines/$1" ]; then
         cp -vr "$source_dir/nix/deployment/machines/$1/default.nix" /etc/nixos/configuration.nix
+        cp -vr "$source_dir/nix/deployment/packages" /etc/nixos/
         cp -vr "$source_dir/nix/deployment/roles" /etc/nixos/
         cp -vr "$source_dir/nix/deployment/users" /etc/nixos/
 
