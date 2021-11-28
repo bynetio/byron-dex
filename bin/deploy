@@ -113,6 +113,9 @@ case "$COMMAND" in
     ;;
 
   bump-s*)
+    script_dir=$(dirname $0)
+    source_dir=$(dirname $script_dir)
+
     if [ $(id -u) -ne 0 ]; then
       >&2 echo "$0: not running as root"
       exit 127
@@ -123,8 +126,6 @@ case "$COMMAND" in
       exit 126
     else
       if [ -d "$source_dir/nix/deployment/machines/$1" ]; then
-        script_dir=$(dirname $0)
-        source_dir=$(dirname $script_dir)
 
         cp -vr $source_dir/nix/deployment/machines/$1/default.nix /etc/nixos/configuration.nix
         cp -vr $source_dir/nix/deployment/roles /etc/nixos/
