@@ -122,7 +122,7 @@ case "$COMMAND" in
       >&2 echo "$0: no target given"
       exit 126
     else
-      if [ -d "$source_dir/$1" ]; then
+      if [ -d "$source_dir/nix/deployment/machines/$1" ]; then
         script_dir=$(dirname $0)
         source_dir=$(dirname $script_dir)
 
