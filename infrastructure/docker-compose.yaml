@@ -23,7 +23,6 @@ services:
         compress: "true"
         max-file: "10"
         max-size: "50m"
-    profiles: ["all", "start"]
 
   cardano-wallet:
     image: inputoutput/cardano-wallet:2021.11.11
@@ -46,10 +45,9 @@ services:
       <<: *logging
     depends_on:
       - cardano-node
-    profiles: ["all", "start"]
 
   plutus-chain-index:
-    image: test
+    image: plutus4binarapps/dex-chain-index
     entrypoint: []
     restart: on-failure
     volumes:
@@ -61,7 +59,6 @@ services:
     command: "/plutus-chain-index --config /config/${NETWORK}/chain-index-config.json --socket-path /ipc/node.socket --db-path /chain-db/chain-index.db start-index"
     depends_on:
       - cardano-node
-    profiles: ["all"]
 
   pab-executable:
     image: plutus4binarapps/dex-backend
@@ -81,7 +78,6 @@ services:
       - cardano-node
         #- plutus-chain-index
       - cardano-wallet
-    profiles: ["all", "start"]
 
   dex-middleware:
     image: plutus4binarapps/dex-middleware
@@ -89,7 +85,6 @@ services:
     command: middleware-manual
     ports:
       - 8080:8080
-    profiles: ["all", "start"]
 
   faucet:
     image: plutus4binarapps/dex-faucet:latest
@@ -104,7 +99,6 @@ services:
       - node-ipc:/var/node-ipc
     depends_on:
       - cardano-node
-    profiles: ["all", "start"]
 
 volumes:
   node-mainnet-db:
