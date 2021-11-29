@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+wid=${1:-"48c9b8120d25260910803ff25d7317076ea50272"}
+iid=$(curl -H "Content-Type: application/json" -X POST -d "{\"caID\":\"DexContract\",\"caWallet\":{\"getWalletId\":\"$wid\"}}" localhost:9080/api/contract/activate 2> /dev/null | jq ".unContractInstanceId" | sed "s/\"//g")
+tmprc=$(mktemp /tmp/wallet.$wid.XXXXXX)
+
+echo "WALLET_ID=$wid"   | tee $tmprc
+echo "INSTANCE_ID=$iid" | tee $tmprc
+echo "PS1=\"\\e[0;34m[wallet:$wid:\\W]\\$ \\e[m\"" >> $tmprc
+
+bash --rcfile $tmprc
+
+rm $tmprc
