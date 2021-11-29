@@ -6,8 +6,10 @@
 
 module Middleware.PabClient.Types
   ( ContractInstanceId(..)
+  , ContractActivationArgs(..)
   , ContractState
   , Fund
+  , Wallet(..)
   , lookupResBody
   ) where
 
@@ -28,8 +30,10 @@ import qualified Dex.WalletHistory                       as WalletHistory
 import           GHC.Generics
 import           Ledger                                  (AssetClass)
 import           Middleware.Capability.Error
+import           Middleware.Dex.Types                    (WalletId (WalletId))
 import           Plutus.PAB.Events.ContractInstanceState (observableState)
 import           Plutus.PAB.Webserver.Types              (ContractInstanceClientState (cicCurrentState))
+import           PlutusTx.Prelude                        (BuiltinByteString)
 import           Servant.API
 
 
@@ -39,9 +43,23 @@ newtype ContractInstanceId = ContractInstanceId { unContractInstanceId :: UUID }
     deriving newtype (FromJSONKey, ToJSONKey, ToHttpApiData, FromHttpApiData)
     deriving anyclass (FromJSON, ToJSON, OpenApi.ToSchema, ToParamSchema)
 
+data ContractActivationArgs =
+    ContractActivationArgs
+        { caID     :: Text,
+          caWallet :: Wallet
+        }
+    deriving stock (Show, Generic)
+    deriving anyclass (ToJSON, FromJSON)
+
+newtype Wallet = Wallet { getWalletId :: WalletId }
+    deriving (Show, Generic)
+    deriving anyclass (FromJSON, ToJSON)
+
 type ContractState = ContractInstanceClientState String
 
 instance NFData ContractState where rnf = rwhnf
+
+instance NFData ContractInstanceId where rnf = rwhnf
 
 type Fund = (AssetClass, Integer)
 

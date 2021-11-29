@@ -1,24 +1,23 @@
 module Middleware.API where
 
-import           Middleware.Dex.Types       (CancelOrderParams (CancelOrderParams),
-                                             CoinSet (CoinSet),
-                                             CreateLiquidityOrderParams (CreateLiquidityOrderParams),
-                                             CreateLiquidityPoolParams (CreateLiquidityPoolParams),
-                                             CreateSellOrderParams,
-                                             FundView (FundView),
-                                             OrderView (..),
-                                             PayoutView (PayoutView),
-                                             PerformRandomParams (PerformRandomParams))
-import           Middleware.PabClient.Types (ContractInstanceId)
-import           Servant                    (Capture, Description, Get, JSON,
-                                             NoContent, Post, PostAccepted,
-                                             PostCreated, ReqBody, (:<|>), (:>))
-import           Servant.Swagger.UI         (SwaggerSchemaUI)
+import Middleware.Dex.Types       (ActivateForm, CancelOrderParams (CancelOrderParams), CoinSet (CoinSet),
+                                   CreateLiquidityOrderParams (CreateLiquidityOrderParams),
+                                   CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                   CreateSellOrderParams, FundView (FundView), OrderView (..),
+                                   PayoutView (PayoutView), PerformRandomParams (PerformRandomParams),
+                                   WalletId)
+import Middleware.PabClient.Types (ContractInstanceId)
+import Servant                    (Capture, Description, Get, JSON, NoContent, Post, PostAccepted,
+                                   PostCreated, ReqBody, (:<|>), (:>))
+import Servant.Swagger.UI         (SwaggerSchemaUI)
 
-type API =
-  Capture "contract-instance-id" ContractInstanceId :> "funds"
-    :> Description "List of user funds."
-    :> Get '[JSON] [FundView]
+type API = "activate"
+      :> Description "Activate contract for wallet."
+      :> ReqBody '[JSON] ActivateForm
+      :> Post '[JSON] ContractInstanceId
+    :<|> Capture "contract-instance-id" ContractInstanceId :> "funds"
+      :> Description "List of user funds."
+      :> Get '[JSON] [FundView]
     :<|> Capture "contract-instance-id" ContractInstanceId :> "collect-funds"
       :> Description "Collect user funds."
       :> PostAccepted '[JSON] ()

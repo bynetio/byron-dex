@@ -1,27 +1,25 @@
 {-# LANGUAGE DeriveAnyClass     #-}
 {-# LANGUAGE DeriveGeneric      #-}
 {-# LANGUAGE DerivingStrategies #-}
+
 module Dex.WalletHistory
-  ( History(..)
+  ( History (..)
   , HistoryId
-  , getHistory
   , append
-  , remove
+  , getHistory
   , lookup
+  , remove
   ) where
 
 import           Data.List           hiding (lookup)
 import           Data.Text           (Text)
 import           Playground.Contract (FromJSON, Generic, ToJSON)
 import           Prelude             hiding (lookup)
+
 type HistoryId = Text
-data History a = History [(HistoryId, a)] [HistoryId]
-  deriving ( Eq
-           , Show
-           , Generic
-           , FromJSON
-           , ToJSON
-           )
+data History a
+  = History [(HistoryId, a)] [HistoryId]
+  deriving (Eq, FromJSON, Generic, Show, ToJSON)
 
 getHistory :: History a -> [a]
 getHistory (History as _) = map snd as
@@ -45,4 +43,3 @@ instance Semigroup (History a) where
 
 instance Monoid (History a) where
    mempty = History [] []
-
