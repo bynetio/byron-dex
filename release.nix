@@ -1,9 +1,9 @@
 let
   packages = import ./.;
-
   pkgs = packages.pkgs;
   haskellNix = pkgs.haskell-nix;
   plutusApps = packages.plutus.plutus-apps;
+  wait-for = pkgs.writeScriptBin "wait-for" (builtins.fetchurl "https://raw.githubusercontent.com/eficode/wait-for/master/wait-for");
 
   projectPackages =
     haskellNix.haskellLib.selectProjectPackages packages.project.hsPkgs;
@@ -44,7 +44,7 @@ let
     pkgs.dockerTools.buildImage {
       name = imageName;
       tag = "latest";
-      contents = [ package pkgs.bash pkgs.busybox ];
+      contents = [ package pkgs.bash pkgs.busybox wait-for ];
       config = { Cmd = [ "/bin/${execName}" ]; };
     };
 
