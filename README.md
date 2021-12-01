@@ -85,7 +85,7 @@ It's also useful to use [haskell-vim](https://github.com/neovimhaskell/haskell-v
 
 ### Contract Endpoints
 
-All contract endpoints are defined in `uniswap/src/Uniswap/OffChain.hs`.
+All contract endpoints are defined in `dex/src/Dex/OffChain.hs`.
 
 - `createSellOrder` -- creates an exchange request, called _Swap Order_, i.e. a will to sell some amount of tokens of one kind for some other amount of tokens of other kind.
 - `createLiquidityOrder` -- creates a script, called _Liquidity Order_, that allocates some funds that can be used in exchange by other users. User can set up how much funds of two different tokens they wish to put in such pool and setup a fee.
@@ -102,11 +102,11 @@ All contract endpoints are defined in `uniswap/src/Uniswap/OffChain.hs`.
 
 This project use GitLab as CI. Check the configuration [file](./.gitlab-ci.yaml) for more information.
 GitLab use custom docker image (`plutus4binarapps/dex-plutus-dev`) which contains necessary dependencies.
-The image is build using [devcontainer](./nix/devcontainer/uniswap-devcontainer.nix).
+The image is build using [devcontainer](./nix/devcontainer/dex-devcontainer.nix).
 To update it or rebuild manually:
 
 1. `docker load < $(nix-build default.nix -A devcontainer)`.
-2. tag result image `docker tag uniswap-devcontainer silquenarmo/dex-plutus-dev:<version>`
+2. tag result image `docker tag dex-devcontainer silquenarmo/dex-plutus-dev:<version>`
 3. _[optional]_ push an image to hub repository `docker push silquenarmo/dex-plutus-dev:<version>` and `docker push silquenarmo/dex-plutus-dev:latest`
 
 NOTE: You can build docker image only on linux.
@@ -139,7 +139,7 @@ Usage:
 
 ```json
 {
-  "name": "Uniswap Project",
+  "name": "Dex Project",
   "image": "silquenarmo/dex-plutus-dev:latest",
 
   // Use 'settings' to set *default* container specific settings.json values on container create.

@@ -1,6 +1,6 @@
-{ pkgs, uniswap }:
+{ pkgs, dex }:
 let
-  shell = uniswap.haskell.project.shellFor { withHoogle = false; };
+  shell = dex.haskell.project.shellFor { withHoogle = false; };
   # This is an evil hack to allow us to have a docker container with a "similar" environment to
   # our haskell.nix shell without having it actually run nix-shell. In particular, we need some
   # of the flags that the stdenv setup hooks set based on the build inputs, like NIX_LDFLAGS.
@@ -14,15 +14,15 @@ let
 in
 pkgs.callPackage (import ./devcontainer.nix) {
   inherit pkgs;
-  name = "uniswap-devcontainer";
+  name = "dex-devcontainer";
   tag = "latest";
-  nonRootUser = "uniswap";
+  nonRootUser = "dex";
   extraContents = [
     pkgs.haskellPackages.ieee
     pkgs.haskellPackages.filemanip
     shell.ghc
-    uniswap.hlint
-    uniswap.cabal-install
+    dex.hlint
+    dex.cabal-install
     pkgs.binutils
   ];
   extraCommands = ''
@@ -35,6 +35,6 @@ pkgs.callPackage (import ./devcontainer.nix) {
     # We just clobbered this, put it back
     echo 'export PATH=$PATH:/usr/bin:/bin' >> etc/profile.d/env.sh
     echo 'export NIX_BUILD_TOP=$(mktemp -d)' >> etc/profile.d/env.sh
-    mkdir -p /home/uniswap/.cabal/packages
+    mkdir -p /home/dex/.cabal/packages
   '';
 }
