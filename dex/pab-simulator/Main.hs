@@ -45,7 +45,7 @@ type ContractHistory = WH.History (Either Text Dex.DexContractState)
 main :: IO ()
 main = void $
   Simulator.runSimulationWith handlers $ do
-    logString @(Builtin DexContracts) "Starting Uniswap PAB webserver on port 8080. Press enter to exit."
+    logString @(Builtin DexContracts) "Starting Dex PAB webserver on port 8080. Press enter to exit."
     shutdown <- PAB.Server.startServerDebug
 
     cidInit <- Simulator.activateContract (knownWallet 1) DexInit
@@ -58,7 +58,7 @@ main = void $
     void $ fmap Map.fromList $
       forM Trace.wallets $ \w -> do
         cid <- Simulator.activateContract w DexContract
-        logString @(Builtin DexContracts) $ "Uniswap user contract started for " ++ show w
+        logString @(Builtin DexContracts) $ "Dex user contract started for " ++ show w
         Simulator.waitForEndpoint cid "funds"
         void $ Simulator.callEndpointOnInstance cid "funds" (Dex.Request "FundsId" 0 ())
         v <- getState (contractState "FundsId") cid

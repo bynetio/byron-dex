@@ -21,10 +21,11 @@ source-repository-package
     plutus-chain-index-core
     plutus-contract
     plutus-ledger
+    plutus-ledger-constraints
     plutus-pab
     plutus-use-cases
     quickcheck-dynamic
-  tag: v2021-11-22
+  tag: c4570793b1251e1a8e79e33a5a40f3e2776c5691
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf

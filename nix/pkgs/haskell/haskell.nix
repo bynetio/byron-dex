@@ -3,15 +3,15 @@ let
   deferPluginErrors = true;
   project = haskell-nix.project {
     src = haskell-nix.haskellLib.cleanGit {
-      name = "uniswap";
+      name = "dex";
       src = ../../../.;
     };
 
     inherit compiler-nix-name;
 
     sha256map = {
-      "https://github.com/input-output-hk/plutus-apps.git"."v2021-11-22" =
-        "10m0gmnakjnpnzyvjs3ksfpxgjcq3pdphr4gf8v7fjhr9fjbc45n";
+      "https://github.com/input-output-hk/plutus-apps.git"."c4570793b1251e1a8e79e33a5a40f3e2776c5691" =
+        "S3D0CW/MX4QNHkK59+e+7hCd2K/tFFK0A3RHz0k0xps=";
 
       "https://github.com/Quid2/flat.git"."ee59880f47ab835dbd73bea0847dab7869fc20d8" =
         "1lrzknw765pz2j97nvv9ip3l1mcpf2zr4n56hwlz0rk7wq7ls4cm";
