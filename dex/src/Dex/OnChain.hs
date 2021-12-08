@@ -22,6 +22,15 @@ import qualified PlutusTx
 import           PlutusTx.Prelude
 
 
+
+
+{-# INLINEABLE lookup #-}
+lookup :: (Eq a) => a -> [(a,b)] -> Maybe b
+lookup _ [] = Nothing
+lookup a ((a',b):as) | a == a' = Just b
+                     | otherwise = lookup a as
+
+
 {-# INLINEABLE mkDexValidator #-}
 -- removing all validation and returning True removes all mkDexValidator memory usage
 -- see: mem-no-validation.svg
@@ -41,7 +50,7 @@ mkDexValidator (Order (SellOrder SellOrderInfo {..})) Swap ctx =
       | txOut <- txOutputs
       , Just (Payout (PayoutInfo ownerHash' orderId')) <- return $ do
               datumHash' <- txOutDatumHash txOut
-              (Datum datum) <- findDatum datumHash' txInfo
+              (Datum datum) <- lookup datumHash' (txInfoData txInfo)
               PlutusTx.fromBuiltinData datum
       , ownerHash == ownerHash'
       , orderId == orderId'
@@ -59,7 +68,7 @@ mkDexValidator (Order (LiquidityOrder liquidityOrderInfo@LiquidityOrderInfo {..}
       | txOut <- txOutputs
       , Just (Order (LiquidityOrder liquidityOrderInfo')) <- return $ do
               datumHash' <- txOutDatumHash txOut
-              (Datum datum) <- findDatum datumHash' txInfo
+              (Datum datum) <- lookup datumHash' (txInfoData txInfo)
               PlutusTx.fromBuiltinData datum
       , liquidityOrderInfo == reversedLiquidityOrder (fromNat expectedAmount) liquidityOrderInfo'
       , assetClassValueOf (txOutValue txOut) expectedCoin * fromNat denominator >= fromNat (expectedAmount * (denominator + numerator))

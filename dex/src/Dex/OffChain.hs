@@ -93,21 +93,39 @@ type DexSchema =
   .\/ Endpoint "performNRandom" (Request Integer)
   .\/ Endpoint "myPayouts" (Request ())
 
-getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> TxConstraints DexAction DexDatum
-getConstraintsForSwap _ txOutRef (SellOrder SellOrderInfo {..}) =
-  Constraints.mustPayToTheScript
-    (Payout PayoutInfo {..})
-    (singleton expectedCoin expectedAmount)
-  <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
+getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> (TxConstraints DexAction DexDatum, Constraints.ScriptLookups Dex)
+getConstraintsForSwap txOut txOutRef order@(SellOrder SellOrderInfo {..}) =
+  let tx = Constraints.mustPayToTheScript
+            (Payout PayoutInfo {..})
+            (singleton expectedCoin expectedAmount)
+        <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData (Payout PayoutInfo {..}))
+        <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData (Order order))
+        <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
-getConstraintsForSwap txOut txOutRef (LiquidityOrder lo@LiquidityOrderInfo {..}) =
+      lookups =
+        Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Payout PayoutInfo {..}))
+        <> Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Order order))
+        <> Constraints.unspentOutputs (Map.singleton txOutRef txOut)
+
+  in (tx,lookups)
+
+getConstraintsForSwap txOut txOutRef order@(LiquidityOrder lo@LiquidityOrderInfo {..}) =
   let (numerator, denominator) = swapFee
       fee = fromIntegral expectedAmount Prelude.* fromIntegral numerator Prelude./ fromIntegral denominator
       integerFee = ceiling @Double @Integer fee
-  in Constraints.mustPayToTheScript
-    (Order (LiquidityOrder (reversedLiquidityOrder (assetClassValueOf (view ciTxOutValue txOut) lockedCoin) lo)))
-    (singleton expectedCoin (expectedAmount Prelude.+ Nat integerFee))
-  <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
+      newOrder = Order (LiquidityOrder (reversedLiquidityOrder (assetClassValueOf (view ciTxOutValue txOut) lockedCoin) lo))
+      tx = Constraints.mustPayToTheScript
+          newOrder
+          (singleton expectedCoin (expectedAmount Prelude.+ Nat integerFee))
+        <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData newOrder)
+        <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData order)
+        <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
+      lookups =
+        Constraints.otherData (Datum $ PlutusTx.toBuiltinData order)
+        <> Constraints.otherData (Datum $ PlutusTx.toBuiltinData order)
+        <> Constraints.unspentOutputs (Map.singleton txOutRef txOut)
+
+  in (tx,lookups)
 
 uuidToBBS :: UUID.UUID -> BuiltinByteString
 uuidToBBS = stringToBuiltinByteString . UUID.toString
@@ -194,22 +212,23 @@ perform :: Contract DexState DexSchema Text ()
 perform = do
   pkh <- ownPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
-  -- this cuts memory usage in the mkDexValidator
-  -- see: mem-perform1.svg
-  -- utxos <- (: []) . head . Map.toList <$> utxosAt address
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
-  -- this cuts memory usage in the mkDexValidator
-  -- see: mem-perform2.svg (which is similar to mem-perform1.svg)
-  --let filtered = (: []) . head $ [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
   let filtered = [(txOut, oref, o) | (txOut, oref, Order o) <- mapped]
+
+  when (PlutusTx.Prelude.null filtered) $
+    throwError "No orders selected"
+  let (orderTx, orderLookups) = foldl' (\(tx',lookups') (o, oref, order) -> let (tx'', lookups'') = getConstraintsForSwap o oref order in (tx' Prelude.<> tx'', lookups' Prelude.<> lookups'')) (Prelude.mempty, Prelude.mempty) filtered
+
   let lookups = Constraints.typedValidatorLookups dexInstance
           <> Constraints.ownPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
-          <> Constraints.unspentOutputs (Map.fromList utxos)
-      tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
-        ) mempty filtered
-  mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
+          <> orderLookups
+      tx = Constraints.mustBeSignedBy pkh
+        <> orderTx
+  mkTxConstraints lookups tx >>= \u -> do
+    let au = Constraints.adjustUnbalancedTx u
+    void $ submitUnbalancedTx au
 
 -- function for testing only
 performNRandom :: SMGen -> Integer -> Contract DexState DexSchema Text ()
@@ -223,17 +242,25 @@ performNRandom smgen n = do
                   case o of
                     LiquidityOrder LiquidityOrderInfo {..} -> orderId
                     SellOrder SellOrderInfo {..}           -> orderId
-  logInfo @Integer (length sorted)
-  unless (Prelude.null sorted) $ do
-    let indices = take n $ map (`Prelude.mod` length sorted) $ nub $ randoms @Integer smgen
-    let selected = map (sorted!!) indices
-    let lookups = Constraints.typedValidatorLookups dexInstance
-            <> Constraints.ownPubKeyHash pkh
-            <> Constraints.otherScript (Scripts.validatorScript dexInstance)
-            <> Constraints.unspentOutputs (Map.fromList $ map (\(o,oref,_) -> (oref,o)) selected)
-        tx = foldl' (\acc (o, oref, order) -> acc <> getConstraintsForSwap o oref order
-          ) mempty selected
-    mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
+  let indices = take n $ map (`Prelude.mod` length sorted) $ nub $ randoms @Integer smgen
+  let selected = map (sorted!!) indices
+
+  when (PlutusTx.Prelude.null selected) $
+    throwError "No orders selected"
+
+  let (orderTx, orderLookups) = foldl' (\(tx',lookups') (o, oref, order) ->
+        let (tx'', lookups'') = getConstraintsForSwap o oref order
+        in (tx' Prelude.<> tx'', lookups' Prelude.<> lookups'')) (Prelude.mempty, Prelude.mempty) selected
+
+  let lookups = Constraints.typedValidatorLookups dexInstance
+          <> Constraints.ownPubKeyHash pkh
+          <> Constraints.otherScript (Scripts.validatorScript dexInstance)
+          <> orderLookups
+      tx = Constraints.mustBeSignedBy pkh
+        <> orderTx
+  mkTxConstraints lookups tx >>= \u -> do
+    let au = Constraints.adjustUnbalancedTx u
+    void $ submitUnbalancedTx au
 
 
 funds :: Contract w s Text [(AssetClass, Integer)]

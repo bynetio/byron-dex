@@ -17,10 +17,10 @@
         "homepage": null,
         "owner": "input-output-hk",
         "repo": "plutus-apps",
-        "rev": "c4570793b1251e1a8e79e33a5a40f3e2776c5691",
-        "sha256": "S3D0CW/MX4QNHkK59+e+7hCd2K/tFFK0A3RHz0k0xps=",
+        "rev": "804a84bd15074902cce9096ef98721675566c003",
+        "sha256": "11cppsp6h38xgxkqcx3j4lcv41my3asgfzfdyklr5y9gsfpakb5y",
         "type": "tarball",
-        "url": "https://github.com/input-output-hk/plutus-apps/archive/c4570793b1251e1a8e79e33a5a40f3e2776c5691.tar.gz",
+        "url": "https://github.com/input-output-hk/plutus-apps/archive/804a84bd15074902cce9096ef98721675566c003.tar.gz",
         "url_template": "https://github.com/<owner>/<repo>/archive/<rev>.tar.gz"
     },
     "pre-commit-hooks-nix": {
