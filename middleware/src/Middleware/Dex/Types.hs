@@ -8,21 +8,29 @@
 -- |
 module Middleware.Dex.Types where
 
-import           Data.Aeson.Types           (FromJSON, ToJSON, object, parseJSON, toJSON, withObject, (.:),
-                                             (.=))
+import           Data.Aeson.Types           (FromJSON, ToJSON, object,
+                                             parseJSON, toJSON, withObject,
+                                             (.:), (.=))
 import           Data.OpenApi.Schema        (ToSchema)
-import           Data.Ratio                 (approxRational, denominator, numerator)
+import           Data.Ratio                 (approxRational, denominator,
+                                             numerator)
 import           Data.Text                  (Text)
 import           Data.Text.Encoding         (decodeUtf8, encodeUtf8)
-import           Dex.Types                  (AssetSet (AssetSet), CancelOrderParams (CancelOrderParams),
+import           Dex.Types                  (AssetSet (AssetSet),
+                                             CancelOrderParams (CancelOrderParams),
                                              LiquidityOrderParams (LiquidityOrderParams),
-                                             LiquidityPoolParams (LiquidityPoolParams), Nat (..),
-                                             OrderInfo (..), PayoutSummary, PoolPartsParams (..),
+                                             LiquidityPoolParams (LiquidityPoolParams),
+                                             Nat (..), OrderInfo (..),
+                                             PayoutSummary,
+                                             PoolPartsParams (..),
                                              SellOrderParams (..), fromNat)
 import           GHC.Generics               (Generic)
-import           Ledger                     (AssetClass, CurrencySymbol, TokenName, TxOutRef)
-import qualified Ledger.Value               as LV (assetClass, currencySymbol, tokenName, unAssetClass,
-                                                   unCurrencySymbol, unTokenName)
+import           Ledger                     (AssetClass, CurrencySymbol,
+                                             TokenName, TxOutRef)
+import qualified Ledger.Value               as LV (assetClass, currencySymbol,
+                                                   tokenName, unAssetClass,
+                                                   unCurrencySymbol,
+                                                   unTokenName)
 import           PlutusTx.Builtins.Internal (BuiltinByteString (..))
 
 newtype Error = Error
@@ -49,8 +57,8 @@ data Coin = Coin
 instance FromJSON Coin where
   parseJSON = withObject "Coin" $ \v ->
     Coin
-      <$> toSymbol (v .: "symbol")
-      <*> toName (v .: "name")
+      <$> toSymbol (v .: "currencySymbol")
+      <*> toName (v .: "tokenName")
     where
       toSymbol = fmap LV.currencySymbol
       toName = fmap $ LV.tokenName . encodeUtf8
@@ -58,8 +66,8 @@ instance FromJSON Coin where
 instance ToJSON Coin where
   toJSON coin =
     object
-      [ "symbol" .= toJSON (LV.unCurrencySymbol . currencySymbol $ coin),
-        "name" .= toJSON (decodeUtf8 . unBSS . LV.unTokenName . tokenName $ coin)
+      [ "currencySymbol" .= toJSON (LV.unCurrencySymbol . currencySymbol $ coin),
+        "tokenName" .= toJSON (decodeUtf8 . unBSS . LV.unTokenName . tokenName $ coin)
       ]
       where
         unBSS (BuiltinByteString s) = s
