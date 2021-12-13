@@ -175,7 +175,7 @@ convertPoolToMid :: PoolPartsParams -> CreatePoolPartsParams
 convertPoolToMid (PriceChangeParams a b (Nat p)) =
   CreatePriceChangeParams (mkPercentage a) (mkPercentage b) p
 
-newtype CancelOrderParams = CancelOrderParams TxOutRef
+newtype CancelOrderParams = CancelOrderParams { orderHash :: TxOutRef }
     deriving (Show, Generic)
     deriving newtype (ToSchema)
     deriving anyclass (FromJSON, ToJSON)
