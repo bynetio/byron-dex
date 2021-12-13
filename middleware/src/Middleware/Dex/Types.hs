@@ -78,7 +78,6 @@ coinFromAssetClass = uncurry Coin . LV.unAssetClass
 assetClassFromCoin :: Coin -> AssetClass
 assetClassFromCoin (Coin cs tn) = LV.assetClass cs tn
 
--- TODO add field for the size of the set
 data CoinSet
   = CoinSet
   { lockedCoin   :: Coin,
@@ -92,7 +91,6 @@ convertCoinSetToPab (CoinSet lc ec) = AssetSet (assetClassFromCoin lc) (assetCla
 mkCoinSet :: AssetSet -> CoinSet
 mkCoinSet (AssetSet lc ec) = CoinSet (coinFromAssetClass lc) (coinFromAssetClass ec)
 
--- FIXME implement ToJSON, FromJSON instances for Percentage
 newtype Percentage = Percentage Double
     deriving (Show, Generic, Eq)
     deriving newtype (ToSchema)
@@ -177,13 +175,11 @@ convertPoolToMid (PriceChangeParams a b (Nat p)) =
 
 newtype CancelOrderParams = CancelOrderParams { orderHash :: TxOutRef }
     deriving (Show, Generic)
-    deriving newtype (ToSchema)
-    deriving anyclass (FromJSON, ToJSON)
+    deriving anyclass (ToSchema, FromJSON, ToJSON)
 
 newtype PerformRandomParams = PerformRandomParams { unPerformRandomParams :: Integer }
     deriving (Show, Generic)
-    deriving newtype (ToSchema)
-    deriving anyclass (FromJSON, ToJSON)
+    deriving anyclass (ToSchema, FromJSON, ToJSON)
 
 -- VIEWS
 
@@ -204,7 +200,6 @@ data OrderView = OrderView
     orderType    :: Text
   }
   deriving (Generic, Show, ToSchema, ToJSON)
-
 
 dexOrder :: OrderInfo -> OrderView
 dexOrder
