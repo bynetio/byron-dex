@@ -27,7 +27,7 @@ module Dex.Types
 import           Data.Aeson          (FromJSON (parseJSON), ToJSON)
 import           Data.Text           (Text)
 import           Dex.WalletHistory
-import           Ledger              (AssetClass, PubKeyHash, TxOutRef)
+import           Ledger              (AssetClass, PaymentPubKeyHash, TxOutRef)
 import           Ledger.Value        (Value, assetClassValue)
 import           Playground.Contract (Generic, ToSchema)
 import qualified PlutusTx
@@ -61,6 +61,7 @@ newtype Nat
     , ToSchema
     )
 
+{-# INLINABLE fromNat #-}
 fromNat :: Nat -> Integer
 fromNat (Nat x) = x
 
@@ -149,7 +150,7 @@ data SellOrderInfo
       { lockedCoin     :: AssetClass
       , expectedCoin   :: AssetClass
       , expectedAmount :: Nat
-      , ownerHash      :: PubKeyHash
+      , ownerHash      :: PaymentPubKeyHash
       , orderId        :: BuiltinByteString
       }
   deriving (FromJSON, Generic, Show, ToJSON)
@@ -165,7 +166,7 @@ PlutusTx.makeLift ''CancelOrderParams
 
 data PayoutInfo
   = PayoutInfo
-      { ownerHash :: PubKeyHash
+      { ownerHash :: PaymentPubKeyHash
       , orderId   :: BuiltinByteString
       }
   deriving (FromJSON, Generic, Show, ToJSON)
@@ -178,7 +179,7 @@ data LiquidityOrderInfo
       , expectedCoin   :: AssetClass
       , expectedAmount :: Nat
       , swapFee        :: (Nat, Nat)
-      , ownerHash      :: PubKeyHash
+      , ownerHash      :: PaymentPubKeyHash
       , orderId        :: BuiltinByteString
       }
   deriving (FromJSON, Generic, Show, ToJSON)
@@ -247,7 +248,7 @@ data OrderInfo
       , expectedCoin   :: AssetClass
       , expectedAmount :: Nat
       , lockedAmount   :: Nat
-      , ownerHash      :: PubKeyHash
+      , ownerHash      :: PaymentPubKeyHash
       , orderType      :: Text
       }
   deriving (FromJSON, Generic, Show, ToJSON)

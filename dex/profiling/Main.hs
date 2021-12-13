@@ -65,7 +65,7 @@ scriptsConfig3 = ScriptsConfig "./" (Transactions (C.Testnet $ C.NetworkMagic 0)
 
 main :: IO ()
 main = do
-  r <- writeScriptsTo scriptsConfig1 "sell-order" dexTrace emulatorCfg
+  r <- writeScriptsTo scriptsConfig2 "sell-order" dexTrace emulatorCfg
   print r
   return ()
 

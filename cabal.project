@@ -25,7 +25,7 @@ source-repository-package
     plutus-pab
     plutus-use-cases
     quickcheck-dynamic
-  tag: 804a84bd15074902cce9096ef98721675566c003
+  tag: 46e831e49287c3a04f83497b9dd9e70718092cde
 
 package cardano-crypto-praos
   flags: -external-libsodium-vrf
@@ -85,6 +85,16 @@ package cardano-wallet-launcher
   optimization: False
 package cardano-wallet-core-integration
   optimization: False
+
+
+source-repository-package
+  type: git
+  location: https://github.com/Liqwid-Labs/plutus-extra.git
+  tag: 40178a3c10f8a4089f319430ed62fb1ada2c6e0a
+  subdir:
+    plutus-size-check
+
+
 -- Copied from plutus-core
 source-repository-package
   type: git

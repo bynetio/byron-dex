@@ -95,17 +95,17 @@ type DexSchema =
 
 getConstraintsForSwap :: ChainIndexTxOut -> TxOutRef  -> Order -> (TxConstraints DexAction DexDatum, Constraints.ScriptLookups Dex)
 getConstraintsForSwap txOut txOutRef order@(SellOrder SellOrderInfo {..}) =
-  let tx = Constraints.mustPayToTheScript
-            (Payout PayoutInfo {..})
+  let tx = Constraints.mustPayToOtherScript (Scripts.validatorHash dexInstance)
+            (Datum $ PlutusTx.toBuiltinData $ Payout PayoutInfo {..})
             (singleton expectedCoin expectedAmount)
         <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData (Payout PayoutInfo {..}))
         <> Constraints.mustIncludeDatum (Datum $ PlutusTx.toBuiltinData (Order order))
         <> Constraints.mustSpendScriptOutput txOutRef (Redeemer $ PlutusTx.toBuiltinData Swap)
 
       lookups =
-        Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Payout PayoutInfo {..}))
-        <> Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Order order))
-        <> Constraints.unspentOutputs (Map.singleton txOutRef txOut)
+        --Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Payout PayoutInfo {..}))
+        -- <> Constraints.otherData (Datum $ PlutusTx.toBuiltinData (Order order))
+        Constraints.unspentOutputs (Map.singleton txOutRef txOut)
 
   in (tx,lookups)
 
@@ -132,7 +132,7 @@ uuidToBBS = stringToBuiltinByteString . UUID.toString
 
 createSellOrder :: SMGen -> SellOrderParams -> Contract DexState DexSchema Text UUID
 createSellOrder smgen SellOrderParams {..} = do
-  ownerHash <- ownPubKeyHash
+  ownerHash <- ownPaymentPubKeyHash
   let uuid = head $ randoms @UUID.UUID smgen
   let orderInfo = SellOrderInfo
                     { expectedCoin = expectedCoin
@@ -147,7 +147,7 @@ createSellOrder smgen SellOrderParams {..} = do
 
 createLiquidityOrder :: SMGen -> LiquidityOrderParams -> Contract DexState DexSchema Text UUID
 createLiquidityOrder smgen LiquidityOrderParams {..} = do
-  ownerHash <- ownPubKeyHash
+  ownerHash <- ownPaymentPubKeyHash
   let uuid = head $ randoms @UUID.UUID smgen
   let orderInfo =
         LiquidityOrderInfo
@@ -176,7 +176,7 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
 
   let lpPartsA = zipWith (curry $ bimap round round) partsA (coreB:virtualPartsB)
   let lpPartsB = zipWith (curry $ bimap round round) partsB (coreA:virtualPartsA)
-  ownerHash <- ownPubKeyHash
+  ownerHash <- ownPaymentPubKeyHash
   let (smgenA, smgenB) = splitSMGen smgen
 
   let uuidsA = randoms @UUID.UUID smgenA
@@ -210,7 +210,7 @@ createLiquidityPool smgen LiquidityPoolParams {..} = do
 
 perform :: Contract DexState DexSchema Text ()
 perform = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
@@ -220,8 +220,8 @@ perform = do
     throwError "No orders selected"
   let (orderTx, orderLookups) = foldl' (\(tx',lookups') (o, oref, order) -> let (tx'', lookups'') = getConstraintsForSwap o oref order in (tx' Prelude.<> tx'', lookups' Prelude.<> lookups'')) (Prelude.mempty, Prelude.mempty) filtered
 
-  let lookups = Constraints.typedValidatorLookups dexInstance
-          <> Constraints.ownPubKeyHash pkh
+  let lookups = -- Constraints.typedValidatorLookups dexInstance
+          Constraints.ownPaymentPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> orderLookups
       tx = Constraints.mustBeSignedBy pkh
@@ -233,7 +233,7 @@ perform = do
 -- function for testing only
 performNRandom :: SMGen -> Integer -> Contract DexState DexSchema Text ()
 performNRandom smgen n = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- mapM (\(oref, txOut) -> getDexDatum txOut >>= \d -> return (txOut, oref, d)) utxos
@@ -253,7 +253,7 @@ performNRandom smgen n = do
         in (tx' Prelude.<> tx'', lookups' Prelude.<> lookups'')) (Prelude.mempty, Prelude.mempty) selected
 
   let lookups = Constraints.typedValidatorLookups dexInstance
-          <> Constraints.ownPubKeyHash pkh
+          <> Constraints.ownPaymentPubKeyHash pkh
           <> Constraints.otherScript (Scripts.validatorScript dexInstance)
           <> orderLookups
       tx = Constraints.mustBeSignedBy pkh
@@ -265,14 +265,14 @@ performNRandom smgen n = do
 
 funds :: Contract w s Text [(AssetClass, Integer)]
 funds = do
-  pkh <- ownPubKeyHash
-  os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh)
+  pkh <- ownPaymentPubKeyHash
+  os <- Map.elems <$> utxosAt (pubKeyHashAddress pkh Nothing)
   let walletValue = getValue $ mconcat [view ciTxOutValue o | o <- os]
   return [(AssetClass (cs, tn),  a) | (cs, tns) <- AssocMap.toList walletValue, (tn, a) <- AssocMap.toList tns]
 
 myOrders :: Contract DexState DexSchema Text [OrderInfo]
 myOrders = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toOrderInfo utxos
@@ -316,7 +316,7 @@ toOrderInfo (orderHash, o) = do
 
 cancel :: CancelOrderParams -> Contract DexState DexSchema Text ()
 cancel CancelOrderParams {..} = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos  <- Map.toList . Map.filterWithKey (\oref' _ -> oref' == orderHash) <$> utxosAt address
   hashes <- mapM (toOwnerHash . snd) utxos
@@ -325,16 +325,18 @@ cancel CancelOrderParams {..} = do
 
   let lookups =
         Constraints.typedValidatorLookups dexInstance
-        <> Constraints.ownPubKeyHash pkh
+        <> Constraints.ownPaymentPubKeyHash pkh
         <> Constraints.otherScript (Scripts.validatorScript dexInstance)
         <> Constraints.unspentOutputs (Map.fromList utxos)
 
-      tx     = Constraints.mustSpendScriptOutput orderHash $ Redeemer $ PlutusTx.toBuiltinData CancelOrder
+
+      tx     = mconcat (map (\(h,_) -> Constraints.mustSpendScriptOutput h (Redeemer $ PlutusTx.toBuiltinData CancelOrder)) utxos)
+            <> Constraints.mustBeSignedBy pkh
 
   mkTxConstraints lookups tx >>= void . submitUnbalancedTx . Constraints.adjustUnbalancedTx
 
   where
-    toOwnerHash :: ChainIndexTxOut -> Contract w s Text PubKeyHash
+    toOwnerHash :: ChainIndexTxOut -> Contract w s Text PaymentPubKeyHash
     toOwnerHash o = do
       order <- getOrderDatum o
       case order of
@@ -343,14 +345,14 @@ cancel CancelOrderParams {..} = do
 
 collectFunds :: Contract DexState DexSchema Text ()
 collectFunds = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   payouts <- catMaybes <$> mapM toPayoutInfo utxos
   let ownedPayouts = filter (\(_, PayoutInfo{..}) -> ownerHash == pkh) payouts
   let lookups =
         Constraints.typedValidatorLookups dexInstance
-        <> Constraints.ownPubKeyHash pkh
+        <> Constraints.ownPaymentPubKeyHash pkh
         <> Constraints.otherScript (Scripts.validatorScript dexInstance)
         <> Constraints.unspentOutputs (Map.fromList $ filter (\(txOutRef, _) -> any ((txOutRef ==) . fst) ownedPayouts) utxos)
   let tx = mconcat $ map (\(txOutRef, _) ->
@@ -365,7 +367,7 @@ collectFunds = do
 
 myPayouts :: Contract DexState DexSchema Text PayoutSummary
 myPayouts = do
-  pkh <- ownPubKeyHash
+  pkh <- ownPaymentPubKeyHash
   let address = Ledger.scriptAddress $ Scripts.validatorScript dexInstance
   utxos <- Map.toList <$> utxosAt address
   mapped <- catMaybes <$> mapM toPayoutInfo utxos
