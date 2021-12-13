@@ -145,3 +145,7 @@ test-suite dex-test
                 , tasty-hunit
                 , tasty-quickcheck
                 , text -any
+                , plutus-size-check
+                , plutus-ledger-api
+                , plutus-tx
+                , plutus-tx-plugin

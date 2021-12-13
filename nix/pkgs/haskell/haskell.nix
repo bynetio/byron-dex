@@ -10,8 +10,10 @@ let
     inherit compiler-nix-name;
 
     sha256map = {
-      "https://github.com/input-output-hk/plutus-apps.git"."804a84bd15074902cce9096ef98721675566c003" =
-        "11cppsp6h38xgxkqcx3j4lcv41my3asgfzfdyklr5y9gsfpakb5y";
+      "https://github.com/Liqwid-Labs/plutus-extra.git"."40178a3c10f8a4089f319430ed62fb1ada2c6e0a" =
+        "1s188f418z1bgvjwa4xhp01pzjxfgkm5pj7jfrhg0jqwdv45m9w0";
+      "https://github.com/input-output-hk/plutus-apps.git"."46e831e49287c3a04f83497b9dd9e70718092cde" =
+        "0ai1245zblqf2mpdihmg3wa8k8w9bsgxvidbcybvrvydifprhf7i";
 
       "https://github.com/Quid2/flat.git"."ee59880f47ab835dbd73bea0847dab7869fc20d8" = "1lrzknw765pz2j97nvv9ip3l1mcpf2zr4n56hwlz0rk7wq7ls4cm";
       "https://github.com/input-output-hk/purescript-bridge.git"."366fc70b341e2633f3ad0158a577d52e1cd2b138" = "18j0rysfccbmfpbw2d1rsjkpd5h84alpsn6b5rwzdxw9h5vqi9m5";
@@ -31,6 +33,7 @@ let
       "https://github.com/input-output-hk/cardano-addresses"."d2f86caa085402a953920c6714a0de6a50b655ec" = "0p6jbnd7ky2yf7bwb1350k8880py8dgqg39k49q02a6ij4ld01ay";
       "https://github.com/input-output-hk/plutus"."2721c59fd2302b75c4138456c29fd5b509e8340a" = "02g8pzldyfl4pm8sy22yd3l2fr3zpyhwkvv9x3h9lsf6lfx5wi7k";
       "https://github.com/j-mueller/cardano-wallet"."6be73ab852c0592713dfe78218856d4a8a0ee69e" = "0rx5hvmbdv5dwb4qq39vyhisj0v75j21jbiivn3s3q9za6m6x1p4";
+
 
     };
 
