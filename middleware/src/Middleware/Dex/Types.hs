@@ -26,7 +26,8 @@ import           Dex.Types                  (AssetSet (AssetSet),
                                              SellOrderParams (..), fromNat)
 import           GHC.Generics               (Generic)
 import           Ledger                     (AssetClass, CurrencySymbol,
-                                             TokenName, TxOutRef)
+                                             TokenName, TxId (..),
+                                             TxOutRef (..))
 import qualified Ledger.Value               as LV (assetClass, currencySymbol,
                                                    tokenName, unAssetClass,
                                                    unCurrencySymbol,
@@ -132,14 +133,9 @@ data CreateLiquidityPoolParams = CreateLiquidityPoolParams
   }
   deriving (Generic, FromJSON, ToJSON, Show, ToSchema)
 
--- FIXME use JSON codecs instead of explicit type conversion
 convertLiquidityPoolToPab :: CreateLiquidityPoolParams -> LiquidityPoolParams
 convertLiquidityPoolToPab (CreateLiquidityPoolParams ca cb am ps (Percentage f) (Percentage e)) =
   LiquidityPoolParams (assetClassFromCoin ca) (assetClassFromCoin cb) (Nat am) (convertPoolToPab ps) (pairFromDouble f) (pairFromDouble e)
-
-convertLiquidityPoolToMid :: LiquidityPoolParams -> CreateLiquidityPoolParams
-convertLiquidityPoolToMid (LiquidityPoolParams ca cb (Nat a) ps f e) =
-  CreateLiquidityPoolParams (coinFromAssetClass ca) (coinFromAssetClass cb) a (convertPoolToMid ps) (mkPercentage f) (mkPercentage e)
 
 data CreateLiquidityOrderParams = CreateLiquidityOrderParams
   { lockedCoin     :: Coin,
@@ -154,10 +150,6 @@ convertLiquidityOrderToPab :: CreateLiquidityOrderParams -> LiquidityOrderParams
 convertLiquidityOrderToPab (CreateLiquidityOrderParams lc ec la ea (Percentage d)) =
   LiquidityOrderParams (assetClassFromCoin lc) (assetClassFromCoin ec) (Nat la) (Nat ea) (pairFromDouble d)
 
-convertLiqudityOrderToMid :: LiquidityOrderParams -> CreateLiquidityOrderParams
-convertLiqudityOrderToMid (LiquidityOrderParams lc ec (Nat la) (Nat ea) f) =
-  CreateLiquidityOrderParams (coinFromAssetClass lc) (coinFromAssetClass ec) la ea (mkPercentage f)
-
 data CreatePoolPartsParams = CreatePriceChangeParams
   { coinAPriceChange :: Percentage,
     coinBPriceChange :: Percentage,
@@ -169,13 +161,12 @@ convertPoolToPab :: CreatePoolPartsParams -> PoolPartsParams
 convertPoolToPab (CreatePriceChangeParams (Percentage a) (Percentage b) np) =
   PriceChangeParams (pairFromDouble a) (pairFromDouble b) (Nat np)
 
-convertPoolToMid :: PoolPartsParams -> CreatePoolPartsParams
-convertPoolToMid (PriceChangeParams a b (Nat p)) =
-  CreatePriceChangeParams (mkPercentage a) (mkPercentage b) p
-
-newtype CancelOrderParams = CancelOrderParams { orderHash :: TxOutRef }
+newtype CreateCancelOrderParams = CreateCancelOrderParams { orderHash :: OrderHash }
     deriving (Show, Generic)
     deriving anyclass (ToSchema, FromJSON, ToJSON)
+
+convertCancelOrderToPab :: CreateCancelOrderParams -> CancelOrderParams
+convertCancelOrderToPab (CreateCancelOrderParams oh) = CancelOrderParams (mkTxOutRef oh)
 
 newtype PerformRandomParams = PerformRandomParams { unPerformRandomParams :: Integer }
     deriving (Show, Generic)
@@ -193,8 +184,20 @@ data FundView = FundView
 mkFundView :: AssetClass -> Integer -> FundView
 mkFundView = FundView . coinFromAssetClass
 
+data OrderHash = OrderHash
+  { orderId  :: BuiltinByteString,
+    orderIdx :: Integer
+  }
+  deriving (Show, Generic, FromJSON, ToJSON, ToSchema)
+
+mkOrderHash :: TxOutRef -> OrderHash
+mkOrderHash (TxOutRef ti tix) = OrderHash (getTxId ti) tix
+
+mkTxOutRef :: OrderHash -> TxOutRef
+mkTxOutRef (OrderHash ti tix) = TxOutRef (TxId ti) tix
+
 data OrderView = OrderView
-  { orderHash    :: TxOutRef,
+  { orderHash    :: OrderHash,
     lockedCoin   :: FundView,
     expectedCoin :: FundView,
     orderType    :: Text
@@ -211,7 +214,7 @@ dexOrder
       expectedAmount = ea,
       orderType = ot
     } =
-    OrderView oh (fv lc la) (fv ec ea) ot
+    OrderView (mkOrderHash oh) (fv lc la) (fv ec ea) ot
     where
       fv coin amount = mkFundView coin (fromNat amount)
 
