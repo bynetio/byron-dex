@@ -1,15 +1,20 @@
 module Middleware.API where
 
-import Middleware.Dex.Types       (ActivateForm, CancelOrderParams (CancelOrderParams), CoinSet (CoinSet),
-                                   CreateLiquidityOrderParams (CreateLiquidityOrderParams),
-                                   CreateLiquidityPoolParams (CreateLiquidityPoolParams),
-                                   CreateSellOrderParams, FundView (FundView), OrderView (..),
-                                   PayoutView (PayoutView), PerformRandomParams (PerformRandomParams),
-                                   WalletId)
-import Middleware.PabClient.Types (ContractInstanceId)
-import Servant                    (Capture, Description, Get, JSON, NoContent, Post, PostAccepted,
-                                   PostCreated, ReqBody, (:<|>), (:>))
-import Servant.Swagger.UI         (SwaggerSchemaUI)
+import           Middleware.Dex.Types       (ActivateForm, CoinSet (CoinSet),
+                                             CreateCancelOrderParams (CreateCancelOrderParams),
+                                             CreateLiquidityOrderParams (CreateLiquidityOrderParams),
+                                             CreateLiquidityPoolParams (CreateLiquidityPoolParams),
+                                             CreateSellOrderParams,
+                                             FundView (FundView),
+                                             OrderView (..),
+                                             PayoutView (PayoutView),
+                                             PerformRandomParams (PerformRandomParams),
+                                             WalletId)
+import           Middleware.PabClient.Types (ContractInstanceId)
+import           Servant                    (Capture, Description, Get, JSON,
+                                             NoContent, Post, PostAccepted,
+                                             PostCreated, ReqBody, (:<|>), (:>))
+import           Servant.Swagger.UI         (SwaggerSchemaUI)
 
 type API = "activate"
       :> Description "Activate contract for wallet."
@@ -61,7 +66,7 @@ type API = "activate"
       :> PostAccepted '[JSON] ()
     :<|> Capture "contract-instance-id" ContractInstanceId :> "cancel"
       :> Description "Cancel order."
-      :> ReqBody '[JSON] CancelOrderParams
+      :> ReqBody '[JSON] CreateCancelOrderParams
       :> PostAccepted '[JSON] ()
 
 type SwaggerAPI = SwaggerSchemaUI "swagger-ui" "swagger.json"

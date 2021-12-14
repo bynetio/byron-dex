@@ -2,24 +2,31 @@
 
 module Middleware.Dex where
 
-import Colog.Polysemy.Formatting         (logInfo)
-import Colog.Polysemy.Formatting.WithLog (WithLog)
-import Dex.Types                         (PayoutSummary (PayoutSummary))
-import Formatting
-import Ledger                            (AssetClass)
-import Ledger.Value                      (assetClass, unAssetClass)
-import Middleware.API                    (API)
-import Middleware.Capability.Error
-import Middleware.Dex.Types              hiding (Error)
-import Middleware.PabClient              (ManagePabClient, activateWallet, cancelOrder, collectFunds,
-                                          createLiquidityOrderInPab, createLiquidityPoolInPab,
-                                          createSellOrder, getAllOrders, getFunds, getMyOrders, getMyPayouts,
-                                          getOrdersBySet, getSets, performInPab, performNRandomInPab, stop)
-import Middleware.PabClient.Types        hiding (Error)
-import Polysemy
-import Servant
-import Servant.Polysemy.Server
-import Servant.Server                    (ServerT)
+import           Colog.Polysemy.Formatting         (logInfo)
+import           Colog.Polysemy.Formatting.WithLog (WithLog)
+import           Dex.Types                         (PayoutSummary (PayoutSummary))
+import           Formatting
+import           Ledger                            (AssetClass)
+import           Ledger.Value                      (assetClass, unAssetClass)
+import           Middleware.API                    (API)
+import           Middleware.Capability.Error
+import           Middleware.Dex.Types              hiding (Error)
+import           Middleware.PabClient              (ManagePabClient,
+                                                    activateWallet, cancelOrder,
+                                                    collectFunds,
+                                                    createLiquidityOrderInPab,
+                                                    createLiquidityPoolInPab,
+                                                    createSellOrder,
+                                                    getAllOrders, getFunds,
+                                                    getMyOrders, getMyPayouts,
+                                                    getOrdersBySet, getSets,
+                                                    performInPab,
+                                                    performNRandomInPab, stop)
+import           Middleware.PabClient.Types        hiding (Error)
+import           Polysemy
+import           Servant
+import           Servant.Polysemy.Server
+import           Servant.Server                    (ServerT)
 
 data Dex r a where
   ActivateContract     :: ActivateForm -> Dex r ContractInstanceId
@@ -36,7 +43,7 @@ data Dex r a where
   Perform              :: ContractInstanceId -> Dex r ()
   PerformNRandom       :: ContractInstanceId -> PerformRandomParams -> Dex r ()
   StopContract         :: ContractInstanceId -> Dex r ()
-  Cancel               :: ContractInstanceId -> CancelOrderParams -> Dex r ()
+  Cancel               :: ContractInstanceId -> CreateCancelOrderParams -> Dex r ()
 
 makeSem ''Dex
 
